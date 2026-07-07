@@ -1,0 +1,49 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.1.0'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+    // 웹 (REST API) — 내장 톰캣 서버 + 컨트롤러 기능
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // JPA — DB 테이블을 자바 객체로 다루게 해주는 ORM
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    // 입력값 검증 — @NotNull, @Email, @Size 등
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // API 문서 자동 생성 (Swagger UI) — 버전은 최신으로 확인 권장
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'
+
+    // PostgreSQL 드라이버 (실행 시점에만 필요)
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // Lombok — 보일러플레이트(getter/생성자 등) 자동 생성
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // DevTools — 코드 저장하면 서버 자동 재시작
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // 테스트 (JUnit5, Mockito, AssertJ) — 보통 처음부터 포함돼 있음
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}

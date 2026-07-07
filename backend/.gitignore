@@ -1,0 +1,53 @@
+HELP.md
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+# 빌드 결과물
+build/
+!gradle/wrapper/gradle-wrapper.jar
+.gradle/
+
+# IDE 설정
+.idea/
+.vscode/
+*.iml
+
+# 로그
+*.log
+
+# 민감 정보가 담긴 설정 (아래 3번 설명 참고)
+application-secret.yml
