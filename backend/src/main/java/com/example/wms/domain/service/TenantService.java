@@ -5,6 +5,9 @@ import com.example.wms.domain.dto.TenantResponse;
 import com.example.wms.domain.entity.Tenant;
 import com.example.wms.domain.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,5 +41,23 @@ public class TenantService {
 
         // Entity → 응답 DTO 변환 후 반환
         return new TenantResponse(saved);
+    }
+
+    // 전체 창고업체 조회
+    @Transactional(readOnly = true)
+    public List<TenantResponse> getAllTenants() {
+        return tenantRepository.findAll()
+                .stream()
+                .map(TenantResponse::new)
+                .toList();
+    }
+
+    // id로 특정 창고업체 조회
+    @Transactional(readOnly = true)
+    public TenantResponse getTenant(Long id) {
+        Tenant tenant = tenantRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 업체입니다. id=" + id));
+
+        return new TenantResponse(tenant);
     }
 }

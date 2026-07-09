@@ -5,6 +5,9 @@ import com.example.wms.domain.dto.TenantResponse;
 import com.example.wms.domain.service.TenantService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,5 +26,19 @@ public class TenantController {
 
         TenantResponse response = tenantService.createTenant(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    // 전체 창고업체 조회 (GET /api/tenants)
+    @GetMapping
+    public ResponseEntity<List<TenantResponse>> getAllTenants() {
+        List<TenantResponse> responses = tenantService.getAllTenants();
+        return ResponseEntity.ok(responses);
+    }
+
+    // id로 특정 창고업체 조회 (GET /api/tenants/1)
+    @GetMapping("/{id}")
+    public ResponseEntity<TenantResponse> getTenant(@PathVariable Long id) {
+        TenantResponse response = tenantService.getTenant(id);
+        return ResponseEntity.ok(response);
     }
 }
