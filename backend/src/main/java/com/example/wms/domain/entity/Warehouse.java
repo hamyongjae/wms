@@ -39,4 +39,11 @@ public class Warehouse {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    public Warehouse(String name, String address, String phone, Tenant tenant) {
+        this.name = name;
+        this.address = address;
+        this.phone = phone;
+        this.tenant = tenant;
+    }
 }
