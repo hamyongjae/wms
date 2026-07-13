@@ -1,16 +1,17 @@
 package com.example.wms.domain.service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.example.wms.domain.dto.TenantCreateRequest;
 import com.example.wms.domain.dto.TenantResponse;
 import com.example.wms.domain.dto.TenantUpdateRequest;
 import com.example.wms.domain.entity.Tenant;
 import com.example.wms.domain.repository.TenantRepository;
+
 import lombok.RequiredArgsConstructor;
-
-import java.util.List;
-
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -44,13 +45,11 @@ public class TenantService {
         return new TenantResponse(saved);
     }
 
-    // 전체 창고업체 조회
+    // 전체 창고업체 조회 (페이징)
     @Transactional(readOnly = true)
-    public List<TenantResponse> getAllTenants() {
-        return tenantRepository.findAll()
-                .stream()
-                .map(TenantResponse::new)
-                .toList();
+    public Page<TenantResponse> getAllTenants(Pageable pageable) {
+        return tenantRepository.findAll(pageable)
+                .map(TenantResponse::new);
     }
 
     // id로 특정 창고업체 조회
