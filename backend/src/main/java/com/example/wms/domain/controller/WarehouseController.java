@@ -2,6 +2,7 @@ package com.example.wms.domain.controller;
 
 import com.example.wms.domain.dto.WarehouseCreateRequest;
 import com.example.wms.domain.dto.WarehouseResponse;
+import com.example.wms.domain.dto.WarehouseUpdateRequest;
 import com.example.wms.domain.service.WarehouseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,5 +35,22 @@ public class WarehouseController {
 
         List<WarehouseResponse> responses = warehouseService.getWarehousesByTenant(tenantId);
         return ResponseEntity.ok(responses);
+    }
+
+    // 창고 수정 (PUT /api/warehouses/1)
+    @PutMapping("/{id}")
+    public ResponseEntity<WarehouseResponse> updateWarehouse(
+            @PathVariable Long id,
+            @Valid @RequestBody WarehouseUpdateRequest request) {
+
+        WarehouseResponse response = warehouseService.updateWarehouse(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    // 창고 삭제 (DELETE /api/warehouses/1)
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteWarehouse(@PathVariable Long id) {
+        warehouseService.deleteWarehouse(id);
+        return ResponseEntity.noContent().build();
     }
 }

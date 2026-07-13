@@ -19,18 +19,18 @@ public class Warehouse {
     private Long id;
 
     @Column(name = "name", nullable = false, length = 100)
-    private String name;                    // 창고명 (예: 일산 창고)
+    private String name; // 창고명 (예: 일산 창고)
 
     @Column(name = "address", length = 255)
-    private String address;                 // 창고 주소
+    private String address; // 창고 주소
 
     @Column(name = "phone", length = 20)
-    private String phone;                   // 창고 연락처
+    private String phone; // 창고 연락처
 
     // --- 여기가 핵심: Tenant와의 관계 ---
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
-    private Tenant tenant;                   // 이 창고가 소속된 업체
+    private Tenant tenant; // 이 창고가 소속된 업체
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -45,5 +45,11 @@ public class Warehouse {
         this.address = address;
         this.phone = phone;
         this.tenant = tenant;
+    }
+
+    public void updateInfo(String name, String address, String phone) {
+        this.name = name;
+        this.address = address;
+        this.phone = phone;
     }
 }

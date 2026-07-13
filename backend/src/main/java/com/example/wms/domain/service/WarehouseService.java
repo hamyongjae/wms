@@ -1,7 +1,10 @@
 package com.example.wms.domain.service;
 
+import com.example.wms.domain.dto.TenantResponse;
+import com.example.wms.domain.dto.TenantUpdateRequest;
 import com.example.wms.domain.dto.WarehouseCreateRequest;
 import com.example.wms.domain.dto.WarehouseResponse;
+import com.example.wms.domain.dto.WarehouseUpdateRequest;
 import com.example.wms.domain.entity.Tenant;
 import com.example.wms.domain.entity.Warehouse;
 import com.example.wms.domain.repository.TenantRepository;
@@ -47,5 +50,29 @@ public class WarehouseService {
                 .stream()
                 .map(WarehouseResponse::new)
                 .toList();
+    }
+
+    // 창고 정보 수정
+    @Transactional
+    public WarehouseResponse updateWarehouse(Long id, WarehouseUpdateRequest request) {
+        Warehouse warehouse = warehouseRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 창고입니다. id=" + id));
+
+        warehouse.updateInfo(
+                request.getName(),
+                request.getAddress(),
+                request.getPhone()
+        );
+
+        return new WarehouseResponse(warehouse);
+    }
+
+    // 창고 삭제
+    @Transactional
+    public void deleteWarehouse(Long id) {
+        Warehouse warehouse = warehouseRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 창고입니다. id=" + id));
+
+        warehouseRepository.delete(warehouse);
     }
 }
