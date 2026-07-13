@@ -45,11 +45,21 @@ public class TenantService {
         return new TenantResponse(saved);
     }
 
-    // 전체 창고업체 조회 (페이징)
+    // 전체 조회 + 이름 검색 (페이징)
     @Transactional(readOnly = true)
-    public Page<TenantResponse> getAllTenants(Pageable pageable) {
-        return tenantRepository.findAll(pageable)
-                .map(TenantResponse::new);
+    public Page<TenantResponse> getAllTenants(String name, Pageable pageable) {
+
+        Page<Tenant> tenants;
+
+        if (name == null || name.isBlank()) {
+            // 검색어가 없으면 전체 조회
+            tenants = tenantRepository.findAll(pageable);
+        } else {
+            // 검색어가 있으면 이름으로 검색
+            tenants = tenantRepository.findByNameContaining(name, pageable);
+        }
+
+        return tenants.map(TenantResponse::new);
     }
 
     // id로 특정 창고업체 조회
