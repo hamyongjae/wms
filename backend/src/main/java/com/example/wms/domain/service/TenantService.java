@@ -2,6 +2,7 @@ package com.example.wms.domain.service;
 
 import com.example.wms.domain.dto.TenantCreateRequest;
 import com.example.wms.domain.dto.TenantResponse;
+import com.example.wms.domain.dto.TenantUpdateRequest;
 import com.example.wms.domain.entity.Tenant;
 import com.example.wms.domain.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
@@ -59,5 +60,31 @@ public class TenantService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 업체입니다. id=" + id));
 
         return new TenantResponse(tenant);
+    }
+
+    // 업체 정보 수정
+    @Transactional
+    public TenantResponse updateTenant(Long id, TenantUpdateRequest request) {
+        Tenant tenant = tenantRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 업체입니다. id=" + id));
+
+        tenant.updateInfo(
+                request.getName(),
+                request.getCeoName(),
+                request.getPhone(),
+                request.getEmail(),
+                request.getAddress()
+        );
+
+        return new TenantResponse(tenant);
+    }
+
+    // 업체 삭제
+    @Transactional
+    public void deleteTenant(Long id) {
+        Tenant tenant = tenantRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 업체입니다. id=" + id));
+
+        tenantRepository.delete(tenant);
     }
 }

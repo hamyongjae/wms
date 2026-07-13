@@ -63,4 +63,14 @@ public class Tenant {
         this.email = email;
         this.address = address;
     }
+
+    // 정보 수정 (사업자번호는 변경 불가)
+    public void updateInfo(String name, String ceoName, String phone,
+                           String email, String address) {
+        this.name = name;
+        this.ceoName = ceoName;
+        this.phone = phone;
+        this.email = email;
+        this.address = address;
+    }
 }

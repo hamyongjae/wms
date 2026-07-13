@@ -2,6 +2,7 @@ package com.example.wms.domain.controller;
 
 import com.example.wms.domain.dto.TenantCreateRequest;
 import com.example.wms.domain.dto.TenantResponse;
+import com.example.wms.domain.dto.TenantUpdateRequest;
 import com.example.wms.domain.service.TenantService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,5 +41,22 @@ public class TenantController {
     public ResponseEntity<TenantResponse> getTenant(@PathVariable Long id) {
         TenantResponse response = tenantService.getTenant(id);
         return ResponseEntity.ok(response);
+    }
+
+    // 업체 수정 (PUT /api/tenants/1)
+    @PutMapping("/{id}")
+    public ResponseEntity<TenantResponse> updateTenant(
+            @PathVariable Long id,
+            @Valid @RequestBody TenantUpdateRequest request) {
+
+        TenantResponse response = tenantService.updateTenant(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    // 업체 삭제 (DELETE /api/tenants/1)
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteTenant(@PathVariable Long id) {
+        tenantService.deleteTenant(id);
+        return ResponseEntity.noContent().build();
     }
 }
