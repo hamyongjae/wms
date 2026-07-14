@@ -21,6 +21,14 @@ dependencies {
     // 웹 (REST API) — 내장 톰캣 서버 + 컨트롤러 기능
     implementation 'org.springframework.boot:spring-boot-starter-web'
 
+    // 보안 — 인증/인가, 비밀번호 암호화(BCrypt), 필터 체인
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // JWT — 토큰 발급/검증 (jjwt)
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
     // JPA — DB 테이블을 자바 객체로 다루게 해주는 ORM
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
@@ -42,6 +50,9 @@ dependencies {
 
     // 테스트 (JUnit5, Mockito, AssertJ) — 보통 처음부터 포함돼 있음
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // 보안 테스트 유틸 (@WithMockUser 등)
+    testImplementation 'org.springframework.security:spring-security-test'
 }
 
 tasks.named('test') {
