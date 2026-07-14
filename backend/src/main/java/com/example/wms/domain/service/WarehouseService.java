@@ -1,7 +1,5 @@
 package com.example.wms.domain.service;
 
-import com.example.wms.domain.dto.TenantResponse;
-import com.example.wms.domain.dto.TenantUpdateRequest;
 import com.example.wms.domain.dto.WarehouseCreateRequest;
 import com.example.wms.domain.dto.WarehouseResponse;
 import com.example.wms.domain.dto.WarehouseUpdateRequest;
