@@ -25,6 +25,9 @@ public interface BillingLedgerRepository extends JpaRepository<BillingLedger, Lo
 
     boolean existsByLedgerNo(String ledgerNo);
 
+    // [배치] 같은 계약·같은 청구기간 원장이 이미 있는지 (월 청구 중복 생성 방지)
+    boolean existsByStorageOrderIdAndBillingPeriodStart(Long storageOrderId, LocalDate billingPeriodStart);
+
     /**
      * [동시성] 수금/조정 같은 임계 구간용 비관적 쓰기 락.
      * 같은 원장을 두 트랜잭션이 동시에 갱신하면 한쪽은 대기 → 갱신 유실 방지.
@@ -34,7 +37,7 @@ public interface BillingLedgerRepository extends JpaRepository<BillingLedger, Lo
     @Query("select l from BillingLedger l where l.id = :id and l.tenant.id = :tenantId")
     Optional<BillingLedger> findForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
-    /** 미납(잔액 > 0) & 납기 경과 원장 — 미납 알림 대상 */
+    /** 미납(잔액 > 0) & 납기 경과 원장 — 특정 테넌트 대상 */
     @Query("""
             select l from BillingLedger l
             where l.tenant.id = :tenantId
@@ -45,4 +48,14 @@ public interface BillingLedgerRepository extends JpaRepository<BillingLedger, Lo
             """)
     List<BillingLedger> findOverdue(@Param("tenantId") Long tenantId,
                                     @Param("baseDate") LocalDate baseDate);
+
+    /** [배치] 전 테넌트 대상 미납 원장 — 스케줄러 미납 촉구용 */
+    @Query("""
+            select l from BillingLedger l
+            where l.balance > 0
+              and l.status in (com.example.wms.billing.entity.BillingStatus.ISSUED,
+                               com.example.wms.billing.entity.BillingStatus.PARTIALLY_PAID)
+              and l.dueDate < :baseDate
+            """)
+    List<BillingLedger> findAllOverdue(@Param("baseDate") LocalDate baseDate);
 }
