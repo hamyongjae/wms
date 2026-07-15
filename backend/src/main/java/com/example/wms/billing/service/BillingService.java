@@ -232,6 +232,18 @@ public class BillingService {
         return new BillingLedgerResponse(getLedgerOrThrow(ledgerId));
     }
 
+    /** 원장 상세 (수금·조정 이력 포함) */
+    @Transactional(readOnly = true)
+    public BillingLedgerDetailResponse getLedgerDetail(Long ledgerId) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        BillingLedger ledger = getLedgerOrThrow(ledgerId);   // 소유권 확인 포함
+        List<PaymentHistory> payments = paymentHistoryRepository
+                .findByBillingLedgerIdAndTenantIdOrderByPaidOnAsc(ledgerId, tenantId);
+        List<BillingAdjustment> adjustments = adjustmentRepository
+                .findByBillingLedgerIdAndTenantIdOrderByCreatedAtAsc(ledgerId, tenantId);
+        return new BillingLedgerDetailResponse(ledger, payments, adjustments);
+    }
+
     @Transactional(readOnly = true)
     public Page<BillingLedgerResponse> listLedgers(Pageable pageable) {
         Long tenantId = SecurityUtils.getCurrentTenantId();

@@ -57,6 +57,11 @@ public class BillingController {
         return ResponseEntity.ok(billingService.getLedger(id));
     }
 
+    @GetMapping("/{id}/detail")
+    public ResponseEntity<BillingLedgerDetailResponse> getLedgerDetail(@PathVariable Long id) {
+        return ResponseEntity.ok(billingService.getLedgerDetail(id));
+    }
+
     @GetMapping("/{id}/payments")
     public ResponseEntity<List<PaymentHistoryResponse>> getPayments(@PathVariable Long id) {
         return ResponseEntity.ok(billingService.getPayments(id));
