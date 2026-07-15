@@ -10,6 +10,8 @@ spring:
 
   # ===== JPA / Hibernate =====
   jpa:
+    # 컨트롤러/뷰 렌더링까지 영속성 컨텍스트를 열어두지 않는다(커넥션 조기 반납, 지연로딩 남용 방지)
+    open-in-view: false
     hibernate:
       ddl-auto: update        # 엔티티 기준으로 테이블 자동 생성/수정
     show-sql: true            # 실행되는 SQL 콘솔 출력
