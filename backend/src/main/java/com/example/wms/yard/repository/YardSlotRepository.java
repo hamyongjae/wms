@@ -35,4 +35,39 @@ public interface YardSlotRepository extends JpaRepository<YardSlot, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from YardSlot s where s.id = :id and s.tenant.id = :tenantId")
     Optional<YardSlot> findForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+    // ===================== 점유 현황(대시보드) =====================
+
+    // 창고 총 슬롯 수 / 점유 수
+    long countByTenantIdAndWarehouseId(Long tenantId, Long warehouseId);
+    long countByTenantIdAndWarehouseIdAndOccupied(Long tenantId, Long warehouseId, boolean occupied);
+
+    // 컨테이너 점유 현황(점유/공실 슬롯 목록, 페이징)
+    Page<YardSlot> findByTenantIdAndWarehouseIdAndOccupied(
+            Long tenantId, Long warehouseId, boolean occupied, Pageable pageable);
+
+    // 블록별 점유 집계 (특정 창고)
+    @Query("""
+            select s.block as block,
+                   count(s) as total,
+                   sum(case when s.occupied = true then 1 else 0 end) as occupied
+            from YardSlot s
+            where s.tenant.id = :tenantId and s.warehouse.id = :warehouseId
+            group by s.block
+            order by s.block
+            """)
+    List<BlockOccupancyView> aggregateByBlock(@Param("tenantId") Long tenantId,
+                                              @Param("warehouseId") Long warehouseId);
+
+    // 창고별 점유 집계 (테넌트 전체)
+    @Query("""
+            select s.warehouse.id as warehouseId,
+                   s.warehouse.name as warehouseName,
+                   count(s) as total,
+                   sum(case when s.occupied = true then 1 else 0 end) as occupied
+            from YardSlot s
+            where s.tenant.id = :tenantId
+            group by s.warehouse.id, s.warehouse.name
+            order by s.warehouse.id
+            """)
+    List<WarehouseOccupancyView> aggregateByWarehouse(@Param("tenantId") Long tenantId);
 }
