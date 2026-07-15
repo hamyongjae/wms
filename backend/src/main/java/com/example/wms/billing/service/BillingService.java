@@ -1,0 +1,341 @@
+package com.example.wms.billing.service;
+
+import com.example.wms.billing.dto.*;
+import com.example.wms.billing.entity.*;
+import com.example.wms.billing.notification.BillingNotification;
+import com.example.wms.billing.notification.BillingNotificationEvent;
+import com.example.wms.billing.notification.NotificationType;
+import com.example.wms.billing.repository.BillingAdjustmentRepository;
+import com.example.wms.billing.repository.BillingLedgerRepository;
+import com.example.wms.billing.repository.PaymentHistoryRepository;
+import com.example.wms.billing.support.MoneyPolicy;
+import com.example.wms.billing.support.ProrationCalculator;
+import com.example.wms.billing.support.ProrationCalculator.MidReleaseResult;
+import com.example.wms.customer.entity.Customer;
+import com.example.wms.order.entity.StorageOrder;
+import com.example.wms.tenant.entity.Tenant;
+import com.example.wms.order.repository.StorageOrderRepository;
+import com.example.wms.security.SecurityUtils;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+/**
+ * 청구/미수금 정산 서비스.
+ *
+ * [동시성] 잔액을 바꾸는 임계 구간(수금·조정·이월·정산)은
+ *   findForUpdate(비관적 쓰기 락)로 원장을 잠근 뒤 처리한다.
+ *   추가로 엔티티 @Version(낙관적 락)이 이중 방어한다.
+ * [격리] 모든 조회·검증은 SecurityUtils의 현재 tenantId로 강제된다.
+ * [오딧] 수금/조정은 불변 이력(PaymentHistory/BillingAdjustment)에 처리자와 함께 남는다.
+ * [알림] 발송은 직접 호출하지 않고 이벤트로 publish → 커밋 후 리스너가 실제 발송.
+ */
+@Service
+@RequiredArgsConstructor
+public class BillingService {
+
+    private final BillingLedgerRepository ledgerRepository;
+    private final PaymentHistoryRepository paymentHistoryRepository;
+    private final BillingAdjustmentRepository adjustmentRepository;
+    private final StorageOrderRepository storageOrderRepository;
+    private final ProrationCalculator prorationCalculator;
+    private final ApplicationEventPublisher eventPublisher;
+
+    // ===================== 원장 생성/발행 =====================
+
+    /** 청구 원장 생성 (일할 계산 반영, DRAFT 상태) */
+    @Transactional
+    public BillingLedgerResponse createLedger(LedgerCreateRequest req) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+
+        StorageOrder order = storageOrderRepository
+                .findByIdAndTenantId(req.getStorageOrderId(), tenantId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "존재하지 않는 계약입니다. id=" + req.getStorageOrderId()));
+
+        BigDecimal baseAmount = resolveBaseAmount(req, order);
+        BigDecimal carriedOverIn = MoneyPolicy.nvl(req.getCarriedOverIn());
+
+        Tenant tenant = order.getTenant();
+        Customer customer = order.getCustomer();
+
+        BillingLedger ledger = new BillingLedger(
+                tenant, order, customer, generateLedgerNo(),
+                req.getBillingType(), req.getSettlementType(),
+                req.getPeriodStart(), req.getPeriodEnd(),
+                baseAmount, carriedOverIn, req.getDueDate());
+
+        BillingLedger saved = ledgerRepository.save(ledger);
+        return new BillingLedgerResponse(saved);
+    }
+
+    /** 원장 발행 (DRAFT → ISSUED) */
+    @Transactional
+    public BillingLedgerResponse issueLedger(Long ledgerId, IssueRequest req) {
+        BillingLedger ledger = lockLedger(ledgerId);
+        ledger.issue(req != null ? req.getDueDate() : ledger.getDueDate());
+        return new BillingLedgerResponse(ledger);
+    }
+
+    // ===================== 수금 (부분 수금) =====================
+
+    /** 부분 수금 처리 (통장 입금 수동 기록) */
+    @Transactional
+    public BillingLedgerResponse recordPayment(Long ledgerId, PaymentRequest req) {
+        BillingLedger ledger = lockLedger(ledgerId);
+        Long userId = SecurityUtils.getCurrentUser().getUserId();
+
+        PaymentHistory payment = new PaymentHistory(
+                ledger.getTenant(), ledger, req.getAmount(), req.getMethod(),
+                req.getPaidOn(), req.getMemo(), userId);
+        paymentHistoryRepository.save(payment);
+
+        ledger.applyPayment(req.getAmount());
+
+        // 완납되면 영수 안내 발송(이벤트)
+        if (ledger.getStatus() == BillingStatus.PAID) {
+            publish(ledger, NotificationType.PAYMENT_RECEIPT);
+        }
+        return new BillingLedgerResponse(ledger);
+    }
+
+    /** 수금 취소/정정 (해당 수금 건 무효화 + 잔액 원복) */
+    @Transactional
+    public BillingLedgerResponse reversePayment(Long paymentId) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+
+        PaymentHistory payment = paymentHistoryRepository.findByIdAndTenantId(paymentId, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 수금 건입니다. id=" + paymentId));
+        if (payment.isReversed()) {
+            throw new IllegalArgumentException("이미 취소된 수금 건입니다.");
+        }
+
+        BillingLedger ledger = lockLedger(payment.getBillingLedger().getId());
+        ledger.reversePayment(payment.getAmount());
+        payment.markReversed();
+
+        return new BillingLedgerResponse(ledger);
+    }
+
+    // ===================== 조정/할인 =====================
+
+    /** 수동 조정/할인 (사유 필수, 오딧 이력 기록) */
+    @Transactional
+    public BillingLedgerResponse applyAdjustment(Long ledgerId, AdjustmentRequest req) {
+        BillingLedger ledger = lockLedger(ledgerId);
+        Long userId = SecurityUtils.getCurrentUser().getUserId();
+
+        BigDecimal signed = toSignedAmount(req.getType(), req.getAmount());
+
+        BillingAdjustment adjustment = new BillingAdjustment(
+                ledger.getTenant(), ledger, req.getType(), signed, req.getReason(), userId);
+        adjustmentRepository.save(adjustment);
+
+        ledger.applyAdjustment(signed);
+        return new BillingLedgerResponse(ledger);
+    }
+
+    // ===================== 미수금 차월 이월 =====================
+
+    /** 남은 미수금을 차월 원장으로 이월하고 현재 원장 마감 */
+    @Transactional
+    public BillingLedgerResponse carryOverToNext(Long ledgerId, CarryOverRequest req) {
+        BillingLedger current = lockLedger(ledgerId);
+
+        BigDecimal outstanding = current.outstandingBalance();
+        if (outstanding.signum() <= 0) {
+            throw new IllegalStateException("이월할 미수금이 없습니다. 잔액=" + current.getBalance());
+        }
+
+        StorageOrder order = current.getStorageOrder();
+        BigDecimal nextBase = resolveNextBaseAmount(req, current, order);
+
+        BillingLedger next = new BillingLedger(
+                current.getTenant(), order, current.getCustomer(), generateLedgerNo(),
+                current.getBillingType(), current.getSettlementType(),
+                req.getNextPeriodStart(), req.getNextPeriodEnd(),
+                nextBase, outstanding, req.getNextDueDate());
+        // 이월 원장은 바로 발행 상태로 (미수금이 살아있어야 하므로)
+        next.issue(req.getNextDueDate());
+        BillingLedger savedNext = ledgerRepository.save(next);
+
+        current.carryOverTo(savedNext);
+        return new BillingLedgerResponse(savedNext);
+    }
+
+    // ===================== 중도 출고 정산 =====================
+
+    /** 중도 출고 정산 미리보기 (원장 변경 없음) */
+    @Transactional(readOnly = true)
+    public MidReleaseSettlementResponse previewMidRelease(Long ledgerId, MidReleaseRequest req) {
+        BillingLedger ledger = getLedgerOrThrow(ledgerId);
+        MidReleaseResult result = calcMidRelease(ledger, req.getActualEndDate());
+        return new MidReleaseSettlementResponse(result, ledger);
+    }
+
+    /** 중도 출고 정산 확정 (환급→차감조정, 추가청구→가산조정으로 원장에 반영) */
+    @Transactional
+    public MidReleaseSettlementResponse applyMidRelease(Long ledgerId, MidReleaseRequest req) {
+        BillingLedger ledger = lockLedger(ledgerId);
+        Long userId = SecurityUtils.getCurrentUser().getUserId();
+
+        MidReleaseResult result = calcMidRelease(ledger, req.getActualEndDate());
+
+        if (result.refundAmount().signum() > 0) {
+            BigDecimal signed = result.refundAmount().negate();   // 환급 = 차감
+            String reason = "중도출고 환급 (사용 " + result.effectiveEndDate() + "까지)";
+            adjustmentRepository.save(new BillingAdjustment(
+                    ledger.getTenant(), ledger, AdjustmentType.CORRECTION, signed, reason, userId));
+            ledger.applyAdjustment(signed);
+        } else if (result.additionalChargeAmount().signum() > 0) {
+            BigDecimal signed = result.additionalChargeAmount();  // 추가청구 = 가산
+            String reason = "중도출고 추가청구 (사용 " + result.effectiveEndDate() + "까지)";
+            adjustmentRepository.save(new BillingAdjustment(
+                    ledger.getTenant(), ledger, AdjustmentType.SURCHARGE, signed, reason, userId));
+            ledger.applyAdjustment(signed);
+        }
+        return new MidReleaseSettlementResponse(result, ledger);
+    }
+
+    // ===================== 알림 발송 =====================
+
+    /** 특정 원장 결제 안내 발송 */
+    @Transactional
+    public void sendPaymentRequest(Long ledgerId) {
+        BillingLedger ledger = getLedgerOrThrow(ledgerId);
+        publish(ledger, NotificationType.PAYMENT_REQUEST);
+    }
+
+    /** 미납(납기 경과 + 잔액>0) 원장 일괄 미납 촉구 발송. 발송 건수 반환 */
+    @Transactional
+    public int sendOverdueReminders() {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        List<BillingLedger> overdue = ledgerRepository.findOverdue(tenantId, LocalDate.now());
+        for (BillingLedger ledger : overdue) {
+            publish(ledger, NotificationType.OVERDUE_REMINDER);
+        }
+        return overdue.size();
+    }
+
+    // ===================== 조회 =====================
+
+    @Transactional(readOnly = true)
+    public BillingLedgerResponse getLedger(Long ledgerId) {
+        return new BillingLedgerResponse(getLedgerOrThrow(ledgerId));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<BillingLedgerResponse> listLedgers(Pageable pageable) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return ledgerRepository.findByTenantId(tenantId, pageable).map(BillingLedgerResponse::new);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentHistoryResponse> getPayments(Long ledgerId) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        getLedgerOrThrow(ledgerId);   // 소유권 확인
+        return paymentHistoryRepository
+                .findByBillingLedgerIdAndTenantIdOrderByPaidOnAsc(ledgerId, tenantId)
+                .stream().map(PaymentHistoryResponse::new).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdjustmentResponse> getAdjustments(Long ledgerId) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        getLedgerOrThrow(ledgerId);   // 소유권 확인
+        return adjustmentRepository
+                .findByBillingLedgerIdAndTenantIdOrderByCreatedAtAsc(ledgerId, tenantId)
+                .stream().map(AdjustmentResponse::new).toList();
+    }
+
+    // ===================== 내부 헬퍼 =====================
+
+    /** [격리] 조회 전용 (락 없음) */
+    private BillingLedger getLedgerOrThrow(Long ledgerId) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return ledgerRepository.findByIdAndTenantId(ledgerId, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 청구 원장입니다. id=" + ledgerId));
+    }
+
+    /** [동시성] 변경 전용 — 비관적 쓰기 락으로 원장 잠금 */
+    private BillingLedger lockLedger(Long ledgerId) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return ledgerRepository.findForUpdate(ledgerId, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 청구 원장입니다. id=" + ledgerId));
+    }
+
+    private MidReleaseResult calcMidRelease(BillingLedger ledger, LocalDate actualEndDate) {
+        BigDecimal monthlyFee = BigDecimal.valueOf(ledger.getStorageOrder().getMonthlyFee());
+        return prorationCalculator.computeMidRelease(
+                monthlyFee, ledger.getBaseAmount(),
+                ledger.getBillingPeriodStart(), ledger.getBillingPeriodEnd(), actualEndDate);
+    }
+
+    private BigDecimal resolveBaseAmount(LedgerCreateRequest req, StorageOrder order) {
+        if (req.getBaseAmount() != null) {
+            return MoneyPolicy.normalize(req.getBaseAmount());
+        }
+        if (req.getBillingType() == BillingType.MONTHLY) {
+            BigDecimal monthlyFee = BigDecimal.valueOf(order.getMonthlyFee());
+            return prorationCalculator.prorateMonthly(monthlyFee, req.getPeriodStart(), req.getPeriodEnd());
+        }
+        // DAILY: 일 단가 필요
+        if (req.getDailyRate() == null) {
+            throw new IllegalArgumentException("일 단위 계약은 dailyRate 또는 baseAmount가 필요합니다.");
+        }
+        return prorationCalculator.prorateDaily(req.getDailyRate(), req.getPeriodStart(), req.getPeriodEnd());
+    }
+
+    private BigDecimal resolveNextBaseAmount(CarryOverRequest req, BillingLedger current, StorageOrder order) {
+        if (req.getNextBaseAmount() != null) {
+            return MoneyPolicy.normalize(req.getNextBaseAmount());
+        }
+        if (current.getBillingType() == BillingType.MONTHLY) {
+            BigDecimal monthlyFee = BigDecimal.valueOf(order.getMonthlyFee());
+            return prorationCalculator.prorateMonthly(
+                    monthlyFee, req.getNextPeriodStart(), req.getNextPeriodEnd());
+        }
+        throw new IllegalArgumentException("일 단위 계약은 차월 기본액(nextBaseAmount)을 직접 지정하세요.");
+    }
+
+    /** 조정 유형에 따라 부호 결정 */
+    private BigDecimal toSignedAmount(AdjustmentType type, BigDecimal amount) {
+        BigDecimal magnitude = amount.abs();
+        return switch (type) {
+            case DISCOUNT, WRITE_OFF -> magnitude.negate();  // 차감
+            case SURCHARGE -> magnitude;                     // 가산
+            case CORRECTION -> amount;                       // 입력 부호 그대로
+        };
+    }
+
+    private void publish(BillingLedger ledger, NotificationType type) {
+        BillingNotification notification = new BillingNotification(
+                ledger.getTenant().getId(),
+                ledger.getId(),
+                ledger.getLedgerNo(),
+                type,
+                ledger.getCustomer().getName(),
+                ledger.getCustomer().getPhoneNumber(),
+                ledger.getBalance(),
+                ledger.getDueDate());
+        eventPublisher.publishEvent(new BillingNotificationEvent(notification));
+    }
+
+    private String generateLedgerNo() {
+        String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String ledgerNo;
+        do {
+            int random = (int) (Math.random() * 10000);
+            ledgerNo = String.format("LDG-%s-%04d", datePart, random);
+        } while (ledgerRepository.existsByLedgerNo(ledgerNo));
+        return ledgerNo;
+    }
+}

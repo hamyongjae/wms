@@ -1,0 +1,137 @@
+package com.example.wms.billing.controller;
+
+import com.example.wms.billing.dto.*;
+import com.example.wms.billing.service.BillingService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * 청구/미수금 정산 API.
+ *
+ * [격리] 모든 처리는 서비스 계층에서 현재 tenantId로 강제된다.
+ * [권한] 돈에 영향을 주는 조정/이월/정산 확정은 ADMIN(사장님) 전용.
+ *   단순 수금 기록·조회는 STAFF도 허용(현장에서 입금 확인).
+ */
+@RestController
+@RequestMapping("/api/billing/ledgers")
+@RequiredArgsConstructor
+public class BillingController {
+
+    private final BillingService billingService;
+
+    // ===== 원장 생성/발행 =====
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping
+    public ResponseEntity<BillingLedgerResponse> createLedger(
+            @Valid @RequestBody LedgerCreateRequest request) {
+        BillingLedgerResponse response = billingService.createLedger(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{id}/issue")
+    public ResponseEntity<BillingLedgerResponse> issueLedger(
+            @PathVariable Long id,
+            @RequestBody(required = false) IssueRequest request) {
+        return ResponseEntity.ok(billingService.issueLedger(id, request));
+    }
+
+    // ===== 조회 =====
+
+    @GetMapping
+    public ResponseEntity<Page<BillingLedgerResponse>> listLedgers(Pageable pageable) {
+        return ResponseEntity.ok(billingService.listLedgers(pageable));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<BillingLedgerResponse> getLedger(@PathVariable Long id) {
+        return ResponseEntity.ok(billingService.getLedger(id));
+    }
+
+    @GetMapping("/{id}/payments")
+    public ResponseEntity<List<PaymentHistoryResponse>> getPayments(@PathVariable Long id) {
+        return ResponseEntity.ok(billingService.getPayments(id));
+    }
+
+    @GetMapping("/{id}/adjustments")
+    public ResponseEntity<List<AdjustmentResponse>> getAdjustments(@PathVariable Long id) {
+        return ResponseEntity.ok(billingService.getAdjustments(id));
+    }
+
+    // ===== 수금 (부분 수금) — STAFF도 허용 =====
+
+    @PostMapping("/{id}/payments")
+    public ResponseEntity<BillingLedgerResponse> recordPayment(
+            @PathVariable Long id,
+            @Valid @RequestBody PaymentRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(billingService.recordPayment(id, request));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/payments/{paymentId}/reverse")
+    public ResponseEntity<BillingLedgerResponse> reversePayment(@PathVariable Long paymentId) {
+        return ResponseEntity.ok(billingService.reversePayment(paymentId));
+    }
+
+    // ===== 조정/할인 — ADMIN 전용 =====
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{id}/adjustments")
+    public ResponseEntity<BillingLedgerResponse> applyAdjustment(
+            @PathVariable Long id,
+            @Valid @RequestBody AdjustmentRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(billingService.applyAdjustment(id, request));
+    }
+
+    // ===== 미수금 차월 이월 — ADMIN 전용 =====
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{id}/carry-over")
+    public ResponseEntity<BillingLedgerResponse> carryOver(
+            @PathVariable Long id,
+            @Valid @RequestBody CarryOverRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(billingService.carryOverToNext(id, request));
+    }
+
+    // ===== 중도 출고 정산 =====
+
+    @PostMapping("/{id}/mid-release/preview")
+    public ResponseEntity<MidReleaseSettlementResponse> previewMidRelease(
+            @PathVariable Long id,
+            @Valid @RequestBody MidReleaseRequest request) {
+        return ResponseEntity.ok(billingService.previewMidRelease(id, request));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{id}/mid-release/apply")
+    public ResponseEntity<MidReleaseSettlementResponse> applyMidRelease(
+            @PathVariable Long id,
+            @Valid @RequestBody MidReleaseRequest request) {
+        return ResponseEntity.ok(billingService.applyMidRelease(id, request));
+    }
+
+    // ===== 알림 발송 =====
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{id}/notify/payment-request")
+    public ResponseEntity<Void> sendPaymentRequest(@PathVariable Long id) {
+        billingService.sendPaymentRequest(id);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/notify/overdue")
+    public ResponseEntity<String> sendOverdueReminders() {
+        int count = billingService.sendOverdueReminders();
+        return ResponseEntity.ok("미납 촉구 발송 대상: " + count + "건");
+    }
+}
