@@ -8,6 +8,7 @@ import com.example.wms.domain.entity.Warehouse;
 import com.example.wms.domain.repository.CustomerRepository;
 import com.example.wms.domain.repository.StorageOrderRepository;
 import com.example.wms.domain.repository.WarehouseRepository;
+import com.example.wms.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,26 +29,26 @@ public class StorageOrderService {
     // 보관 계약 등록
     @Transactional
     public StorageOrderResponse createOrder(StorageOrderCreateRequest request) {
-        Customer customer = customerRepository.findById(request.getCustomerId())
+        // [격리] 고객·창고 모두 "내 tenant 소유"여야만 조회됨.
+        // 남의 고객/창고 id를 넣으면 여기서 "존재하지 않음"으로 막힌다.
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+
+        Customer customer = customerRepository.findByIdAndTenantId(request.getCustomerId(), tenantId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "존재하지 않는 고객입니다. id=" + request.getCustomerId()));
 
-        Warehouse warehouse = warehouseRepository.findById(request.getWarehouseId())
+        Warehouse warehouse = warehouseRepository.findByIdAndTenantId(request.getWarehouseId(), tenantId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "존재하지 않는 창고입니다. id=" + request.getWarehouseId()));
 
-        // 고객과 창고가 같은 업체 소속인지 검증
-        Tenant customerTenant = customer.getTenant();
-        if (!customerTenant.getId().equals(warehouse.getTenant().getId())) {
-            throw new IllegalArgumentException(
-                    "고객과 창고의 소속 업체가 다릅니다. 같은 업체의 고객·창고만 계약할 수 있습니다.");
-        }
+        // 고객·창고가 모두 내 tenant 소유이므로 소속은 자동으로 동일하다.
+        Tenant tenant = customer.getTenant();
 
         String orderNumber = generateOrderNumber();
 
         StorageOrder order = new StorageOrder(
                 orderNumber,
-                customerTenant,
+                tenant,
                 customer,
                 warehouse,
                 request.getStorageStartDate(),
@@ -62,7 +63,8 @@ public class StorageOrderService {
     }
 
     @Transactional(readOnly = true)
-    public Page<StorageOrderResponse> getOrdersByTenant(Long tenantId, Pageable pageable) {
+    public Page<StorageOrderResponse> getOrders(Pageable pageable) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();   // [격리]
         return storageOrderRepository.findByTenantId(tenantId, pageable)
                 .map(StorageOrderResponse::new);
     }
@@ -98,8 +100,10 @@ public class StorageOrderService {
     }
 
     // ===== 내부 헬퍼 =====
+    // [격리] id로 찾되 내 tenant 소유일 때만
     private StorageOrder findOrderOrThrow(Long id) {
-        return storageOrderRepository.findById(id)
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return storageOrderRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 계약입니다. id=" + id));
     }
 

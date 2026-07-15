@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -24,11 +25,10 @@ public class StorageOrderController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    // 내 업체의 계약 목록 — tenantId는 토큰에서 자동 결정
     @GetMapping
-    public ResponseEntity<Page<StorageOrderResponse>> getOrders(
-            @RequestParam Long tenantId,
-            Pageable pageable) {
-        return ResponseEntity.ok(storageOrderService.getOrdersByTenant(tenantId, pageable));
+    public ResponseEntity<Page<StorageOrderResponse>> getOrders(Pageable pageable) {
+        return ResponseEntity.ok(storageOrderService.getOrders(pageable));
     }
 
     @GetMapping("/{id}")
@@ -50,6 +50,8 @@ public class StorageOrderController {
         return ResponseEntity.ok(storageOrderService.releaseOrder(id, request));
     }
 
+    // 계약 삭제 — ADMIN만 허용 (STAFF가 호출하면 403)
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
         storageOrderService.deleteOrder(id);

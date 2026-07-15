@@ -1,5 +1,6 @@
 package com.example.wms.domain.service;
 
+import com.example.wms.domain.dto.CompanyRegisterRequest;
 import com.example.wms.domain.dto.LoginRequest;
 import com.example.wms.domain.dto.LoginResponse;
 import com.example.wms.domain.dto.SignUpRequest;
@@ -10,7 +11,8 @@ import com.example.wms.domain.entity.UserRole;
 import com.example.wms.domain.entity.UserStatus;
 import com.example.wms.domain.repository.TenantRepository;
 import com.example.wms.domain.repository.UserRepository;
-import com.example.wms.security.JwtTokenProvider;
+import com.example.wms.security.SecurityUtils;
+import com.example.wms.security.jwt.TokenProvider;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,16 +26,48 @@ public class AuthService {
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtTokenProvider tokenProvider;
+    private final TokenProvider tokenProvider;   // 인터페이스에 의존 (구현체 교체 자유)
 
-    // 직원 계정 생성
+    // 신규 업체 셀프 가입: 회사 + 첫 관리자(ADMIN)를 한 번에 생성 (공개)
+    @Transactional
+    public LoginResponse registerCompany(CompanyRegisterRequest request) {
+
+        // 사업자번호 중복 검사
+        if (tenantRepository.existsByBusinessNumber(request.getBusinessNumber())) {
+            throw new IllegalArgumentException(
+                    "이미 등록된 사업자번호입니다: " + request.getBusinessNumber());
+        }
+
+        // 1) 회사(Tenant) 생성
+        Tenant tenant = new Tenant(
+                request.getCompanyName(),
+                request.getBusinessNumber(),
+                request.getCeoName(),
+                request.getPhone(),
+                request.getEmail(),
+                request.getAddress());
+        Tenant savedTenant = tenantRepository.save(tenant);
+
+        // 2) 첫 계정을 ADMIN으로 생성 (비밀번호 해시 저장)
+        String encodedPassword = passwordEncoder.encode(request.getAdminPassword());
+        User admin = new User(savedTenant, request.getAdminUsername(), encodedPassword,
+                request.getAdminName(), UserRole.ADMIN);
+        User savedAdmin = userRepository.save(admin);
+
+        // 3) 바로 로그인된 상태가 되도록 토큰 발급해서 반환
+        String token = tokenProvider.createToken(savedAdmin);
+        return new LoginResponse(token, savedAdmin);
+    }
+
+    // 직원/관리자 계정 생성 — ADMIN이 "자기 회사"에만 추가 (tenantId는 토큰에서 결정)
     @Transactional
     public UserResponse signUp(SignUpRequest request) {
 
-        // 소속 업체 존재 확인
-        Tenant tenant = tenantRepository.findById(request.getTenantId())
+        // [격리] 소속 업체는 요청 값이 아니라 로그인한 ADMIN의 tenant로 고정
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "존재하지 않는 업체입니다. tenantId=" + request.getTenantId()));
+                        "존재하지 않는 업체입니다. tenantId=" + tenantId));
 
         // 같은 업체 안에서 아이디 중복 검사
         if (userRepository.existsByTenantIdAndUsername(tenant.getId(), request.getUsername())) {

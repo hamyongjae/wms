@@ -6,6 +6,7 @@ import com.example.wms.domain.entity.CustomerType;
 import com.example.wms.domain.entity.Tenant;
 import com.example.wms.domain.repository.CustomerRepository;
 import com.example.wms.domain.repository.TenantRepository;
+import com.example.wms.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,9 +23,11 @@ public class CustomerService {
     // 고객 등록
     @Transactional
     public CustomerResponse createCustomer(CustomerCreateRequest request) {
-        Tenant tenant = tenantRepository.findById(request.getTenantId())
+        // [격리] 소속 업체는 클라이언트가 아니라 로그인 토큰에서 결정
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "존재하지 않는 업체입니다. id=" + request.getTenantId()));
+                        "존재하지 않는 업체입니다. id=" + tenantId));
 
         // customerType이 안 넘어오면 개인(INDIVIDUAL)으로 기본 처리
         CustomerType type = (request.getCustomerType() != null)
@@ -52,9 +55,10 @@ public class CustomerService {
         return new CustomerResponse(saved);
     }
 
-    // 특정 업체의 고객 목록 + 이름 검색 (페이징)
+    // 내 업체의 고객 목록 + 이름 검색 (페이징)
     @Transactional(readOnly = true)
-    public Page<CustomerResponse> getCustomers(Long tenantId, String name, Pageable pageable) {
+    public Page<CustomerResponse> getCustomers(String name, Pageable pageable) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();   // [격리] 내 tenant만
         Page<Customer> customers;
         if (name == null || name.isBlank()) {
             customers = customerRepository.findByTenantId(tenantId, pageable);
@@ -112,9 +116,11 @@ public class CustomerService {
         customerRepository.delete(customer);
     }
 
-    // 공통: id로 고객 찾고 없으면 예외
+    // 공통: id로 고객 찾되 [격리] 내 tenant 소유일 때만.
+    // 남의 고객 id를 넣어도 "존재하지 않음"으로 응답되어 데이터·존재가 노출되지 않는다.
     private Customer findCustomerOrThrow(Long id) {
-        return customerRepository.findById(id)
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return customerRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 고객입니다. id=" + id));
     }
 }

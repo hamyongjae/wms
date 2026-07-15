@@ -2,7 +2,6 @@ package com.example.wms.domain.dto;
 
 import com.example.wms.domain.entity.UserRole;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -11,8 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class SignUpRequest {
 
-    @NotNull(message = "소속 업체(tenantId)는 필수입니다")
-    private Long tenantId;
+    // tenantId는 더 이상 받지 않는다 — 로그인한 ADMIN의 회사로 자동 지정
 
     @NotBlank(message = "아이디는 필수입니다")
     @Size(min = 4, max = 50, message = "아이디는 4~50자여야 합니다")

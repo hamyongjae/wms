@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: wms
+
+  # ===== PostgreSQL 연결 =====
+  datasource:
+    url: jdbc:postgresql://localhost:5432/wms   # 맨 뒤 wms 자리에 본인 DB 이름
+    username: postgres
+    password: 1234
+
+  # ===== JPA / Hibernate =====
+  jpa:
+    hibernate:
+      ddl-auto: update        # 엔티티 기준으로 테이블 자동 생성/수정
+    show-sql: true            # 실행되는 SQL 콘솔 출력
+    properties:
+      hibernate:
+        format_sql: true      # SQL 보기 좋게 정렬
+
+# ===== JWT 설정 =====
+jwt:
+  # 보안 핵심: secret은 코드에 하드코딩하지 않는다.
+  # 운영에서는 JWT_SECRET 환경변수로 주입하고, 없으면 아래 기본값(개발용) 사용.
+  # Base64 인코딩된 최소 256bit(32byte 이상) 문자열이어야 한다.
+  secret: ${JWT_SECRET:dGhpcy1pcy1hLXZlcnktbG9uZy1zZWNyZXQta2V5LWZvci13bXMtand0LWhtYWMtc2hhMjU2LTEyMzQ1Ng==}
+  # Access 토큰 만료 시간 (밀리초, 기본 1시간)
+  access-token-validity-ms: ${JWT_ACCESS_TOKEN_VALIDITY_MS:3600000}

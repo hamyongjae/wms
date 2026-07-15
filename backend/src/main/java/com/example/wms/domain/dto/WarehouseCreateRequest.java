@@ -1,7 +1,6 @@
 package com.example.wms.domain.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -9,8 +8,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class WarehouseCreateRequest {
 
-    @NotNull(message = "소속 업체 id는 필수입니다")
-    private Long tenantId;          // 어느 업체 소속인지
+    // tenantId는 더 이상 받지 않는다 — 로그인 토큰에서 자동 결정(테넌트 격리)
 
     @NotBlank(message = "창고명은 필수입니다")
     private String name;

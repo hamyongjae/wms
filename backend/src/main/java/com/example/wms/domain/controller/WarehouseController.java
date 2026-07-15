@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,7 +20,8 @@ public class WarehouseController {
 
     private final WarehouseService warehouseService;
 
-    // 창고 등록 (POST /api/warehouses)
+    // 창고 등록 (POST /api/warehouses) — ADMIN만 (창고 관리)
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<WarehouseResponse> createWarehouse(
             @Valid @RequestBody WarehouseCreateRequest request) {
@@ -28,16 +30,16 @@ public class WarehouseController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // 특정 업체의 창고 목록 (GET /api/warehouses?tenantId=1)
+    // 내 업체의 창고 목록 (GET /api/warehouses)
+    // tenantId는 토큰에서 자동 결정
     @GetMapping
-    public ResponseEntity<List<WarehouseResponse>> getWarehousesByTenant(
-            @RequestParam Long tenantId) {
-
-        List<WarehouseResponse> responses = warehouseService.getWarehousesByTenant(tenantId);
+    public ResponseEntity<List<WarehouseResponse>> getWarehouses() {
+        List<WarehouseResponse> responses = warehouseService.getWarehouses();
         return ResponseEntity.ok(responses);
     }
 
-    // 창고 수정 (PUT /api/warehouses/1)
+    // 창고 수정 (PUT /api/warehouses/1) — ADMIN만
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<WarehouseResponse> updateWarehouse(
             @PathVariable Long id,
@@ -47,7 +49,8 @@ public class WarehouseController {
         return ResponseEntity.ok(response);
     }
 
-    // 창고 삭제 (DELETE /api/warehouses/1)
+    // 창고 삭제 (DELETE /api/warehouses/1) — ADMIN만
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteWarehouse(@PathVariable Long id) {
         warehouseService.deleteWarehouse(id);

@@ -7,6 +7,7 @@ import com.example.wms.domain.entity.Tenant;
 import com.example.wms.domain.entity.Warehouse;
 import com.example.wms.domain.repository.TenantRepository;
 import com.example.wms.domain.repository.WarehouseRepository;
+import com.example.wms.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,10 +25,11 @@ public class WarehouseService {
     @Transactional
     public WarehouseResponse createWarehouse(WarehouseCreateRequest request) {
 
-        // 규칙: 존재하는 업체인지 먼저 확인
-        Tenant tenant = tenantRepository.findById(request.getTenantId())
+        // [격리] 소속 업체는 로그인 토큰에서 결정
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "존재하지 않는 업체입니다. id=" + request.getTenantId()));
+                        "존재하지 않는 업체입니다. id=" + tenantId));
 
         // tenantId(숫자) → Tenant(객체)로 바꿔서 창고 생성
         Warehouse warehouse = new Warehouse(
@@ -41,9 +43,10 @@ public class WarehouseService {
         return new WarehouseResponse(saved);
     }
 
-    // 특정 업체의 창고 목록 조회
+    // 내 업체의 창고 목록 조회
     @Transactional(readOnly = true)
-    public List<WarehouseResponse> getWarehousesByTenant(Long tenantId) {
+    public List<WarehouseResponse> getWarehouses() {
+        Long tenantId = SecurityUtils.getCurrentTenantId();   // [격리]
         return warehouseRepository.findByTenantId(tenantId)
                 .stream()
                 .map(WarehouseResponse::new)
@@ -53,8 +56,7 @@ public class WarehouseService {
     // 창고 정보 수정
     @Transactional
     public WarehouseResponse updateWarehouse(Long id, WarehouseUpdateRequest request) {
-        Warehouse warehouse = warehouseRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 창고입니다. id=" + id));
+        Warehouse warehouse = findWarehouseOrThrow(id);
 
         warehouse.updateInfo(
                 request.getName(),
@@ -68,9 +70,14 @@ public class WarehouseService {
     // 창고 삭제
     @Transactional
     public void deleteWarehouse(Long id) {
-        Warehouse warehouse = warehouseRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 창고입니다. id=" + id));
-
+        Warehouse warehouse = findWarehouseOrThrow(id);
         warehouseRepository.delete(warehouse);
+    }
+
+    // 공통: id로 창고 찾되 [격리] 내 tenant 소유일 때만
+    private Warehouse findWarehouseOrThrow(Long id) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return warehouseRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 창고입니다. id=" + id));
     }
 }

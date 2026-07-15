@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -25,13 +26,13 @@ public class CustomerController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // 특정 업체의 고객 목록 + 검색 (GET /api/customers?tenantId=1&name=홍)
+    // 내 업체의 고객 목록 + 검색 (GET /api/customers?name=홍)
+    // tenantId는 토큰에서 자동 결정 — 클라이언트가 지정하지 않는다.
     @GetMapping
     public ResponseEntity<Page<CustomerResponse>> getCustomers(
-            @RequestParam Long tenantId,
             @RequestParam(required = false) String name,
             Pageable pageable) {
-        Page<CustomerResponse> responses = customerService.getCustomers(tenantId, name, pageable);
+        Page<CustomerResponse> responses = customerService.getCustomers(name, pageable);
         return ResponseEntity.ok(responses);
     }
 
@@ -57,7 +58,8 @@ public class CustomerController {
         return ResponseEntity.ok(customerService.changeStatus(id, request));
     }
 
-    // 고객 삭제
+    // 고객 삭제 — ADMIN만 허용 (STAFF가 호출하면 403)
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCustomer(@PathVariable Long id) {
         customerService.deleteCustomer(id);

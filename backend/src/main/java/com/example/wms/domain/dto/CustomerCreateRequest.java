@@ -2,7 +2,6 @@ package com.example.wms.domain.dto;
 
 import com.example.wms.domain.entity.CustomerType;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -10,8 +9,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class CustomerCreateRequest {
 
-    @NotNull(message = "소속 업체 id는 필수입니다")
-    private Long tenantId;
+    // tenantId는 더 이상 받지 않는다 — 로그인 토큰에서 자동 결정(테넌트 격리)
 
     @NotBlank(message = "고객명은 필수입니다")
     private String name;
