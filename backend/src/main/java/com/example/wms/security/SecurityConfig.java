@@ -77,8 +77,4 @@ public class SecurityConfig {
 
                 // JWT 필터를 기본 인증 필터 앞에 배치
                 .addFilterBefore(jwtAuthenticationFilter,
-                        UsernamePasswordAuthenticationFilter.class);
-
-        return http.build();
-    }
-}
+         

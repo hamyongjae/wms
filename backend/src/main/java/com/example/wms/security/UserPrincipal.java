@@ -1,7 +1,7 @@
 package com.example.wms.security;
 
-import com.example.wms.domain.entity.User;
-import com.example.wms.domain.entity.UserRole;
+import com.example.wms.user.entity.User;
+import com.example.wms.user.entity.UserRole;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

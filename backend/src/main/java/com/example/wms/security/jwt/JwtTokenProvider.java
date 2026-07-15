@@ -1,7 +1,7 @@
 package com.example.wms.security.jwt;
 
-import com.example.wms.domain.entity.User;
-import com.example.wms.domain.entity.UserRole;
+import com.example.wms.user.entity.User;
+import com.example.wms.user.entity.UserRole;
 import com.example.wms.security.UserPrincipal;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
