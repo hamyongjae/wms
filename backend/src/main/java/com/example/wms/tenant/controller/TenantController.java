@@ -1,27 +1,26 @@
 package com.example.wms.tenant.controller;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import com.example.wms.tenant.dto.TenantCreateRequest;
 import com.example.wms.tenant.dto.TenantResponse;
 import com.example.wms.tenant.dto.TenantUpdateRequest;
 import com.example.wms.tenant.service.TenantService;
-
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 업체(자기 회사) 관리 API.
+ *
+ * 회사 생성은 공개 온보딩(POST /api/auth/register-company)에서만 이뤄진다.
+ * 여기서는 "로그인한 사용자의 자기 회사"만 조회/수정한다.
+ * 전체 목록·타 업체 조회·삭제는 노출하지 않아 테넌트 간 격리를 지킨다.
+ * (플랫폼 관리자(SUPER_ADMIN) 도입 시 전체 관리 API를 별도로 열 수 있음)
+ */
 @RestController
 @RequestMapping("/api/tenants")
 @RequiredArgsConstructor
@@ -29,46 +28,17 @@ public class TenantController {
 
     private final TenantService tenantService;
 
-    // 창고업체 등록 (POST /api/tenants)
-    @PostMapping
-    public ResponseEntity<TenantResponse> createTenant(
-            @Valid @RequestBody TenantCreateRequest request) {
-
-        TenantResponse response = tenantService.createTenant(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    // 내 회사 정보 조회 (GET /api/tenants/me)
+    @GetMapping("/me")
+    public ResponseEntity<TenantResponse> getMyTenant() {
+        return ResponseEntity.ok(tenantService.getMyTenant());
     }
 
-    // 전체 조회 + 이름 검색 (페이징)
-    @GetMapping
-    public ResponseEntity<Page<TenantResponse>> getAllTenants(
-            @RequestParam(required = false) String name,
-            Pageable pageable) {
-
-        Page<TenantResponse> responses = tenantService.getAllTenants(name, pageable);
-        return ResponseEntity.ok(responses);
-    }
-
-    // id로 특정 창고업체 조회 (GET /api/tenants/1)
-    @GetMapping("/{id}")
-    public ResponseEntity<TenantResponse> getTenant(@PathVariable Long id) {
-        TenantResponse response = tenantService.getTenant(id);
-        return ResponseEntity.ok(response);
-    }
-
-    // 업체 수정 (PUT /api/tenants/1)
-    @PutMapping("/{id}")
-    public ResponseEntity<TenantResponse> updateTenant(
-            @PathVariable Long id,
+    // 내 회사 정보 수정 (PUT /api/tenants/me) — ADMIN만
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/me")
+    public ResponseEntity<TenantResponse> updateMyTenant(
             @Valid @RequestBody TenantUpdateRequest request) {
-
-        TenantResponse response = tenantService.updateTenant(id, request);
-        return ResponseEntity.ok(response);
-    }
-
-    // 업체 삭제 (DELETE /api/tenants/1)
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteTenant(@PathVariable Long id) {
-        tenantService.deleteTenant(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(tenantService.updateMyTenant(request));
     }
 }
