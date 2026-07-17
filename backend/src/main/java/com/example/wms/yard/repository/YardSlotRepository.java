@@ -19,7 +19,7 @@ public interface YardSlotRepository extends JpaRepository<YardSlot, Long> {
 
     Page<YardSlot> findByTenantIdAndWarehouseId(Long tenantId, Long warehouseId, Pageable pageable);
 
-    // 창고의 모든 슬롯 (추천 알고리즘용 — 경계가 있는 야적장이라 전량 로드 OK)
+    // 창고의 모든 슬롯 (추천 알고리즘용 — 경계가 있는 보관창고이라 전량 로드 OK)
     List<YardSlot> findByTenantIdAndWarehouseId(Long tenantId, Long warehouseId);
 
     // [창고 삭제] 창고에 종속된 슬롯(격자) 일괄 삭제 — 삭제된 행 수 반환
@@ -69,4 +69,8 @@ public interface YardSlotRepository extends JpaRepository<YardSlot, Long> {
                    sum(case when s.occupied = true then 1 else 0 end) as occupied
             from YardSlot s
             where s.tenant.id = :tenantId
-            group by s
+            group by s.warehouse.id, s.warehouse.name
+            order by s.warehouse.id
+            """)
+    List<WarehouseOccupancyView> aggregateByWarehouse(@Param("tenantId") Long tenantId);
+}

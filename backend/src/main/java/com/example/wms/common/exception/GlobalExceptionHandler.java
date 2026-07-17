@@ -57,4 +57,55 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidInputException.class)
     public ResponseEntity<ErrorResponse> handleInvalidInput(InvalidInputException e) {
         ErrorResponse error = new ErrorResponse(HttpStatus.BAD_REQUEST.value(), e.getMessage());
-        return ResponseEntit
+        return ResponseEntity.badRequest().body(error);
+    }
+
+    // 도메인 규칙 위반(상태 전이 불가 등) → 409 Conflict
+    // 예: 발행은 DRAFT에서만, 완납 원장 취소 불가, 이월할 미수금 없음
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException e) {
+        ErrorResponse error = new ErrorResponse(HttpStatus.CONFLICT.value(), e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    // 동시성 충돌: 낙관적 락(@Version) — 다른 트랜잭션이 먼저 수정함 → 409
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLock(ObjectOptimisticLockingFailureException e) {
+        ErrorResponse error = new ErrorResponse(HttpStatus.CONFLICT.value(),
+                "다른 사용자가 먼저 처리했습니다. 최신 상태를 다시 불러온 뒤 시도하세요.");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    // 동시성 충돌: 비관적 락 획득 실패(잠금 대기 초과 등) → 409
+    @ExceptionHandler(CannotAcquireLockException.class)
+    public ResponseEntity<ErrorResponse> handlePessimisticLock(CannotAcquireLockException e) {
+        ErrorResponse error = new ErrorResponse(HttpStatus.CONFLICT.value(),
+                "다른 처리가 진행 중입니다. 잠시 후 다시 시도하세요.");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    // DB 무결성 위반 → 원인별로 메시지를 구분한다.
+    //  - FK 위반: 다른 데이터가 참조 중(삭제 불가)
+    //  - NOT NULL 위반: 필수 값 누락(보통 스키마 마이그레이션 누락)
+    //  - 그 외: 일반 제약 위반
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException e) {
+        String cause = e.getMostSpecificCause().getMessage();
+        String lower = (cause == null) ? "" : cause.toLowerCase();
+
+        String message;
+        if (lower.contains("foreign key") || lower.contains("still referenced")) {
+            message = "다른 데이터가 참조하고 있어 삭제할 수 없습니다. "
+                    + "배치된 컨테이너·슬롯·계약 등을 먼저 정리한 뒤 다시 시도하세요.";
+        } else if (lower.contains("not-null") || lower.contains("not null") || lower.contains("null value")) {
+            message = "필수 항목이 비어 있어 저장할 수 없습니다. "
+                    + "(DB 스키마가 최신이 아닐 수 있습니다 — 관리자에게 문의하세요)";
+        } else if (lower.contains("unique") || lower.contains("duplicate")) {
+            message = "이미 존재하는 값이라 저장할 수 없습니다.";
+        } else {
+            message = "데이터 제약 조건에 위배되어 처리할 수 없습니다.";
+        }
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                new ErrorResponse(HttpStatus.CONFLICT.value(), message));
+    }
+}

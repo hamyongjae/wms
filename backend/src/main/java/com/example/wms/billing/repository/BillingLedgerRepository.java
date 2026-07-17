@@ -57,4 +57,8 @@ public interface BillingLedgerRepository extends JpaRepository<BillingLedger, Lo
             select l from BillingLedger l
             where l.balance > 0
               and l.status in (com.example.wms.billing.entity.BillingStatus.ISSUED,
-                               com.example.wms.billing.entity.BillingStatus.PARTIALLY_PAI
+                               com.example.wms.billing.entity.BillingStatus.PARTIALLY_PAID)
+              and l.dueDate < :baseDate
+            """)
+    List<BillingLedger> findAllOverdue(@Param("baseDate") LocalDate baseDate);
+}

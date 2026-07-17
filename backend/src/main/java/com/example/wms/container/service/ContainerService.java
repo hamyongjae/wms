@@ -134,4 +134,21 @@ public class ContainerService {
     public void deleteContainer(Long id) {
         Container container = findOrThrow(id);
         if (container.getStatus() == ContainerStatus.OCCUPIED) {
-            throw ne
+            throw new IllegalStateException("사용 중인 컨테이너는 삭제할 수 없습니다. 먼저 회수하세요.");
+        }
+        containerRepository.delete(container);
+    }
+
+    // ===== 내부 헬퍼 =====
+    private Container findOrThrow(Long id) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return containerRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 컨테이너입니다. id=" + id));
+    }
+
+    private Container lockOrThrow(Long id) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return containerRepository.findForUpdate(id, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 컨테이너입니다. id=" + id));
+    }
+}

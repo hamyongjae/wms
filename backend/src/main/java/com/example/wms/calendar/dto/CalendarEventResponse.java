@@ -30,4 +30,17 @@ public class CalendarEventResponse {
     public CalendarEventResponse(Long id, String title, LocalDateTime startAt, LocalDateTime endAt,
                                  CalendarEventType type, CalendarEventStatus status,
                                  String customerName, BigDecimal amount,
-   
+                                 LocalDate startDate, LocalDate endDate, BigDecimal unitPrice) {
+        this.id = id;
+        this.title = title;
+        this.startAt = startAt;
+        this.endAt = endAt;
+        this.type = type;
+        this.status = status;
+        this.customerName = customerName;
+        this.amount = amount;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.unitPrice = unitPrice;
+    }
+}

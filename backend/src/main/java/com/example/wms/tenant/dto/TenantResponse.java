@@ -18,4 +18,12 @@ public class TenantResponse {
     // Entity를 받아서 DTO로 변환하는 생성자
     public TenantResponse(Tenant tenant) {
         this.id = tenant.getId();
-        this.name =
+        this.name = tenant.getName();
+        this.businessNumber = tenant.getBusinessNumber();
+        this.ceoName = tenant.getCeoName();
+        this.phone = tenant.getPhone();
+        this.email = tenant.getEmail();
+        this.address = tenant.getAddress();
+        this.status = tenant.getStatus().name();
+    }
+}

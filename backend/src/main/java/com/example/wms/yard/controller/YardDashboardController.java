@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 야적장 공간·점유 현황 대시보드 API (조회 전용, 인증된 사용자 모두 허용).
+ * 보관창고 공간·점유 현황 대시보드 API (조회 전용, 인증된 사용자 모두 허용).
  */
 @RestController
 @RequestMapping("/api/yard/occupancy")

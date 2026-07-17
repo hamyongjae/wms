@@ -70,4 +70,12 @@ public class JwtTokenProvider implements TokenProvider {
             Long userId = Long.valueOf(claims.getSubject());
             Long tenantId = claims.get("tenantId", Long.class);
             String username = claims.get("username", String.class);
-            UserRole role = UserRole.valueOf(claims.get("role"
+            UserRole role = UserRole.valueOf(claims.get("role", String.class));
+
+            return new UserPrincipal(userId, tenantId, username, role);
+        } catch (Exception e) {
+            // 만료/위조/형식오류 → 인증 실패로 처리 (null)
+            return null;
+        }
+    }
+}

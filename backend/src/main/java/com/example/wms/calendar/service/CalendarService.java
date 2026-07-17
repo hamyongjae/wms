@@ -169,4 +169,16 @@ public class CalendarService {
         return fallback;
     }
 
-    private CalendarEventResponse ev
+    private CalendarEventResponse event(Long id, String title, LocalDate date,
+                                        CalendarEventType type, CalendarEventStatus status,
+                                        String customer, java.math.BigDecimal amount,
+                                        LocalDate startDate, LocalDate endDate, java.math.BigDecimal unitPrice) {
+        return new CalendarEventResponse(id, title,
+                date.atTime(EVENT_TIME), date.atTime(EVENT_TIME),
+                type, status, customer, amount, startDate, endDate, unitPrice);
+    }
+
+    private boolean inRange(LocalDate d, LocalDate from, LocalDate to) {
+        return !d.isBefore(from) && !d.isAfter(to);
+    }
+}

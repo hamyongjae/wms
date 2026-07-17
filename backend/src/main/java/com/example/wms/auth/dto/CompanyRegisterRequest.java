@@ -37,4 +37,6 @@ public class CompanyRegisterRequest {
     @Pattern(regexp = ValidationPatterns.PASSWORD, message = ValidationPatterns.PASSWORD_MESSAGE)
     private String adminPassword;
 
-   
+    @NotBlank(message = "관리자 이름은 필수입니다")
+    private String adminName;
+}

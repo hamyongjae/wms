@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 야적장 입고/이동/반출 처리 + 슬롯 등록.
+ * 보관창고 입고/이동/반출 처리 + 슬롯 등록.
  *
  * [규칙] 한 슬롯에는 한 대만(중복 방지) — YardSlot.place()가 LocationFullException으로 강제.
  *   (중력·최대 단수 같은 적재 물리 규칙과 이동 이력은 사용하지 않음)
@@ -74,7 +74,7 @@ public class YardOperationService {
 
     // ===================== 입고 / 이동 / 반출 =====================
 
-    /** 반입: 야적장 밖의 컨테이너를 대상 슬롯에 적재 */
+    /** 반입: 보관창고 밖의 컨테이너를 대상 슬롯에 적재 */
     @Transactional
     public YardSlotResponse inbound(InboundRequest req) {
         Long tenantId = SecurityUtils.getCurrentTenantId();
@@ -83,7 +83,7 @@ public class YardOperationService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "존재하지 않는 컨테이너입니다. id=" + req.getContainerId()));
 
-        // 이미 야적장에 적재돼 있으면 반입이 아니라 이동을 써야 함
+        // 이미 보관창고에 적재돼 있으면 반입이 아니라 이동을 써야 함
         yardSlotRepository.findByTenantIdAndContainerId(tenantId, container.getId())
                 .ifPresent(s -> {
                     throw new IllegalStateException(
@@ -130,7 +130,7 @@ public class YardOperationService {
         return new YardSlotResponse(target);
     }
 
-    /** 반출: 컨테이너를 야적장 밖으로 (슬롯 비움) */
+    /** 반출: 컨테이너를 보관창고 밖으로 (슬롯 비움) */
     @Transactional
     public YardSlotResponse outbound(OutboundRequest req) {
         Long tenantId = SecurityUtils.getCurrentTenantId();
@@ -150,4 +150,8 @@ public class YardOperationService {
 
     // ===================== 내부 =====================
 
-    private YardSlot lockSlot(Long slotId, Long tena
+    private YardSlot lockSlot(Long slotId, Long tenantId) {
+        return yardSlotRepository.findForUpdate(slotId, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 슬롯입니다. id=" + slotId));
+    }
+}

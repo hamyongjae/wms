@@ -13,9 +13,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * 컨테이너 (야적장의 5톤 임대 단위).
+ * 컨테이너 (보관창고의 5톤 임대 단위).
  *
- * 한 창고(야적장)에 여러 컨테이너가 있고, 각 컨테이너는 한 번에 하나의 계약에만 배정된다.
+ * 한 창고(보관창고)에 여러 컨테이너가 있고, 각 컨테이너는 한 번에 하나의 계약에만 배정된다.
  * (한 계약이 여러 컨테이너를 점유하는 1:N은 허용 — currentOrder를 여러 컨테이너가 참조)
  *
  * [동시성] 배정/회수는 "두 관리자가 같은 빈 컨테이너를 동시에 배정" 같은 경합이 생길 수 있어
@@ -42,7 +42,7 @@ public class Container {
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
 
-    // ===== 소속 창고(야적장) =====
+    // ===== 소속 창고(보관창고) =====
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "warehouse_id", nullable = false)
     private Warehouse warehouse;
@@ -110,15 +110,15 @@ public class Container {
         this.expectedOutboundDate = expectedOutboundDate;
     }
 
-    // ===== 야적장 적재/반출에 따른 상태 전환 (계약 배정과는 별개) =====
-    /** 야적장 슬롯에 적재됨 → 사용중. (점검/폐기 상태는 건드리지 않음) */
+    // ===== 보관창고 적재/반출에 따른 상태 전환 (계약 배정과는 별개) =====
+    /** 보관창고 슬롯에 적재됨 → 사용중. (점검/폐기 상태는 건드리지 않음) */
     public void markPlacedInYard() {
         if (this.status == ContainerStatus.AVAILABLE) {
             this.status = ContainerStatus.OCCUPIED;
         }
     }
 
-    /** 야적장에서 반출됨 → 가용. (계약에 배정돼 있으면 그대로 유지) */
+    /** 보관창고에서 반출됨 → 가용. (계약에 배정돼 있으면 그대로 유지) */
     public void markRemovedFromYard() {
         if (this.status == ContainerStatus.OCCUPIED && this.currentOrder == null) {
             this.status = ContainerStatus.AVAILABLE;
@@ -127,4 +127,30 @@ public class Container {
 
     // ===== 계약 배정 (빈 컨테이너 → 사용중) =====
     public void assignTo(StorageOrder order) {
-        if (this.
+        if (this.status != ContainerStatus.AVAILABLE) {
+            throw new IllegalStateException("배정은 빈(AVAILABLE) 컨테이너만 가능합니다. 현재=" + status);
+        }
+        this.currentOrder = order;
+        this.status = ContainerStatus.OCCUPIED;
+    }
+
+    // ===== 계약 회수 (사용중 → 빈) =====
+    public void release() {
+        if (this.status != ContainerStatus.OCCUPIED) {
+            throw new IllegalStateException("회수는 사용 중(OCCUPIED) 컨테이너만 가능합니다. 현재=" + status);
+        }
+        this.currentOrder = null;
+        this.status = ContainerStatus.AVAILABLE;
+    }
+
+    // ===== 상태 변경 (점검/폐기/복귀 등, 배정과는 분리) =====
+    public void changeStatus(ContainerStatus newStatus) {
+        if (newStatus == ContainerStatus.OCCUPIED) {
+            throw new IllegalStateException("사용중 상태는 계약 배정으로만 설정됩니다.");
+        }
+        if (this.status == ContainerStatus.OCCUPIED) {
+            throw new IllegalStateException("사용 중인 컨테이너는 먼저 회수해야 상태를 변경할 수 있습니다.");
+        }
+        this.status = newStatus;
+    }
+}

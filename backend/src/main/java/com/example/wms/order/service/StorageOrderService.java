@@ -108,4 +108,26 @@ public class StorageOrderService {
     }
 
     @Transactional
-    publi
+    public void deleteOrder(Long id) {
+        StorageOrder order = findOrderOrThrow(id);
+        storageOrderRepository.delete(order);
+    }
+
+    // ===== 내부 헬퍼 =====
+    // [격리] id로 찾되 내 tenant 소유일 때만
+    private StorageOrder findOrderOrThrow(Long id) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return storageOrderRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 계약입니다. id=" + id));
+    }
+
+    private String generateOrderNumber() {
+        String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String orderNumber;
+        do {
+            int random = (int) (Math.random() * 10000);
+            orderNumber = String.format("ORD-%s-%04d", datePart, random);
+        } while (storageOrderRepository.existsByOrderNumber(orderNumber));
+        return orderNumber;
+    }
+}

@@ -13,7 +13,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 /**
- * 야적장 로케이션 슬롯 (Block-Row-Column-Tier 격자의 한 칸).
+ * 보관창고 로케이션 슬롯 (Block-Row-Column-Tier 격자의 한 칸).
  *
  * 물리적 위치 하나 = 한 슬롯이며 최대 한 대의 컨테이너를 담는다.
  * 좌표는 (창고, 블록, 열, 연, 단)으로 유일하다.

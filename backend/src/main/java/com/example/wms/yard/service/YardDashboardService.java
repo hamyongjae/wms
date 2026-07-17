@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * 야적장 공간·점유 현황 대시보드.
+ * 보관창고 공간·점유 현황 대시보드.
  *
  * 총 슬롯 / 사용중 / 공실 / 사용률·공실률을 창고 단위·블록 단위로 집계하고,
  * 컨테이너가 실제로 어느 슬롯을 점유했는지 목록으로 보여준다.

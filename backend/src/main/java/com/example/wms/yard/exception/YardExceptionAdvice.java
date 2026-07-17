@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * 야적장 도메인 예외 → 409 Conflict.
+ * 보관창고 도메인 예외 → 409 Conflict.
  * (이미 컨테이너가 있는 위치에 적재하려는 경우)
  */
 @RestControllerAdvice

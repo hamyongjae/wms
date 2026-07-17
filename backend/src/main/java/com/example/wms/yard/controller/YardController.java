@@ -15,7 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * 야적장(Yard) 관리 API.
+ * 보관창고(Yard) 관리 API.
  *
  * [권한] 슬롯 격자 설계(등록/생성)는 ADMIN. 입고/이동/반출·조회·추천은 현장(STAFF)도 허용.
  */

@@ -16,3 +16,9 @@ public class ContainerUpdateRequest {
 
     @Positive(message = "용량은 0보다 커야 합니다")
     private Integer capacityTon;
+
+    private String memo;
+
+    private LocalDate inboundDate;            // 입고일
+    private LocalDate expectedOutboundDate;   // 출고 예정일
+}
