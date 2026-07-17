@@ -727,13 +727,17 @@ function ActionPanel({
 
         <div className="space-y-3 px-6 py-5">
           <dl className="grid grid-cols-2 gap-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-sm">
+            <div className="col-span-2">
+              <dt className="text-xs text-slate-400">화주(고객)</dt>
+              <dd className="font-semibold text-slate-800">{extractOwner(container?.memo) ?? '—'}</dd>
+            </div>
             <Info label="용량">{container ? `${container.capacityTon}톤` : '—'}</Info>
             <Info label="상태">{container ? (CONTAINER_STATUS_KO[container.status] ?? container.status) : '—'}</Info>
             <Info label="입고일">{container?.inboundDate ?? '—'}</Info>
             <Info label="출고 예정일">{container?.expectedOutboundDate ?? '—'}</Info>
             <div className="col-span-2">
               <dt className="text-xs text-slate-400">특이사항</dt>
-              <dd className="text-slate-700">{container?.memo || '—'}</dd>
+              <dd className="text-slate-700">{stripOwnerTag(container?.memo) || '—'}</dd>
             </div>
           </dl>
 
@@ -774,7 +778,8 @@ function EditModal({
   onDone: () => void
 }) {
   const [capacityTon, setCapacityTon] = useState(container?.capacityTon ?? 5)
-  const [memo, setMemo] = useState(container?.memo ?? '')
+  // 특이사항 편집은 [화주] 태그를 뺀 본문만 다룬다(저장 시 태그를 다시 붙임)
+  const [memo, setMemo] = useState(stripOwnerTag(container?.memo))
   const [inboundDate, setInboundDate] = useState(container?.inboundDate ?? '')
   const [expectedOutboundDate, setExpectedOutboundDate] = useState(container?.expectedOutboundDate ?? '')
   const [submitting, setSubmitting] = useState(false)
@@ -789,11 +794,13 @@ function EditModal({
     setFormError(null)
     setSubmitting(true)
     try {
+      // [화주 보존] 편집한 특이사항 본문 앞에 기존 [화주] 태그를 다시 붙여 저장
+      const composedMemo = [ownerTag(container?.memo), memo.trim()].filter(Boolean).join(' ').trim() || undefined
       // 컨테이너 번호는 변경하지 않지만 백엔드 필수값이라 기존 번호를 그대로 실어 보낸다.
       await containerApi.update(slot.containerId, {
         containerNo: slot.containerNo ?? container?.containerNo ?? undefined,
         capacityTon,
-        memo: memo || undefined,
+        memo: composedMemo,
         inboundDate: inboundDate || undefined,
         expectedOutboundDate: expectedOutboundDate || undefined,
       })
@@ -808,6 +815,10 @@ function EditModal({
   return (
     <Modal open onClose={onClose} title={`${extractOwner(container?.memo) ?? '컨테이너'} · 보관 정보 수정`}>
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+          <span className="block text-xs text-slate-400">화주(고객)</span>
+          <span className="font-semibold text-slate-800">{extractOwner(container?.memo) ?? '—'}</span>
+        </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">용량(톤)</label>
           <input type="number" min={1} value={capacityTon} onChange={(e) => setCapacityTon(Number(e.target.value))} className={inputCls} />
@@ -986,6 +997,19 @@ function extractOwner(memo?: string | null): string | null {
     .map((t) => t.trim())
     .filter((t) => t && !/^\d+ft$/i.test(t) && t !== '자가' && t !== '임차')
   return tokens.length > 0 ? tokens.join(' · ') : null
+}
+
+/** memo 앞머리의 [ ... ] 화주 태그 원문(대괄호 포함). 없으면 빈 문자열. */
+function ownerTag(memo?: string | null): string {
+  if (!memo) return ''
+  const m = memo.match(/^\[[^\]]*\]/)
+  return m ? m[0] : ''
+}
+
+/** [화주] 태그를 걷어낸 순수 특이사항 본문만 반환. */
+function stripOwnerTag(memo?: string | null): string {
+  if (!memo) return ''
+  return memo.replace(/^\[[^\]]*\]\s*/, '').trim()
 }
 
 /** 접두사 없이 순번 컨테이너 번호 자동 생성 — 기존 숫자 번호 중 최대값 +1 (없으면 1001). */
