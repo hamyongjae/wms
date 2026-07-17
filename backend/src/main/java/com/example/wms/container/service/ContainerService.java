@@ -1,6 +1,7 @@
 package com.example.wms.container.service;
 
 import com.example.wms.container.dto.*;
+import com.example.wms.common.validation.TemporalValidator;
 import com.example.wms.container.entity.Container;
 import com.example.wms.container.entity.ContainerStatus;
 import com.example.wms.container.repository.ContainerRepository;
@@ -41,6 +42,10 @@ public class ContainerService {
         if (containerRepository.existsByTenantIdAndContainerNo(tenantId, req.getContainerNo())) {
             throw new IllegalArgumentException("이미 존재하는 컨테이너 번호입니다: " + req.getContainerNo());
         }
+
+        // [날짜 정합성] 실제 입고일은 미래 불가 + 출고예정일은 입고일보다 과거 불가
+        TemporalValidator.validateInboundNotFuture(req.getInboundDate());
+        TemporalValidator.validateOutboundAfterInbound(req.getInboundDate(), req.getExpectedOutboundDate());
 
         Container container = new Container(
                 warehouse.getTenant(), warehouse, req.getContainerNo(),
@@ -85,6 +90,10 @@ public class ContainerService {
                 && containerRepository.existsByTenantIdAndContainerNo(tenantId, req.getContainerNo())) {
             throw new IllegalArgumentException("이미 존재하는 컨테이너 번호입니다: " + req.getContainerNo());
         }
+        // [날짜 정합성] 수정 시에도 입고 미래 불가 + 출고 >= 입고
+        TemporalValidator.validateInboundNotFuture(req.getInboundDate());
+        TemporalValidator.validateOutboundAfterInbound(req.getInboundDate(), req.getExpectedOutboundDate());
+
         container.updateInfo(req.getContainerNo(), req.getCapacityTon(), req.getMemo());
         container.setStorageDates(req.getInboundDate(), req.getExpectedOutboundDate());
         return new ContainerResponse(container);
@@ -125,18 +134,4 @@ public class ContainerService {
     public void deleteContainer(Long id) {
         Container container = findOrThrow(id);
         if (container.getStatus() == ContainerStatus.OCCUPIED) {
-            throw new IllegalStateException("사용 중인 컨테이너는 삭제할 수 없습니다. 먼저 회수하세요.");
-        }
-        containerRepository.delete(container);
-    }
-
-    // ===== 내부 헬퍼 =====
-    private Container findOrThrow(Long id) {
-        Long tenantId = SecurityUtils.getCurrentTenantId();
-        return containerRepository.findByIdAndTenantId(id, tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 컨테이너입니다. id=" + id));
-    }
-
-    private Container lockOrThrow(Long id) {
-        Long tenantId = SecurityUtils.getCurrentTenantId();
-        return c
+            throw ne

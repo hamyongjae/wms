@@ -1,6 +1,7 @@
 package com.example.wms.order.service;
 
 import com.example.wms.order.dto.*;
+import com.example.wms.common.validation.TemporalValidator;
 import com.example.wms.customer.entity.Customer;
 import com.example.wms.customer.exception.BlacklistedCustomerException;
 import com.example.wms.order.entity.StorageOrder;
@@ -43,6 +44,9 @@ public class StorageOrderService {
             throw new BlacklistedCustomerException(customer.getName());
         }
 
+        // [날짜 정합성] 종료일 >= 시작일 (당일 계약 허용)
+        TemporalValidator.validateContractPeriod(request.getStorageStartDate(), request.getExpectedEndDate());
+
         Warehouse warehouse = warehouseRepository.findByIdAndTenantId(request.getWarehouseId(), tenantId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "존재하지 않는 창고입니다. id=" + request.getWarehouseId()));
@@ -83,6 +87,8 @@ public class StorageOrderService {
     @Transactional
     public StorageOrderResponse updateOrder(Long id, StorageOrderUpdateRequest request) {
         StorageOrder order = findOrderOrThrow(id);
+        // [날짜 정합성] 변경되는 종료일도 시작일보다 빠를 수 없다
+        TemporalValidator.validateContractPeriod(order.getStorageStartDate(), request.getExpectedEndDate());
         order.updateInfo(
                 request.getExpectedEndDate(),
                 request.getMonthlyFee(),
@@ -95,23 +101,11 @@ public class StorageOrderService {
     @Transactional
     public StorageOrderResponse releaseOrder(Long id, StorageOrderReleaseRequest request) {
         StorageOrder order = findOrderOrThrow(id);
+        // [날짜 정합성] 실제 출고일은 보관 시작일보다 빠를 수 없다
+        TemporalValidator.validateContractPeriod(order.getStorageStartDate(), request.getActualEndDate());
         order.release(request.getActualEndDate());
         return new StorageOrderResponse(order);
     }
 
     @Transactional
-    public void deleteOrder(Long id) {
-        StorageOrder order = findOrderOrThrow(id);
-        storageOrderRepository.delete(order);
-    }
-
-    // ===== 내부 헬퍼 =====
-    // [격리] id로 찾되 내 tenant 소유일 때만
-    private StorageOrder findOrderOrThrow(Long id) {
-        Long tenantId = SecurityUtils.getCurrentTenantId();
-        return storageOrderRepository.findByIdAndTenantId(id, tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 계약입니다. id=" + id));
-    }
-
-    private String generateOrderNumber() {
-        String datePart = LocalDate.now().format(DateTimeFormatte
+    publi
