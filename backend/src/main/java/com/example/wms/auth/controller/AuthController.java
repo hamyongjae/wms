@@ -33,13 +33,14 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // 직원/관리자 계정 추가 (POST /api/auth/signup) — ADMIN 전용, 자기 회사에만
+    // 직원 계정 추가 (POST /api/auth/signup-staff) — ADMIN 전용, 자기 회사에만
+    // tenantId는 요청 값이 아니라 로그인한 ADMIN의 토큰에서 상속된다.
     @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/signup")
-    public ResponseEntity<UserResponse> signUp(
+    @PostMapping("/signup-staff")
+    public ResponseEntity<UserResponse> signUpStaff(
             @Valid @RequestBody SignUpRequest request) {
 
-        UserResponse response = authService.signUp(request);
+        UserResponse response = authService.signUpStaff(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

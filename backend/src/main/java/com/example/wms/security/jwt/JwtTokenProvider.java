@@ -44,9 +44,12 @@ public class JwtTokenProvider implements TokenProvider {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + accessTokenValidityMs);
 
+        // 소셜 최초 진입(PENDING) 유저는 아직 tenant가 없으므로 tenantId 클레임이 null일 수 있다.
+        Long tenantId = (user.getTenant() != null) ? user.getTenant().getId() : null;
+
         return Jwts.builder()
                 .subject(String.valueOf(user.getId()))     // 표준 sub 클레임 = userId
-                .claim("tenantId", user.getTenant().getId())
+                .claim("tenantId", tenantId)               // null 이면 클레임 미포함
                 .claim("username", user.getUsername())
                 .claim("role", user.getRole().name())
                 .issuedAt(now)

@@ -1,5 +1,7 @@
 package com.example.wms.common.exception;
 
+import com.example.wms.auth.exception.DuplicateUsernameException;
+import com.example.wms.auth.exception.LocalLoginNotAllowedException;
 import com.example.wms.common.dto.ErrorResponse;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.http.HttpStatus;
@@ -17,6 +19,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException e) {
         ErrorResponse error = new ErrorResponse(HttpStatus.BAD_REQUEST.value(), e.getMessage());
         return ResponseEntity.badRequest().body(error);
+    }
+
+    // 아이디 중복 가입 시도 → 409 Conflict (리소스 상태 충돌)
+    @ExceptionHandler(DuplicateUsernameException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateUsername(DuplicateUsernameException e) {
+        ErrorResponse error = new ErrorResponse(HttpStatus.CONFLICT.value(), e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    // 소셜 계정으로 로컬 로그인 시도 → 401 Unauthorized (인증 방식 불일치)
+    @ExceptionHandler(LocalLoginNotAllowedException.class)
+    public ResponseEntity<ErrorResponse> handleLocalLoginNotAllowed(LocalLoginNotAllowedException e) {
+        ErrorResponse error = new ErrorResponse(HttpStatus.UNAUTHORIZED.value(), e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
     }
 
     // @Valid 검증 실패 처리 (필수값 누락 등) → 400

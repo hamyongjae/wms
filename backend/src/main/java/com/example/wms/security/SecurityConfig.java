@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -49,6 +50,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                // CORS 활성화 (CorsConfig의 CorsConfigurationSource 빈 사용)
+                .cors(Customizer.withDefaults())
+
                 // REST + 토큰 방식이라 CSRF/폼로그인/기본인증 비활성화
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -59,9 +63,12 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
-                        // 공개: 로그인 + 신규 업체 셀프 가입만
-                        // (signup은 이제 ADMIN 전용이므로 여기서 제외 → 인증 필요)
-                        .requestMatchers("/api/auth/login", "/api/auth/register-company").permitAll()
+                        // 공개: 로그인 + 신규 업체 셀프 가입 + 소셜 로그인 진입점
+                        // (signup/social 회사등록/초대는 인증·ADMIN 필요 → 여기서 제외)
+                        .requestMatchers(
+                                "/api/auth/login",
+                                "/api/auth/register-company",
+                                "/api/auth/social/login/**").permitAll()
                         // Swagger 문서 공개
                         .requestMatchers(
                                 "/swagger-ui/**",

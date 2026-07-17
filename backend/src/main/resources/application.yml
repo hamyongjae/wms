@@ -25,5 +25,7 @@ jwt:
   # 운영에서는 JWT_SECRET 환경변수로 주입하고, 없으면 아래 기본값(개발용) 사용.
   # Base64 인코딩된 최소 256bit(32byte 이상) 문자열이어야 한다.
   secret: ${JWT_SECRET:dGhpcy1pcy1hLXZlcnktbG9uZy1zZWNyZXQta2V5LWZvci13bXMtand0LWhtYWMtc2hhMjU2LTEyMzQ1Ng==}
-  # Access 토큰 만료 시간 (밀리초, 기본 1시간)
-  access-token-validity-ms: ${JWT_ACCESS_TOKEN_VALIDITY_MS:3600000}
+  # Access 토큰 만료 시간 (밀리초)
+  # 개발 편의를 위해 기본 12시간. 운영에서는 JWT_ACCESS_TOKEN_VALIDITY_MS 환경변수로
+  # 짧게(예: 3600000=1시간) 주고 리프레시 토큰을 도입하는 것을 권장.
+  access-token-validity-ms: ${JWT_ACCESS_TOKEN_VALIDITY_MS:43200000}
