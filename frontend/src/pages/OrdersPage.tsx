@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, Trash2, LogOut, FileText, ShieldAlert, AlertTriangle } from 'lucide-react'
+import { Plus, Loader2, Trash2, LogOut, FileText, ShieldAlert, AlertTriangle, Pencil } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus } from '@/api/orderApi'
 import { customerApi, type Customer, type CustomerType } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
@@ -45,6 +45,7 @@ export default function OrdersPage() {
   const [refreshKey, setRefreshKey] = useState(0)
 
   const [createOpen, setCreateOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<StorageOrder | null>(null)
   const [releaseTarget, setReleaseTarget] = useState<StorageOrder | null>(null)
 
   const reload = () => setRefreshKey((k) => k + 1)
@@ -181,14 +182,24 @@ export default function OrdersPage() {
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-1">
                       {isActive(o.status) && (
-                        <button
-                          type="button"
-                          onClick={() => setReleaseTarget(o)}
-                          className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-amber-600 transition hover:bg-amber-50"
-                        >
-                          <LogOut size={14} />
-                          출고 처리
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setEditTarget(o)}
+                            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+                          >
+                            <Pencil size={14} />
+                            수정
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReleaseTarget(o)}
+                            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-amber-600 transition hover:bg-amber-50"
+                          >
+                            <LogOut size={14} />
+                            출고 처리
+                          </button>
+                        </>
                       )}
                       {isAdmin && (
                         <button
@@ -221,6 +232,15 @@ export default function OrdersPage() {
         }}
       />
 
+      <EditOrderModal
+        target={editTarget}
+        onClose={() => setEditTarget(null)}
+        onDone={() => {
+          setEditTarget(null)
+          reload()
+        }}
+      />
+
       <ReleaseModal
         target={releaseTarget}
         onClose={() => setReleaseTarget(null)}
@@ -230,6 +250,136 @@ export default function OrdersPage() {
         }}
       />
     </div>
+  )
+}
+
+/* ===== 계약 수정 (출고예정일·월보관료·총부피·메모) ===== */
+function EditOrderModal({
+  target,
+  onClose,
+  onDone,
+}: {
+  target: StorageOrder | null
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [expectedEndDate, setEndDate] = useState('')
+  const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
+  const [totalVolume, setVolume] = useState('')
+  const [memo, setMemo] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (target) {
+      setEndDate(target.expectedEndDate ?? '')
+      setMonthlyFee(target.monthlyFee)
+      setVolume(target.totalVolume != null ? String(target.totalVolume) : '')
+      setMemo(target.memo ?? '')
+      setFormError(null)
+    }
+  }, [target])
+
+  if (!target) return null
+
+  const periodError = validateContractPeriod(target.storageStartDate, expectedEndDate)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (periodError) {
+      setFormError(periodError)
+      return
+    }
+    if (monthlyFee == null || monthlyFee <= 0) {
+      setFormError('월 보관료를 입력하세요.')
+      return
+    }
+    setFormError(null)
+    setSubmitting(true)
+    try {
+      await orderApi.update(target!.id, {
+        expectedEndDate: expectedEndDate || undefined,
+        monthlyFee: monthlyFee!,
+        totalVolume: totalVolume ? Number(totalVolume) : undefined,
+        memo: memo || undefined,
+      })
+      onDone()
+    } catch (err) {
+      setFormError(errMsg(err, '계약 수정에 실패했습니다.'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`${target.orderNumber} · 계약 수정`}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
+          <div>
+            <span className="block text-xs text-slate-400">고객</span>
+            <span className="font-medium text-slate-700">{target.customerName}</span>
+          </div>
+          <div>
+            <span className="block text-xs text-slate-400">창고</span>
+            <span className="font-medium text-slate-700">{target.warehouseName}</span>
+          </div>
+          <div>
+            <span className="block text-xs text-slate-400">보관 시작일</span>
+            <span className="font-medium text-slate-700">{target.storageStartDate}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
+            <input
+              type="date"
+              value={expectedEndDate}
+              min={target.storageStartDate || undefined}
+              onChange={(e) => setEndDate(e.target.value)}
+              className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">월 보관료 *</label>
+            <MoneyInput
+              value={monthlyFee}
+              onChange={setMonthlyFee}
+              required
+              placeholder="예: 300,000"
+              className={cn(inputCls, 'pr-9')}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">총 부피(㎥)</label>
+            <input type="number" min={0} step="0.1" value={totalVolume} onChange={(e) => setVolume(e.target.value)} className={inputCls} />
+          </div>
+        </div>
+
+        {periodError && (
+          <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            {periodError}
+          </p>
+        )}
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">메모</label>
+          <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} />
+        </div>
+
+        {formError && <p className="text-sm text-red-600">{formError}</p>}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
+            취소
+          </button>
+          <button type="submit" disabled={submitting || periodError != null} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
+            {submitting ? '저장 중…' : '저장'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
