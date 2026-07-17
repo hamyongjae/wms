@@ -7,7 +7,6 @@ import {
   Loader2,
   X,
   CalendarDays,
-  PackageOpen,
   Truck,
   Bell,
   ArrowRightLeft,
@@ -475,11 +474,6 @@ function EventCard({
             중도 출고 정산
           </QuickBtn>
         )}
-        {event.type === 'INBOUND' && (
-          <QuickBtn onClick={() => navigate('/yard')} icon={<PackageOpen size={13} />}>
-            빈 슬롯 추천·배치
-          </QuickBtn>
-        )}
         {event.type === 'BILLING' && event.status !== 'COMPLETED' && (
           <>
             <QuickBtn onClick={settlePayment} disabled={busy} icon={<CheckCircle2 size={13} />} tone="emerald">
@@ -493,7 +487,7 @@ function EventCard({
           </>
         )}
         {event.type === 'INBOUND' && (
-          <QuickBtn onClick={() => navigate('/containers')} icon={<Truck size={13} />}>
+          <QuickBtn onClick={() => navigate('/yard')} icon={<Truck size={13} />}>
             컨테이너 관리
           </QuickBtn>
         )}
@@ -534,3 +528,4 @@ function QuickBtn({
     </button>
   )
 }
+                                                                                                                                                                                                                           
