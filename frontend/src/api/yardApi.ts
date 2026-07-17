@@ -64,7 +64,7 @@ export const yardApi = {
     return data
   },
   async slots(warehouseId: number): Promise<YardSlot[]> {
-    // 야적장은 경계가 있어 전량 로드해도 무방 (넉넉히 size 지정)
+    // 보관창고은 경계가 있어 전량 로드해도 무방 (넉넉히 size 지정)
     const { data } = await api.get<Page<YardSlot>>('/api/yard/slots', {
       params: { warehouseId, size: 2000 },
     })

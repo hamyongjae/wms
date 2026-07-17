@@ -98,7 +98,7 @@ export default function YardDispatchPage() {
         setContainersById(new Map(cs.map((c) => [c.id, c])))
         setCustomers(cu)
       })
-      .catch(() => setError('야적장 현황을 불러오지 못했습니다.'))
+      .catch(() => setError('보관창고 현황을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [selectedId, refreshKey])
 
@@ -732,7 +732,7 @@ function GridModal({
   }
 
   return (
-    <Modal open onClose={onClose} title="야적장 구역(격자) 생성">
+    <Modal open onClose={onClose} title="보관창고 구역(격자) 생성">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">구역(Block)</label>

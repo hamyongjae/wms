@@ -63,7 +63,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         {!collapsed && (
           <div className="leading-tight">
             <p className="text-sm font-bold text-white">창고관리시스템</p>
-            <p className="text-xs text-slate-400">야적장 관리</p>
+            <p className="text-xs text-slate-400">보관창고 관리</p>
           </div>
         )}
       </div>

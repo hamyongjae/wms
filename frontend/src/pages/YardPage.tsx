@@ -52,7 +52,7 @@ export default function YardPage() {
         setOccupancy(occ)
         setSlots(sl)
       })
-      .catch(() => setError('야적장 현황을 불러오지 못했습니다.'))
+      .catch(() => setError('보관창고 현황을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [selectedId, refreshKey])
 
@@ -62,7 +62,7 @@ export default function YardPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">야적장 상황판</h2>
+          <h2 className="text-xl font-bold text-slate-800">보관창고 상황판</h2>
           <p className="mt-1 text-sm text-slate-500">구역별 컨테이너 적재 현황과 공실률을 한눈에 봅니다.</p>
         </div>
         {isAdmin && selectedId != null && (
@@ -246,7 +246,7 @@ function GridGenerator({ warehouseId, onDone }: { warehouseId: number; onDone: (
         구역 생성
       </button>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="야적장 구역(격자) 생성">
+      <Modal open={open} onClose={() => setOpen(false)} title="보관창고 구역(격자) 생성">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">구역(Block)</label>

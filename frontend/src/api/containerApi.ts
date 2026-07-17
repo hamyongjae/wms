@@ -79,7 +79,7 @@ export const containerApi = {
     await api.delete(`/api/containers/${id}`)
   },
 
-  // ===== 야적장 배치(입고/이동/반출) — 현장(STAFF+) =====
+  // ===== 보관창고 배치(입고/이동/반출) — 현장(STAFF+) =====
   async inbound(body: InboundRequest): Promise<void> {
     await api.post('/api/yard/inbound', body)
   },

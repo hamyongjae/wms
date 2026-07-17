@@ -121,7 +121,7 @@ export default function WarehousesPage() {
             <WarehouseIcon size={22} />
           </div>
           <p className="mt-4 text-base font-semibold text-slate-700">등록된 창고가 없습니다</p>
-          <p className="mt-1 text-sm text-slate-400">첫 창고를 추가해 야적장 운영을 시작하세요.</p>
+          <p className="mt-1 text-sm text-slate-400">첫 창고를 추가해 보관창고 운영을 시작하세요.</p>
         </div>
       )}
 

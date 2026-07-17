@@ -60,16 +60,16 @@ export default function LoginPage() {
         <div className="relative">
           <WarehouseArt className="mb-8 w-full max-w-xl" />
           <h2 className="text-3xl font-bold leading-snug text-white">
-            컨테이너 야적장을
+            컨테이너 보관창고를
             <br />
             한 화면에서 스마트하게
           </h2>
           <p className="mt-3 max-w-md text-sm leading-relaxed text-slate-300">
-            입출고·보관 계약·청구 정산·야적장 배치까지, 현장 운영에 필요한 모든 흐름을 실시간으로 관리하세요.
+            입출고·보관 계약·청구 정산·보관창고 배치까지, 현장 운영에 필요한 모든 흐름을 실시간으로 관리하세요.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-2.5">
-            <HeroChip icon={<Layers size={14} />} label="야적장 3단 적재 관리" />
+            <HeroChip icon={<Layers size={14} />} label="보관창고 3단 적재 관리" />
             <HeroChip icon={<Activity size={14} />} label="실시간 입출고 현황" />
             <HeroChip icon={<ShieldCheck size={14} />} label="금융 원장 수준 정산" />
           </div>
