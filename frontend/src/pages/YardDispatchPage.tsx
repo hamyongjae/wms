@@ -245,7 +245,7 @@ export default function YardDispatchPage() {
       {!loading && !error && slots.length > 0 && (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard label="총 슬롯" value={fmt(kpi.total)} icon={Grid3x3} tone="slate" />
+            <StatCard label="총 컨테이너" value={fmt(kpi.total)} icon={Grid3x3} tone="slate" />
             <StatCard label="사용중" value={fmt(kpi.occupied)} icon={Boxes} tone="indigo" />
             <StatCard label="공실" value={fmt(kpi.empty)} icon={Square} tone="emerald" />
           </div>

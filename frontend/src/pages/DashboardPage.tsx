@@ -16,6 +16,7 @@ import { billingApi, type BillingLedger } from '@/api/billingApi'
 import { yardApi, type WarehouseOccupancy } from '@/api/yardApi'
 import StatCard from '@/components/ui/StatCard'
 import RevenueBarChart, { type RevenuePoint } from '@/components/charts/RevenueBarChart'
+import WarehouseArt from '@/components/brand/WarehouseArt'
 import { authStorage } from '@/lib/auth'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -98,10 +99,22 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-slate-800">안녕하세요, {user?.name ?? ''}님 👋</h2>
-        <p className="mt-1 text-sm text-slate-500">오늘의 운영 현황을 한눈에 확인하세요.</p>
-      </div>
+      {/* 히어로 배너 — 스마트 창고 비주얼 결합 */}
+      <section className="bg-brand-hero relative overflow-hidden rounded-2xl px-6 py-7 shadow-sm sm:px-8">
+        <div className="bg-node-dots absolute inset-0 opacity-50" />
+        <WarehouseArt className="pointer-events-none absolute -right-6 top-1/2 hidden h-[150%] max-w-none -translate-y-1/2 opacity-90 md:block md:w-[46%]" />
+        <div className="relative max-w-lg">
+          <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-slate-100 backdrop-blur">
+            Smart Yard &amp; Warehouse
+          </span>
+          <h2 className="mt-3 text-2xl font-bold text-white">
+            안녕하세요, {user?.name ?? ''}님 👋
+          </h2>
+          <p className="mt-1.5 text-sm leading-relaxed text-slate-300">
+            오늘의 입출고·보관·정산 현황을 한눈에 확인하세요.
+          </p>
+        </div>
+      </section>
 
       {loading ? (
         <div className="flex items-center justify-center gap-2 py-20 text-slate-400">
@@ -115,7 +128,7 @@ export default function DashboardPage() {
             <StatCard label="진행중 계약" value={`${stats.activeContracts}건`} icon={FileText} tone="indigo" />
             <StatCard label="미수금 총액" value={won(stats.outstanding)} icon={Wallet} tone="amber" />
             <StatCard
-              label="야적장 사용률"
+              label="보관비율"
               value={`${stats.usage}%`}
               sub={`${stats.occupiedSlots.toLocaleString('ko-KR')}/${stats.totalSlots.toLocaleString('ko-KR')} 슬롯`}
               icon={Grid3x3}

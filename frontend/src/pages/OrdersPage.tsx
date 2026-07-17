@@ -185,20 +185,20 @@ export default function OrdersPage() {
                         <>
                           <button
                             type="button"
-                            onClick={() => setEditTarget(o)}
-                            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
-                          >
-                            <Pencil size={14} />
-                            수정
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => setReleaseTarget(o)}
                             className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-amber-600 transition hover:bg-amber-50"
                           >
                             <LogOut size={14} />
                             출고 처리
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditTarget(o)}
+                            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+                          >
+                            <Pencil size={14} />
+                          </button>
+
                         </>
                       )}
                       {isAdmin && (
@@ -312,7 +312,7 @@ function EditOrderModal({
   }
 
   return (
-    <Modal open onClose={onClose} title={`${target.orderNumber} · 계약 수정`}>
+    <Modal open onClose={onClose} title={`계약 수정`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
           <div>
@@ -341,7 +341,7 @@ function EditOrderModal({
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">월 보관료 *</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">보관료</label>
             <MoneyInput
               value={monthlyFee}
               onChange={setMonthlyFee}
@@ -349,10 +349,6 @@ function EditOrderModal({
               placeholder="예: 300,000"
               className={cn(inputCls, 'pr-9')}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">총 부피(㎥)</label>
-            <input type="number" min={0} step="0.1" value={totalVolume} onChange={(e) => setVolume(e.target.value)} className={inputCls} />
           </div>
         </div>
 

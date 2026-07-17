@@ -1,8 +1,81 @@
 @import "tailwindcss";
 
+/*
+ * ===== WMS 다크블루 / 슬레이트 테마 =====
+ * 인디고·바이올렛 계열 유틸리티를 앱 전역에서 다크블루(네이비) 스케일로 리매핑한다.
+ * 각 페이지의 `indigo-*` / `violet-*` 클래스를 수정하지 않고도 포인트 컬러가 한 번에 통일된다.
+ */
+@theme {
+  /* 브랜드 네이비 스케일 (indigo 오버라이드) */
+  --color-indigo-50: #eef3fb;
+  --color-indigo-100: #dae6f5;
+  --color-indigo-200: #bacfea;
+  --color-indigo-300: #8eaedd;
+  --color-indigo-400: #5c86ca;
+  --color-indigo-500: #3a62b0;
+  --color-indigo-600: #294f97;
+  --color-indigo-700: #223f78;
+  --color-indigo-800: #213862;
+  --color-indigo-900: #1b2c4c;
+  --color-indigo-950: #111d33;
+
+  /* 바이올렛도 동일 네이비로 흡수해 로그인/그라디언트 톤 통일 */
+  --color-violet-50: #eef3fb;
+  --color-violet-100: #dae6f5;
+  --color-violet-200: #bacfea;
+  --color-violet-300: #8eaedd;
+  --color-violet-400: #5c86ca;
+  --color-violet-500: #3a62b0;
+  --color-violet-600: #294f97;
+  --color-violet-700: #223f78;
+  --color-violet-800: #213862;
+  --color-violet-900: #1b2c4c;
+  --color-violet-950: #111d33;
+
+  /* 시맨틱 별칭 (신규 컴포넌트에서 사용) */
+  --color-brand: #294f97;
+  --color-brand-deep: #1b2c4c;
+  --color-navy: #16233d;
+}
+
 /* 앱 전체가 화면 높이를 채우도록 */
 html,
 body,
 #root {
   height: 100%;
+}
+
+/*
+ * ===== 창고/야적장 컨셉 배경 유틸 =====
+ */
+
+/* 히어로용 딥 네이비 그라디언트 (스마트 물류 톤) */
+.bg-brand-hero {
+  background:
+    radial-gradient(1200px 500px at 85% -10%, rgba(58, 98, 176, 0.35), transparent 60%),
+    radial-gradient(900px 600px at 0% 110%, rgba(41, 79, 151, 0.25), transparent 55%),
+    linear-gradient(135deg, #16233d 0%, #1b2c4c 45%, #223f78 100%);
+}
+
+/* 야적장 격자 패턴 (컨테이너 야드를 연상시키는 옅은 그리드) */
+.bg-yard-grid {
+  background-color: #f1f5f9;
+  background-image:
+    linear-gradient(rgba(41, 79, 151, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(41, 79, 151, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* 히어로 위에 얹는 옅은 도트(스마트/센서 노드 느낌) */
+.bg-node-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1.5px);
+  background-size: 22px 22px;
+}
+
+/* 딥 네이비 표면 위 격자 (사이드바/히어로 내부용) */
+.bg-navy-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 26px 26px;
 }

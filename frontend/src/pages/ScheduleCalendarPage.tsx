@@ -160,7 +160,7 @@ export default function ScheduleCalendarPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-800">입출고 · 청구 캘린더</h2>
+        <h2 className="text-xl font-bold text-slate-800">입출고 일정</h2>
         <p className="mt-1 text-sm text-slate-500">하루의 입고·출고·청구 흐름을 한눈에 보고 당일 액션을 처리합니다.</p>
       </div>
 
