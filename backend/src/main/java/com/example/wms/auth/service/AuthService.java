@@ -49,20 +49,30 @@ public class AuthService {
             throw new DuplicateUsernameException(request.getAdminUsername());
         }
 
+        // 이메일 정규화(공백 → null) — 빈 문자열이 unique 제약에 저장되는 것 방지
+        String adminEmail = (request.getEmail() != null && !request.getEmail().isBlank())
+                ? request.getEmail().trim() : null;
+
+        // [이메일 유일성] 계정찾기/비밀번호 재설정의 키이므로 가입 시점에 중복을 막는다
+        if (adminEmail != null && userRepository.existsByEmail(adminEmail)) {
+            throw new IllegalArgumentException("이미 사용 중인 이메일입니다: " + adminEmail);
+        }
+
         // 1) 회사(Tenant) 생성
         Tenant tenant = new Tenant(
                 request.getCompanyName(),
                 request.getBusinessNumber(),
                 request.getCeoName(),
                 request.getPhone(),
-                request.getEmail(),
+                adminEmail,
                 request.getAddress());
         Tenant savedTenant = tenantRepository.save(tenant);
 
         // 2) 첫 계정을 ADMIN으로 생성 (비밀번호 해시 저장)
+        //    [버그픽스] 관리자 계정에도 이메일을 저장해야 계정찾기/비밀번호 재설정이 동작한다.
         String encodedPassword = passwordEncoder.encode(request.getAdminPassword());
-        User admin = new User(savedTenant, request.getAdminUsername(), encodedPassword,
-                request.getAdminName(), UserRole.ADMIN);
+        User admin = User.localUser(savedTenant, request.getAdminUsername(), encodedPassword,
+                request.getAdminName(), adminEmail, UserRole.ADMIN);
         User savedAdmin = userRepository.save(admin);
 
         // 3) 바로 로그인된 상태가 되도록 토큰 발급해서 반환
