@@ -26,6 +26,9 @@ public interface ContainerRepository extends JpaRepository<Container, Long> {
     // 창고별 조회
     Page<Container> findByTenantIdAndWarehouseId(Long tenantId, Long warehouseId, Pageable pageable);
 
+    // [화주 검색] 창고 내 전체 컨테이너 (memo 화주 태그 파싱용, 경계가 있어 전량 로드 OK)
+    List<Container> findAllByTenantIdAndWarehouseId(Long tenantId, Long warehouseId);
+
     // 상태별 조회 (빈 컨테이너 찾기 등)
     Page<Container> findByTenantIdAndStatus(Long tenantId, ContainerStatus status, Pageable pageable);
 

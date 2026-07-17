@@ -48,6 +48,15 @@ public class ContainerController {
         return ResponseEntity.ok(containerService.getContainer(id));
     }
 
+    // [화주명 검색] 창고 내 화주명 일치 컨테이너 id 목록 (하이라이트용)
+    //   예: GET /api/containers/search-owner?warehouseId=1&ownerName=홍길동
+    @GetMapping("/search-owner")
+    public ResponseEntity<java.util.List<Long>> searchByOwner(
+            @RequestParam Long warehouseId,
+            @RequestParam(required = false) String ownerName) {
+        return ResponseEntity.ok(containerService.searchContainerIdsByOwner(warehouseId, ownerName));
+    }
+
     // 기본 정보 수정 — ADMIN
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")

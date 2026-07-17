@@ -18,7 +18,6 @@ public class ContainerResponse {
     private final Integer capacityTon;
     private final ContainerStatus status;
     private final Long currentOrderId;
-    private final String currentOrderNumber;
     private final String memo;
     private final LocalDate inboundDate;
     private final LocalDate expectedOutboundDate;
@@ -35,7 +34,6 @@ public class ContainerResponse {
         this.capacityTon = c.getCapacityTon();
         this.status = c.getStatus();
         this.currentOrderId = c.getCurrentOrder() != null ? c.getCurrentOrder().getId() : null;
-        this.currentOrderNumber = c.getCurrentOrder() != null ? c.getCurrentOrder().getOrderNumber() : null;
         this.memo = c.getMemo();
         this.inboundDate = c.getInboundDate();
         this.expectedOutboundDate = c.getExpectedOutboundDate();

@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 
 @Service
 @RequiredArgsConstructor
@@ -54,10 +53,7 @@ public class StorageOrderService {
         // 고객·창고가 모두 내 tenant 소유이므로 소속은 자동으로 동일하다.
         Tenant tenant = customer.getTenant();
 
-        String orderNumber = generateOrderNumber();
-
         StorageOrder order = new StorageOrder(
-                orderNumber,
                 tenant,
                 customer,
                 warehouse,
@@ -87,9 +83,13 @@ public class StorageOrderService {
     @Transactional
     public StorageOrderResponse updateOrder(Long id, StorageOrderUpdateRequest request) {
         StorageOrder order = findOrderOrThrow(id);
-        // [날짜 정합성] 변경되는 종료일도 시작일보다 빠를 수 없다
-        TemporalValidator.validateContractPeriod(order.getStorageStartDate(), request.getExpectedEndDate());
+        // 시작일이 함께 넘어오면 그 값을, 아니면 기존 시작일을 기준으로 정합성 검증
+        LocalDate effectiveStart = request.getStorageStartDate() != null
+                ? request.getStorageStartDate() : order.getStorageStartDate();
+        // [날짜 정합성] 보관 시작일이 계약 종료일보다 미래가 될 수 없다 (당일 허용)
+        TemporalValidator.validateContractPeriod(effectiveStart, request.getExpectedEndDate());
         order.updateInfo(
+                request.getStorageStartDate(),
                 request.getExpectedEndDate(),
                 request.getMonthlyFee(),
                 request.getTotalVolume(),
@@ -119,15 +119,5 @@ public class StorageOrderService {
         Long tenantId = SecurityUtils.getCurrentTenantId();
         return storageOrderRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 계약입니다. id=" + id));
-    }
-
-    private String generateOrderNumber() {
-        String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String orderNumber;
-        do {
-            int random = (int) (Math.random() * 10000);
-            orderNumber = String.format("ORD-%s-%04d", datePart, random);
-        } while (storageOrderRepository.existsByOrderNumber(orderNumber));
-        return orderNumber;
     }
 }

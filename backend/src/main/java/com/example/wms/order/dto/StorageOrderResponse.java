@@ -9,7 +9,6 @@ import java.time.LocalDate;
 public class StorageOrderResponse {
 
     private final Long id;
-    private final String orderNumber;
 
     private final Long tenantId;
     private final String tenantName;
@@ -28,7 +27,6 @@ public class StorageOrderResponse {
 
     public StorageOrderResponse(StorageOrder order) {
         this.id = order.getId();
-        this.orderNumber = order.getOrderNumber();
 
         this.tenantId = order.getTenant().getId();
         this.tenantName = order.getTenant().getName();

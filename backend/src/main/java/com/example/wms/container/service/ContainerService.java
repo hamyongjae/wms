@@ -16,6 +16,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * 컨테이너 관리 서비스.
  *
@@ -29,6 +34,9 @@ public class ContainerService {
     private final ContainerRepository containerRepository;
     private final WarehouseRepository warehouseRepository;
     private final StorageOrderRepository storageOrderRepository;
+
+    // memo 앞머리의 [화주·규격·소유] 태그를 파싱하기 위한 패턴
+    private static final Pattern OWNER_TAG = Pattern.compile("^\\[([^\\]]+)\\]");
 
     // ===== 등록 =====
     @Transactional
@@ -77,6 +85,45 @@ public class ContainerService {
     @Transactional(readOnly = true)
     public ContainerResponse getContainer(Long id) {
         return new ContainerResponse(findOrThrow(id));
+    }
+
+    // ===== [화주명 검색] 창고 내에서 화주명이 일치하는 컨테이너 id 목록 =====
+    // 프론트가 넘긴 고객명(화주명) 질의를 tenant 격리 하에 검증·매칭하여, 하이라이트 대상 id 집합을 돌려준다.
+    @Transactional(readOnly = true)
+    public List<Long> searchContainerIdsByOwner(Long warehouseId, String ownerName) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        List<Long> matched = new ArrayList<>();
+        if (ownerName == null || ownerName.isBlank()) {
+            return matched; // 빈 질의 → 매칭 없음(하이라이트 해제)
+        }
+        // [격리] 요청 창고가 내 tenant 소유인지 확인 (남의 창고 id 차단)
+        warehouseRepository.findByIdAndTenantId(warehouseId, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 창고입니다. id=" + warehouseId));
+
+        String needle = ownerName.trim().toLowerCase();
+        for (Container c : containerRepository.findAllByTenantIdAndWarehouseId(tenantId, warehouseId)) {
+            String owner = ownerFromMemo(c.getMemo());
+            if (owner != null && owner.toLowerCase().contains(needle)) {
+                matched.add(c.getId());
+            }
+        }
+        return matched;
+    }
+
+    /** memo 앞 [화주·규격·소유] 태그에서 화주명만 추출 (규격/소유 토큰 제외). 없으면 null. */
+    private String ownerFromMemo(String memo) {
+        if (memo == null) return null;
+        Matcher m = OWNER_TAG.matcher(memo);
+        if (!m.find()) return null;
+        List<String> keep = new ArrayList<>();
+        for (String token : m.group(1).split("·")) {
+            String t = token.trim();
+            if (t.isEmpty() || t.matches("(?i)\\d+ft") || t.equals("자가") || t.equals("임차")) {
+                continue;
+            }
+            keep.add(t);
+        }
+        return keep.isEmpty() ? null : String.join(" · ", keep);
     }
 
     // ===== 기본 정보 수정 =====

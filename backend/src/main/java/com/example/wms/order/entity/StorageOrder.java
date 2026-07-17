@@ -22,9 +22,6 @@ public class StorageOrder {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "order_number", nullable = false, unique = true, length = 50)
-    private String orderNumber;              // 계약 번호 (자동 생성)
-
     // ===== 관계 =====
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
@@ -73,10 +70,9 @@ public class StorageOrder {
     private LocalDateTime updatedAt;
 
     // ===== 생성자 =====
-    public StorageOrder(String orderNumber, Tenant tenant, Customer customer, Warehouse warehouse,
+    public StorageOrder(Tenant tenant, Customer customer, Warehouse warehouse,
                         LocalDate storageStartDate, LocalDate expectedEndDate,
                         Integer monthlyFee, Double totalVolume, String memo) {
-        this.orderNumber = orderNumber;
         this.tenant = tenant;
         this.customer = customer;
         this.warehouse = warehouse;
@@ -88,9 +84,12 @@ public class StorageOrder {
         this.status = OrderStatus.RECEIVED;
     }
 
-    // ===== 정보 수정 =====
-    public void updateInfo(LocalDate expectedEndDate, Integer monthlyFee,
+    // ===== 정보 수정 (보관 시작일까지 편집 허용) =====
+    public void updateInfo(LocalDate storageStartDate, LocalDate expectedEndDate, Integer monthlyFee,
                            Double totalVolume, String memo) {
+        if (storageStartDate != null) {
+            this.storageStartDate = storageStartDate;
+        }
         this.expectedEndDate = expectedEndDate;
         this.monthlyFee = monthlyFee;
         this.totalVolume = totalVolume;
