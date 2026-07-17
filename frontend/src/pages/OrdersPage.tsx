@@ -70,7 +70,7 @@ export default function OrdersPage() {
   }, [orders, filter])
 
   async function handleDelete(o: StorageOrder) {
-    if (!window.confirm(`'${o.orderNumber}' 계약을 삭제할까요?`)) return
+    if (!window.confirm(`'${o.customerName}' 계약을 삭제할까요?`)) return
     try {
       await orderApi.remove(o.id)
       reload()
@@ -148,7 +148,6 @@ export default function OrdersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
-                <th className="px-5 py-3 font-medium">계약번호</th>
                 <th className="px-5 py-3 font-medium">고객</th>
                 <th className="px-5 py-3 font-medium">창고</th>
                 <th className="px-5 py-3 font-medium">보관기간</th>
@@ -160,8 +159,7 @@ export default function OrdersPage() {
             <tbody className="divide-y divide-slate-100">
               {visible.map((o) => (
                 <tr key={o.id} className="transition hover:bg-slate-50">
-                  <td className="px-5 py-3 font-medium text-slate-800">{o.orderNumber}</td>
-                  <td className="px-5 py-3 text-slate-600">{o.customerName}</td>
+                  <td className="px-5 py-3 font-medium text-slate-800">{o.customerName}</td>
                   <td className="px-5 py-3 text-slate-500">{o.warehouseName}</td>
                   <td className="px-5 py-3 text-slate-500">
                     {o.storageStartDate}
@@ -263,6 +261,7 @@ function EditOrderModal({
   onClose: () => void
   onDone: () => void
 }) {
+  const [storageStartDate, setStartDate] = useState('')
   const [expectedEndDate, setEndDate] = useState('')
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
   const [totalVolume, setVolume] = useState('')
@@ -272,6 +271,7 @@ function EditOrderModal({
 
   useEffect(() => {
     if (target) {
+      setStartDate(target.storageStartDate ?? '')
       setEndDate(target.expectedEndDate ?? '')
       setMonthlyFee(target.monthlyFee)
       setVolume(target.totalVolume != null ? String(target.totalVolume) : '')
@@ -282,7 +282,8 @@ function EditOrderModal({
 
   if (!target) return null
 
-  const periodError = validateContractPeriod(target.storageStartDate, expectedEndDate)
+  // [정합성] 보관 시작일이 계약 종료일보다 미래가 될 수 없다 (당일 허용)
+  const periodError = validateContractPeriod(storageStartDate, expectedEndDate)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -298,6 +299,7 @@ function EditOrderModal({
     setSubmitting(true)
     try {
       await orderApi.update(target!.id, {
+        storageStartDate: storageStartDate || undefined,
         expectedEndDate: expectedEndDate || undefined,
         monthlyFee: monthlyFee!,
         totalVolume: totalVolume ? Number(totalVolume) : undefined,
@@ -323,25 +325,32 @@ function EditOrderModal({
             <span className="block text-xs text-slate-400">창고</span>
             <span className="font-medium text-slate-700">{target.warehouseName}</span>
           </div>
-          <div>
-            <span className="block text-xs text-slate-400">보관 시작일</span>
-            <span className="font-medium text-slate-700">{target.storageStartDate}</span>
-          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">보관 시작일 *</label>
+            <input
+              type="date"
+              value={storageStartDate}
+              max={expectedEndDate || undefined}
+              onChange={(e) => setStartDate(e.target.value)}
+              required
+              className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+            />
+          </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
             <input
               type="date"
               value={expectedEndDate}
-              min={target.storageStartDate || undefined}
+              min={storageStartDate || undefined}
               onChange={(e) => setEndDate(e.target.value)}
               className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
             />
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">보관료</label>
+          <div className="col-span-2">
+            <label className="mb-1 block text-sm font-medium text-slate-700">보관료 *</label>
             <MoneyInput
               value={monthlyFee}
               onChange={setMonthlyFee}
@@ -360,8 +369,14 @@ function EditOrderModal({
         )}
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">메모</label>
-          <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} />
+          <label className="mb-1 block text-sm font-medium text-slate-700">메모 (특이사항)</label>
+          <textarea
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            rows={6}
+            placeholder="계약 특이사항이나 부대 정보를 자유롭게 입력하세요."
+            className={cn(inputCls, 'min-h-[140px] w-full resize-y leading-relaxed')}
+          />
         </div>
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
@@ -750,7 +765,7 @@ function ReleaseModal({
   }
 
   return (
-    <Modal open onClose={onClose} title={`${target.orderNumber} · 출고 처리`}>
+    <Modal open onClose={onClose} title={`${target.customerName} · 출고 처리`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
           <span className="font-medium text-slate-800">{target.customerName}</span> 계약을 출고 완료 처리합니다.

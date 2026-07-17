@@ -5,7 +5,6 @@ export type OrderStatus = 'RECEIVED' | 'IN_STORAGE' | 'RELEASED' | 'CANCELLED'
 
 export interface StorageOrder {
   id: number
-  orderNumber: string
   tenantId: number
   tenantName: string
   customerId: number
@@ -32,6 +31,7 @@ export interface OrderCreate {
 }
 
 export interface OrderUpdate {
+  storageStartDate?: string
   expectedEndDate?: string
   monthlyFee?: number
   totalVolume?: number

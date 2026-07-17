@@ -38,8 +38,9 @@ export type CustomerDto = Customer
 
 export const customerApi = {
   async list(name?: string): Promise<Customer[]> {
+    // 가장 최근 신규 등록 고객이 최상단에 오도록 등록일 내림차순 정렬
     const { data } = await api.get<Page<Customer>>('/api/customers', {
-      params: { name: name || undefined, size: 500 },
+      params: { name: name || undefined, size: 500, sort: 'createdAt,desc' },
     })
     return data.content
   },

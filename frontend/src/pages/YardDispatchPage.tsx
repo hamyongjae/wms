@@ -64,6 +64,9 @@ export default function YardDispatchPage() {
   const [refreshKey, setRefreshKey] = useState(0)
 
   const [query, setQuery] = useState('')
+  // [화주명 검색] 백엔드가 검증·매칭해 돌려준 하이라이트 대상 컨테이너 id 집합
+  const [matchedIds, setMatchedIds] = useState<Set<number>>(new Set())
+  const [searching, setSearching] = useState(false)
   const [inboundSlot, setInboundSlot] = useState<YardSlot | null>(null)
   const [actionSlot, setActionSlot] = useState<YardSlot | null>(null)
   const [editSlot, setEditSlot] = useState<YardSlot | null>(null)
@@ -88,6 +91,9 @@ export default function YardDispatchPage() {
     if (selectedId == null) return
     setLoading(true)
     setError(null)
+    // 창고 전환/새로고침 시 이전 하이라이트·질의는 초기화
+    setMatchedIds(new Set())
+    setQuery('')
     Promise.all([
       yardApi.slots(selectedId),
       containerApi.list({ warehouseId: selectedId }),
@@ -109,8 +115,41 @@ export default function YardDispatchPage() {
     return { total, occupied, empty: total - occupied }
   }, [slots])
 
-  const q = query.trim().toLowerCase()
-  const matchSlot = (s: YardSlot) => q !== '' && s.occupied && (s.containerNo ?? '').toLowerCase().includes(q)
+  // 백엔드가 반환한 매칭 컨테이너 id 집합에 속하면 하이라이트
+  const matchSlot = (s: YardSlot) =>
+    matchedIds.size > 0 && s.occupied && s.containerId != null && matchedIds.has(s.containerId)
+
+  // [화주명 검색] 프론트 상태(질의) → 백엔드 검증 쿼리 → 매칭 id 집합 수신 → 하이라이트
+  async function handleOwnerSearch(e: FormEvent) {
+    e.preventDefault()
+    if (selectedId == null) return
+    const term = query.trim()
+    if (term === '') {
+      setMatchedIds(new Set())
+      setBanner(null)
+      return
+    }
+    setSearching(true)
+    try {
+      const ids = await containerApi.searchByOwner(selectedId, term)
+      setMatchedIds(new Set(ids))
+      setBanner(
+        ids.length > 0
+          ? `'${term}' 화주 컨테이너 ${ids.length}개를 찾았습니다.`
+          : `'${term}' 화주 소유 컨테이너가 없습니다.`,
+      )
+    } catch {
+      setBanner('화주명 검색에 실패했습니다.')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  // 검색어를 비우면 하이라이트 즉시 해제
+  function onQueryChange(v: string) {
+    setQuery(v)
+    if (v.trim() === '') setMatchedIds(new Set())
+  }
 
   /* ===== 액션 ===== */
   async function doQuickInbound(body: QuickInboundDto) {
@@ -197,15 +236,24 @@ export default function YardDispatchPage() {
             </button>
           ))}
         </div>
-        <div className="relative w-full sm:max-w-xs">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="컨테이너 번호 검색 (하이라이트)"
-            className={cn(inputCls, 'pl-9')}
-          />
-        </div>
+        <form onSubmit={handleOwnerSearch} className="flex w-full gap-2 sm:max-w-md">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={query}
+              onChange={(e) => onQueryChange(e.target.value)}
+              placeholder="고객명(화주명) 검색 · 조회 시 하이라이트"
+              className={cn(inputCls, 'pl-9')}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={searching}
+            className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
+          >
+            {searching ? '조회 중…' : '조회'}
+          </button>
+        </form>
       </div>
 
       {banner && (

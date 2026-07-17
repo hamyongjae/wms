@@ -12,7 +12,6 @@ export interface Container {
   capacityTon: number
   status: ContainerStatus
   currentOrderId: number | null
-  currentOrderNumber: string | null
   memo: string | null
   inboundDate: string | null
   expectedOutboundDate: string | null
@@ -62,6 +61,13 @@ export const containerApi = {
       params: { ...params, size: 1000 },
     })
     return data.content
+  },
+  /** [화주명 검색] 창고 내 화주명 일치 컨테이너 id 목록 (하이라이트용) */
+  async searchByOwner(warehouseId: number, ownerName: string): Promise<number[]> {
+    const { data } = await api.get<number[]>('/api/containers/search-owner', {
+      params: { warehouseId, ownerName },
+    })
+    return data
   },
   async create(body: ContainerCreate): Promise<Container> {
     const { data } = await api.post<Container>('/api/containers', body)
