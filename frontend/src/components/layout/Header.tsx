@@ -190,4 +190,25 @@ function UserMenu() {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolu
+          <div className="absolute right-0 z-40 mt-1.5 w-52 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+            <div className="px-3 py-2">
+              <p className="text-sm font-medium text-slate-800">{user?.name ?? '사용자'}</p>
+              <p className="text-xs text-slate-400">
+                {user?.role === 'ADMIN' ? '관리자' : '직원'} · 업체 {user?.tenantId ?? '-'}
+              </p>
+            </div>
+            <div className="my-1 h-px bg-slate-100" />
+            <button
+              type="button"
+              onClick={logout}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+            >
+              <LogOut size={16} />
+              로그아웃
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}

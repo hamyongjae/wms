@@ -38,4 +38,12 @@ export async function getMonthEvents(year: number, month1to12: number): Promise<
   const from = new Date(first)
   from.setDate(from.getDate() - 6)
   const to = new Date(last)
-  to.setDate(to.getDate() 
+  to.setDate(to.getDate() + 14)
+
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+
+  const { data } = await api.get<CalendarEvent[]>('/api/calendar/events', {
+    params: { from: fmt(from), to: fmt(to) },
+  })
+  return data
+}

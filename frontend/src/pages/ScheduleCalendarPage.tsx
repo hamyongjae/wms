@@ -485,7 +485,7 @@ function EventCard({
               )}
               {event.unitPrice != null && (
                 <div className="flex items-center gap-2">
-                  <dt className="w-10 shrink-0 text-slate-400">단가</dt>
+                  <dt className="w-10 shrink-0 text-slate-400">보관료</dt>
                   <dd className="font-semibold text-indigo-600">{won(event.unitPrice)}</dd>
                 </div>
               )}
@@ -507,4 +507,46 @@ function EventCard({
               수금 완료 처리
             </QuickBtn>
             {isAdmin && (
-              <QuickBtn o
+              <QuickBtn onClick={resendNotify} disabled={busy} icon={<Bell size={13} />}>
+                알림톡 재발송
+              </QuickBtn>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function QuickBtn({
+  onClick,
+  icon,
+  children,
+  disabled,
+  tone = 'slate',
+}: {
+  onClick: () => void
+  icon: ReactNode
+  children: ReactNode
+  disabled?: boolean
+  tone?: 'slate' | 'emerald'
+}) {
+  const cls =
+    tone === 'emerald'
+      ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition disabled:opacity-50',
+        cls,
+      )}
+    >
+      {icon}
+      {children}
+    </button>
+  )
+}

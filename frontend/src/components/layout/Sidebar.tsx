@@ -77,4 +77,51 @@ export default function Sidebar({ collapsed }: SidebarProps) {
             <div
               key={to}
               draggable={draggable}
-              onDragStart={(e) 
+              onDragStart={(e) => onDragStart(e, index)}
+              onDragOver={(e) => onDragOver(e, index)}
+              onDrop={(e) => onDrop(e, index)}
+              onDragEnd={onDragEnd}
+              className={cn(
+                'group rounded-lg transition',
+                isDragging && 'opacity-50 shadow-md',
+                isOver && 'border-t-2 border-indigo-400',
+              )}
+            >
+              <NavLink to={to} title={collapsed ? label : undefined}>
+                {({ isActive }) => (
+                  <div
+                    className={cn(
+                      'relative flex items-center rounded-lg px-3 py-2 text-sm transition',
+                      collapsed && 'justify-center px-0',
+                      isActive
+                        ? 'bg-indigo-50 font-semibold text-indigo-700'
+                        : 'font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                    )}
+                  >
+                    {/* 좌측 포인트 바 */}
+                    {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-indigo-600" />}
+
+                    {/* 드래그 핸들 (펼친 상태에서만) */}
+                    {draggable && (
+                      <GripVertical
+                        size={15}
+                        className="mr-1 shrink-0 cursor-grab text-slate-300 opacity-0 transition group-hover:opacity-100 active:cursor-grabbing"
+                      />
+                    )}
+
+                    <Icon size={19} className="shrink-0" />
+                    {!collapsed && <span className="ml-3 truncate">{label}</span>}
+                  </div>
+                )}
+              </NavLink>
+            </div>
+          )
+        })}
+      </nav>
+
+      {!collapsed && (
+        <p className="px-4 py-3 text-[11px] text-slate-300">메뉴를 드래그해 순서를 바꿀 수 있어요</p>
+      )}
+    </aside>
+  )
+}
