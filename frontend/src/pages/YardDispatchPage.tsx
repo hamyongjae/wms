@@ -12,6 +12,9 @@ import {
   Boxes,
   Grid3x3,
   Square,
+  Check,
+  UserRound,
+  Building2,
 } from 'lucide-react'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { yardApi, type YardSlot } from '@/api/yardApi'
@@ -21,6 +24,7 @@ import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
+import { digitsOnly } from '@/lib/format'
 import { validateInOut, todayStr } from '@/lib/dateValidation'
 
 /* ===== 타입 명세 ===== */
@@ -502,6 +506,7 @@ function InboundModal({
   onDone: () => void
 }) {
   const [customerId, setCustomerId] = useState('')
+  const [custQuery, setCustQuery] = useState('')
   const [capacityTon, setCapacityTon] = useState(5)
   const [inboundDate, setInboundDate] = useState(new Date().toISOString().slice(0, 10))
   const [outboundDate, setOutboundDate] = useState('')
@@ -511,6 +516,23 @@ function InboundModal({
 
   // 컨테이너 번호 자동 배정 (접두사 없이 순번) — 기존 번호 중 최대 정수 +1
   const autoNo = useMemo(() => nextContainerNo(existingNos), [existingNos])
+
+  const selectedCustomer = useMemo(
+    () => customers.find((c) => String(c.id) === customerId) ?? null,
+    [customers, customerId],
+  )
+
+  // 이름/연락처로 즉시 필터 (검색어 없으면 전체 = 최근 등록순)
+  const filteredCustomers = useMemo(() => {
+    const q = custQuery.trim().toLowerCase()
+    const qd = digitsOnly(custQuery)
+    if (!q) return customers
+    return customers.filter((c) => {
+      const byName = c.name.toLowerCase().includes(q)
+      const byPhone = qd.length > 0 && (c.phoneNumber ?? '').replace(/\D/g, '').includes(qd)
+      return byName || byPhone
+    })
+  }, [customers, custQuery])
 
   // 실제 입고 확정이므로 입고일 미래 불가 + 출고예정일 >= 입고일
   const dateError = validateInOut(inboundDate, outboundDate)
@@ -541,51 +563,123 @@ function InboundModal({
   }
 
   return (
-    <Modal open onClose={onClose} title="즉시 입고 및 배치">
+    <Modal open onClose={onClose} title="즉시 입고 및 배치" widthClass="max-w-3xl">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-700">
           <PackagePlus size={16} />
           위치 <span className="font-semibold">{slot.locationLabel}</span> 에 새 컨테이너를 배치합니다.
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">화주(고객) *</label>
-          <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} autoFocus className={inputCls}>
-            <option value="">화주 선택…</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">용량(톤)</label>
-          <input type="number" min={1} value={capacityTon} onChange={(e) => setCapacityTon(Number(e.target.value))} className={inputCls} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">입고일</label>
-            <input type="date" value={inboundDate} max={todayStr()} onChange={(e) => setInboundDate(e.target.value)} className={inputCls} />
+
+        {/* 좌: 입고 정보 폼 / 우: 화주 선택 리스트 */}
+        <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_19rem]">
+          {/* ===== 좌측 폼 ===== */}
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">화주(고객) *</label>
+              {selectedCustomer ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-800">{selectedCustomer.name}</p>
+                    <p className="truncate text-xs text-slate-500">{selectedCustomer.phoneNumber || '연락처 없음'}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCustomerId('')}
+                    className="shrink-0 rounded-md p-1 text-slate-400 transition hover:bg-white hover:text-slate-600"
+                    title="선택 해제"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              ) : (
+                <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-400">
+                  오른쪽 목록에서 화주를 선택하세요.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">용량(톤)</label>
+              <input type="number" min={1} value={capacityTon} onChange={(e) => setCapacityTon(Number(e.target.value))} className={inputCls} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">입고일</label>
+                <input type="date" value={inboundDate} max={todayStr()} onChange={(e) => setInboundDate(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
+                <input type="date" value={outboundDate} min={inboundDate || undefined} onChange={(e) => setOutboundDate(e.target.value)} className={inputCls} />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">특이사항</label>
+              <textarea
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                rows={3}
+                placeholder="컨테이너 특이사항을 자유롭게 입력하세요."
+                className={cn(inputCls, 'min-h-20 resize-y')}
+              />
+            </div>
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
-            <input type="date" value={outboundDate} min={inboundDate || undefined} onChange={(e) => setOutboundDate(e.target.value)} className={inputCls} />
+
+          {/* ===== 우측 화주 선택 리스트 ===== */}
+          <div className="flex max-h-[24rem] flex-col overflow-hidden rounded-xl border border-slate-200">
+            <div className="relative border-b border-slate-200 p-2">
+              <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                autoFocus
+                value={custQuery}
+                onChange={(e) => setCustQuery(e.target.value)}
+                placeholder="이름·연락처로 검색"
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-8 pr-3 text-sm outline-none focus:border-indigo-400 focus:bg-white"
+              />
+            </div>
+            <div className="flex items-center justify-between px-3 py-1.5 text-[11px] text-slate-400">
+              <span>{custQuery.trim() ? `검색 결과 ${filteredCustomers.length}건` : `전체 ${customers.length}명`}</span>
+            </div>
+            <ul className="flex-1 overflow-y-auto">
+              {filteredCustomers.length === 0 ? (
+                <li className="px-3 py-8 text-center text-sm text-slate-400">일치하는 고객이 없습니다.</li>
+              ) : (
+                filteredCustomers.map((c) => {
+                  const active = String(c.id) === customerId
+                  return (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => setCustomerId(String(c.id))}
+                        className={cn(
+                          'flex w-full items-center gap-2.5 px-3 py-2 text-left transition',
+                          active ? 'bg-indigo-50' : 'hover:bg-slate-50',
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg',
+                            c.customerType === 'CORPORATE' ? 'bg-violet-50 text-violet-600' : 'bg-slate-100 text-slate-500',
+                          )}
+                        >
+                          {c.customerType === 'CORPORATE' ? <Building2 size={14} /> : <UserRound size={14} />}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-slate-800">{c.name}</span>
+                          <span className="block truncate text-xs text-slate-400">{c.phoneNumber || '연락처 없음'}</span>
+                        </span>
+                        {active && <Check size={16} className="shrink-0 text-indigo-600" />}
+                      </button>
+                    </li>
+                  )
+                })
+              )}
+            </ul>
           </div>
         </div>
+
         {dateError && (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{dateError}</p>
         )}
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">특이사항</label>
-          <textarea
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            rows={4}
-            placeholder="컨테이너 특이사항을 자유롭게 입력하세요."
-            className={cn(inputCls, 'min-h-24 resize-y')}
-          />
-        </div>
-
         {formError && <p className="text-sm text-red-600">{formError}</p>}
 
         <div className="flex justify-end gap-2 pt-2">

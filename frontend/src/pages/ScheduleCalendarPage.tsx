@@ -45,9 +45,8 @@ const TYPE_META: Record<CalendarEventType, { label: string; emoji: string; badge
 
 const FILTERS: Array<{ key: FilterMode; label: string }> = [
   { key: 'ALL', label: '전체보기' },
-  { key: 'INBOUND', label: '입고만' },
-  { key: 'OUTBOUND', label: '출고만' },
-  { key: 'BILLING', label: '청구일만' },
+  { key: 'INBOUND', label: '입고' },
+  { key: 'OUTBOUND', label: '출고' }
 ]
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
