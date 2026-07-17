@@ -7,7 +7,6 @@ import {
   Loader2,
   X,
   CalendarDays,
-  Truck,
   Bell,
   ArrowRightLeft,
   CheckCircle2,
@@ -59,6 +58,11 @@ const todayStr = () => {
   return toDateStr(n.getFullYear(), n.getMonth(), n.getDate())
 }
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
+// 'YYYY-MM-DD' → 'YYYY. MM. DD' (백엔드 LocalDate 직렬화 문자열을 안전하게 표기)
+const fmtDate = (s: string) => {
+  const [y, m, d] = s.split('-')
+  return d ? `${y}. ${m}. ${d}` : s
+}
 
 // 입고/출고 이벤트는 상태에 따라 "예정/지연"을 붙여 명확히 보여준다.
 function eventLabel(e: CalendarEvent): string {
@@ -464,6 +468,29 @@ function EventCard({
           {event.amount != null && (
             <p className="text-xs text-slate-500">미수 {won(event.amount)}</p>
           )}
+
+          {(event.startDate || event.endDate || event.unitPrice != null) && (
+            <dl className="mt-2 space-y-1 border-t border-slate-100 pt-2 text-xs">
+              {event.startDate && (
+                <div className="flex items-center gap-2">
+                  <dt className="w-10 shrink-0 text-slate-400">시작일</dt>
+                  <dd className="font-medium text-slate-700">{fmtDate(event.startDate)}</dd>
+                </div>
+              )}
+              {event.endDate && (
+                <div className="flex items-center gap-2">
+                  <dt className="w-10 shrink-0 text-slate-400">종료일</dt>
+                  <dd className="font-medium text-slate-700">{fmtDate(event.endDate)}</dd>
+                </div>
+              )}
+              {event.unitPrice != null && (
+                <div className="flex items-center gap-2">
+                  <dt className="w-10 shrink-0 text-slate-400">단가</dt>
+                  <dd className="font-semibold text-indigo-600">{won(event.unitPrice)}</dd>
+                </div>
+              )}
+            </dl>
+          )}
         </div>
       </div>
 
@@ -480,52 +507,4 @@ function EventCard({
               수금 완료 처리
             </QuickBtn>
             {isAdmin && (
-              <QuickBtn onClick={resendNotify} disabled={busy} icon={<Bell size={13} />}>
-                알림톡 재발송
-              </QuickBtn>
-            )}
-          </>
-        )}
-        {event.type === 'INBOUND' && (
-          <QuickBtn onClick={() => navigate('/yard')} icon={<Truck size={13} />}>
-            컨테이너 관리
-          </QuickBtn>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function QuickBtn({
-  onClick,
-  icon,
-  children,
-  disabled,
-  tone = 'slate',
-}: {
-  onClick: () => void
-  icon: ReactNode
-  children: ReactNode
-  disabled?: boolean
-  tone?: 'slate' | 'emerald'
-}) {
-  const cls =
-    tone === 'emerald'
-      ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        'flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition disabled:opacity-50',
-        cls,
-      )}
-    >
-      {icon}
-      {children}
-    </button>
-  )
-}
-                                                                                                                                                                                                                           
+              <QuickBtn o

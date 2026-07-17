@@ -19,6 +19,9 @@ export interface CalendarEvent {
   status: CalendarEventStatus
   customerName: string
   amount?: number | null // BILLING 타입일 때만 값(미수 잔액)
+  startDate?: string | null // 시작일 (입고일/보관시작/청구기간 시작)
+  endDate?: string | null // 종료일 (출고예정/보관종료/청구기간 종료)
+  unitPrice?: number | null // 단가 (월 보관료/기본 청구액)
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -35,12 +38,4 @@ export async function getMonthEvents(year: number, month1to12: number): Promise<
   const from = new Date(first)
   from.setDate(from.getDate() - 6)
   const to = new Date(last)
-  to.setDate(to.getDate() + 14)
-
-  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-
-  const { data } = await api.get<CalendarEvent[]>('/api/calendar/events', {
-    params: { from: fmt(from), to: fmt(to) },
-  })
-  return data
-}
+  to.setDate(to.getDate() 
