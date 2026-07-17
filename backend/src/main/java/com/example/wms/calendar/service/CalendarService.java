@@ -57,13 +57,19 @@ public class CalendarService {
             }
             String customer = order.getCustomer().getName();
 
+            java.math.BigDecimal fee = order.getMonthlyFee() != null
+                    ? java.math.BigDecimal.valueOf(order.getMonthlyFee()) : null;
+            LocalDate periodStart = order.getStorageStartDate();
+            LocalDate periodEnd = order.getActualEndDate() != null
+                    ? order.getActualEndDate() : order.getExpectedEndDate();
+
             // 입고 이벤트
             LocalDate inDate = order.getStorageStartDate();
             if (inDate != null && inRange(inDate, from, to)) {
                 CalendarEventStatus status =
                         inDate.isAfter(today) ? CalendarEventStatus.PENDING : CalendarEventStatus.COMPLETED;
                 events.add(event(order.getId(), "[" + customer + "] 입고", inDate,
-                        CalendarEventType.INBOUND, status, customer, null));
+                        CalendarEventType.INBOUND, status, customer, null, periodStart, periodEnd, fee));
             }
 
             // 출고 이벤트 (완료면 실제일, 아니면 예정일)
@@ -79,7 +85,7 @@ public class CalendarService {
                     status = CalendarEventStatus.PENDING;
                 }
                 events.add(event(order.getId(), "[" + customer + "] 출고", outDate,
-                        CalendarEventType.OUTBOUND, status, customer, null));
+                        CalendarEventType.OUTBOUND, status, customer, null, periodStart, periodEnd, fee));
             }
         }
 
@@ -111,29 +117,31 @@ public class CalendarService {
             events.add(new CalendarEventResponse(
                     ledger.getId(), "[" + customer + "] 청구",
                     due.atTime(EVENT_TIME), due.atTime(EVENT_TIME),
-                    CalendarEventType.BILLING, status, customer, ledger.getBalance()));
+                    CalendarEventType.BILLING, status, customer, ledger.getBalance(),
+                    ledger.getBillingPeriodStart(), ledger.getBillingPeriodEnd(), ledger.getBaseAmount()));
         }
 
         // ===== 컨테이너 → 입고/출고(예정) =====
         for (Container container : containerRepository.findAllByTenantId(tenantId)) {
             String owner = ownerFromMemo(container.getMemo(), container.getContainerNo());
 
-            LocalDate inDate = container.getInboundDate();
-            if (inDate != null && inRange(inDate, from, to)) {
+            LocalDate cIn = container.getInboundDate();
+            LocalDate cOut = container.getExpectedOutboundDate();
+
+            if (cIn != null && inRange(cIn, from, to)) {
                 CalendarEventStatus status =
-                        inDate.isAfter(today) ? CalendarEventStatus.PENDING : CalendarEventStatus.COMPLETED;
-                events.add(event(container.getId(), "[" + owner + "] 입고", inDate,
-                        CalendarEventType.INBOUND, status, owner, null));
+                        cIn.isAfter(today) ? CalendarEventStatus.PENDING : CalendarEventStatus.COMPLETED;
+                events.add(event(container.getId(), "[" + owner + "] 입고", cIn,
+                        CalendarEventType.INBOUND, status, owner, null, cIn, cOut, null));
             }
 
-            LocalDate outDate = container.getExpectedOutboundDate();
-            if (outDate != null && inRange(outDate, from, to)) {
+            if (cOut != null && inRange(cOut, from, to)) {
                 // 아직 적재 중인데 출고 예정일이 지났으면 지연
-                boolean overdue = outDate.isBefore(today) && container.getStatus() == ContainerStatus.OCCUPIED;
+                boolean overdue = cOut.isBefore(today) && container.getStatus() == ContainerStatus.OCCUPIED;
                 CalendarEventStatus status =
                         overdue ? CalendarEventStatus.OVERDUE : CalendarEventStatus.PENDING;
-                events.add(event(container.getId(), "[" + owner + "] 출고", outDate,
-                        CalendarEventType.OUTBOUND, status, owner, null));
+                events.add(event(container.getId(), "[" + owner + "] 출고", cOut,
+                        CalendarEventType.OUTBOUND, status, owner, null, cIn, cOut, null));
             }
         }
 
@@ -161,15 +169,4 @@ public class CalendarService {
         return fallback;
     }
 
-    private CalendarEventResponse event(Long id, String title, LocalDate date,
-                                        CalendarEventType type, CalendarEventStatus status,
-                                        String customer, java.math.BigDecimal amount) {
-        return new CalendarEventResponse(id, title,
-                date.atTime(EVENT_TIME), date.atTime(EVENT_TIME),
-                type, status, customer, amount);
-    }
-
-    private boolean inRange(LocalDate d, LocalDate from, LocalDate to) {
-        return !d.isBefore(from) && !d.isAfter(to);
-    }
-}
+    private CalendarEventResponse ev

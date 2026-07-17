@@ -3,6 +3,7 @@ package com.example.wms.calendar.dto;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -21,16 +22,12 @@ public class CalendarEventResponse {
     private final String customerName;
     private final BigDecimal amount;        // BILLING 일 때만 값(미수 잔액), 그 외 null
 
+    // 상세 표시용: 시작일/종료일/단가 (소스에 있으면 채워짐, 없으면 null)
+    private final LocalDate startDate;
+    private final LocalDate endDate;
+    private final BigDecimal unitPrice;
+
     public CalendarEventResponse(Long id, String title, LocalDateTime startAt, LocalDateTime endAt,
                                  CalendarEventType type, CalendarEventStatus status,
-                                 String customerName, BigDecimal amount) {
-        this.id = id;
-        this.title = title;
-        this.startAt = startAt;
-        this.endAt = endAt;
-        this.type = type;
-        this.status = status;
-        this.customerName = customerName;
-        this.amount = amount;
-    }
-}
+                                 String customerName, BigDecimal amount,
+   
