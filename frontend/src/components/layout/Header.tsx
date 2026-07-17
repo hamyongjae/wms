@@ -12,7 +12,7 @@ import {
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { loadNotifications, type AppNotification } from '@/lib/notifications'
-import { tenantApi, type TenantInfo } from '@/api/tenantApi'
+import { useCompanyName } from '@/hooks/useCompanyName'
 
 interface HeaderProps {
   collapsed: boolean
@@ -41,29 +41,12 @@ export default function Header({ collapsed, onToggle }: HeaderProps) {
   )
 }
 
-/* ===== 소속 업체 배지 — 실데이터 ===== */
+/* ===== 소속 업체 배지 — 동적 업체명(캐시 공유) ===== */
 function CompanyBadge() {
-  const [tenant, setTenant] = useState<TenantInfo | null>(null)
-
-  useEffect(() => {
-    let alive = true
-    tenantApi
-      .me()
-      .then((t) => alive && setTenant(t))
-      .catch(() => undefined)
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  const name = tenant?.name ?? '내 업체'
-  const tip = tenant?.businessNumber ? `사업자번호 ${tenant.businessNumber}` : undefined
+  const name = useCompanyName()
 
   return (
-    <div
-      title={tip}
-      className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700"
-    >
+    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700">
       <Building2 size={16} className="text-slate-400" />
       <span className="max-w-[180px] truncate">{name}</span>
     </div>

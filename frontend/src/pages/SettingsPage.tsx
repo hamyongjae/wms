@@ -52,6 +52,8 @@ export default function SettingsPage() {
         address: address || undefined,
       })
       setTenant(updated)
+      // 헤더/사이드바 동적 타이틀 캐시 갱신 (업체명 변경 즉시 반영)
+      if (updated.name?.trim()) authStorage.setTenantName(updated.name)
       setSaved(true)
     } catch (err) {
       setFormError(isAxiosError(err) ? (err.response?.data?.message ?? '저장에 실패했습니다.') : '저장에 실패했습니다.')

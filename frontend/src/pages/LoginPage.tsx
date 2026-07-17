@@ -75,7 +75,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="relative text-xs text-slate-400">© {new Date().getFullYear()} WMS · 인테리어/이사 보관 물류</p>
+        <p className="relative text-xs text-slate-400">© {new Date().getFullYear()} 인테리어/이사보관 창고관리시스템 · 문의 : 010 - 6484 - 2434</p>
       </aside>
 
       {/* ===== 우측 로그인 폼 ===== */}

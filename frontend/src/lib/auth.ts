@@ -12,6 +12,7 @@ export interface AuthUser {
 
 const TOKEN_KEY = 'wms.token'
 const USER_KEY = 'wms.user'
+const TENANT_NAME_KEY = 'wms.tenantName'
 
 export const authStorage = {
   getToken(): string | null {
@@ -27,11 +28,19 @@ export const authStorage = {
   setUser(user: AuthUser) {
     localStorage.setItem(USER_KEY, JSON.stringify(user))
   },
+  // 가입 업체명 캐시 (헤더/사이드바 동적 타이틀용)
+  getTenantName(): string | null {
+    return localStorage.getItem(TENANT_NAME_KEY)
+  },
+  setTenantName(name: string) {
+    localStorage.setItem(TENANT_NAME_KEY, name)
+  },
   isAuthenticated(): boolean {
     return !!localStorage.getItem(TOKEN_KEY)
   },
   clear() {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
+    localStorage.removeItem(TENANT_NAME_KEY)
   },
 }

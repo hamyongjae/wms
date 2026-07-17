@@ -4,6 +4,7 @@ import { Boxes, GripVertical } from 'lucide-react'
 import { navItems } from './navItems'
 import { authStorage } from '@/lib/auth'
 import { useMenuOrder, sortByOrder } from '@/hooks/useMenuOrder'
+import { useCompanyName, DEFAULT_SYSTEM_NAME } from '@/hooks/useCompanyName'
 import { cn } from '@/lib/cn'
 
 interface SidebarProps {
@@ -12,6 +13,7 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed }: SidebarProps) {
   const isAdmin = authStorage.getUser()?.role === 'ADMIN'
+  const companyName = useCompanyName()
 
   // 권한 필터 후의 가용 메뉴
   const available = useMemo(() => navItems.filter((item) => !item.adminOnly || isAdmin), [isAdmin])
@@ -61,9 +63,14 @@ export default function Sidebar({ collapsed }: SidebarProps) {
           <Boxes size={18} />
         </div>
         {!collapsed && (
-          <div className="leading-tight">
-            <p className="text-sm font-bold text-white">창고관리시스템</p>
-            <p className="text-xs text-slate-400">보관창고 관리</p>
+          <div className="min-w-0 leading-tight">
+            {/* 로그인 세션의 가입 업체명을 동적 렌더링 (미인증/정보없음 → 기본 시스템명) */}
+            <p className="truncate text-sm font-bold text-white" title={companyName}>
+              {companyName}
+            </p>
+            <p className="text-xs text-slate-400">
+              {companyName === DEFAULT_SYSTEM_NAME ? '보관 물류 시스템' : DEFAULT_SYSTEM_NAME}
+            </p>
           </div>
         )}
       </div>
