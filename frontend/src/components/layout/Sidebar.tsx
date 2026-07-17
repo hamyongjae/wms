@@ -53,19 +53,19 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'bg-navy-grid relative flex shrink-0 flex-col border-r border-white/10 bg-[#16233d] transition-[width] duration-200 ease-in-out',
+        'relative flex shrink-0 flex-col border-r border-slate-200 bg-white transition-[width] duration-200 ease-in-out',
         collapsed ? 'w-16' : 'w-64',
       )}
     >
       {/* 브랜드 */}
       <div className={cn('flex h-14 items-center px-3', collapsed ? 'justify-center' : 'gap-2.5 px-4')}>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-sm ring-1 ring-white/20">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-sm">
           <Boxes size={18} />
         </div>
         {!collapsed && (
           <div className="min-w-0 leading-tight">
             {/* 로그인 세션의 가입 업체명을 동적 렌더링 (미인증/정보없음 → 기본 시스템명) */}
-            <p className="truncate text-sm font-bold text-white" title={companyName}>
+            <p className="truncate text-sm font-bold text-slate-800" title={companyName}>
               {companyName}
             </p>
             <p className="text-xs text-slate-400">
@@ -91,7 +91,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
               className={cn(
                 'group rounded-lg transition',
                 isDragging && 'opacity-50 shadow-md',
-                isOver && 'border-t-2 border-indigo-300',
+                isOver && 'border-t-2 border-indigo-400',
               )}
             >
               <NavLink to={to} title={collapsed ? label : undefined}>
@@ -101,18 +101,18 @@ export default function Sidebar({ collapsed }: SidebarProps) {
                       'relative flex items-center rounded-lg px-3 py-2 text-sm transition',
                       collapsed && 'justify-center px-0',
                       isActive
-                        ? 'bg-white/10 font-semibold text-white'
-                        : 'font-medium text-slate-300 hover:bg-white/5 hover:text-white',
+                        ? 'bg-indigo-50 font-semibold text-indigo-700'
+                        : 'font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900',
                     )}
                   >
                     {/* 좌측 포인트 바 */}
-                    {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-indigo-300" />}
+                    {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-indigo-600" />}
 
                     {/* 드래그 핸들 (펼친 상태에서만) */}
                     {draggable && (
                       <GripVertical
                         size={15}
-                        className="mr-1 shrink-0 cursor-grab text-slate-500 opacity-0 transition group-hover:opacity-100 active:cursor-grabbing"
+                        className="mr-1 shrink-0 cursor-grab text-slate-300 opacity-0 transition group-hover:opacity-100 active:cursor-grabbing"
                       />
                     )}
 
@@ -127,7 +127,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       </nav>
 
       {!collapsed && (
-        <p className="px-4 py-3 text-[11px] text-slate-500">메뉴를 드래그해 순서를 바꿀 수 있어요</p>
+        <p className="px-4 py-3 text-[11px] text-slate-300">메뉴를 드래그해 순서를 바꿀 수 있어요</p>
       )}
     </aside>
   )
