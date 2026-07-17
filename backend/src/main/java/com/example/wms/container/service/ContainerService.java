@@ -139,7 +139,4 @@ public class ContainerService {
 
     private Container lockOrThrow(Long id) {
         Long tenantId = SecurityUtils.getCurrentTenantId();
-        return containerRepository.findForUpdate(id, tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 컨테이너입니다. id=" + id));
-    }
-}
+        return c

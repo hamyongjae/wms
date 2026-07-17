@@ -45,8 +45,4 @@ public interface ContainerRepository extends JpaRepository<Container, Long> {
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from Container c where c.id = :id and c.tenant.id = :tenantId")
-    Optional<Container> findForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
-
-    // 특정 계약이 점유 중인 컨테이너 목록
-    List<Container> findByTenantIdAndCurrentOrderId(Long tenantId, Long currentOrderId);
-}
+    Optional<Container> findForUpdate(@Param("id") Long id, @Param("tenantId") Long tena

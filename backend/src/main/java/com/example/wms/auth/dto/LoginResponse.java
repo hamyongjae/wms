@@ -22,11 +22,3 @@ public class LoginResponse {
 
     public LoginResponse(String accessToken, User user) {
         this.accessToken = accessToken;
-        this.userId = user.getId();
-        this.username = user.getUsername();
-        this.name = user.getName();
-        this.role = user.getRole();
-        this.tenantId = (user.getTenant() != null) ? user.getTenant().getId() : null;
-        this.registrationComplete = user.isRegistrationComplete();
-    }
-}

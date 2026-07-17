@@ -69,8 +69,4 @@ public interface YardSlotRepository extends JpaRepository<YardSlot, Long> {
                    sum(case when s.occupied = true then 1 else 0 end) as occupied
             from YardSlot s
             where s.tenant.id = :tenantId
-            group by s.warehouse.id, s.warehouse.name
-            order by s.warehouse.id
-            """)
-    List<WarehouseOccupancyView> aggregateByWarehouse(@Param("tenantId") Long tenantId);
-}
+            group by s

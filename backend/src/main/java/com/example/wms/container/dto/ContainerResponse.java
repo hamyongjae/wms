@@ -37,10 +37,4 @@ public class ContainerResponse {
         this.currentOrderId = c.getCurrentOrder() != null ? c.getCurrentOrder().getId() : null;
         this.currentOrderNumber = c.getCurrentOrder() != null ? c.getCurrentOrder().getOrderNumber() : null;
         this.memo = c.getMemo();
-        this.inboundDate = c.getInboundDate();
-        this.expectedOutboundDate = c.getExpectedOutboundDate();
-        this.version = c.getVersion();
-        this.createdAt = c.getCreatedAt();
-        this.updatedAt = c.getUpdatedAt();
-    }
-}
+        this.i

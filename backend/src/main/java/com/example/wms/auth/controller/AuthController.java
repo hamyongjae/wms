@@ -60,12 +60,4 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    // 내 정보 (GET /api/auth/me) — 토큰 필요
-    @GetMapping("/me")
-    public ResponseEntity<UserResponse> me(
-            @AuthenticationPrincipal UserPrincipal principal) {
-
-        UserResponse response = authService.getMe(principal.getUserId());
-        return ResponseEntity.ok(response);
-    }
-}
+    // 내 정보 (GET /api/auth

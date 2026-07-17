@@ -114,12 +114,4 @@ public class StorageOrderService {
     }
 
     private String generateOrderNumber() {
-        String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String orderNumber;
-        do {
-            int random = (int) (Math.random() * 10000);
-            orderNumber = String.format("ORD-%s-%04d", datePart, random);
-        } while (storageOrderRepository.existsByOrderNumber(orderNumber));
-        return orderNumber;
-    }
-}
+        String datePart = LocalDate.now().format(DateTimeFormatte

@@ -128,14 +128,4 @@ public class Container {
         this.status = ContainerStatus.AVAILABLE;
     }
 
-    // ===== 상태 변경 (점검/폐기/복귀 등, 배정과는 분리) =====
-    public void changeStatus(ContainerStatus newStatus) {
-        if (newStatus == ContainerStatus.OCCUPIED) {
-            throw new IllegalStateException("사용중 상태는 계약 배정으로만 설정됩니다.");
-        }
-        if (this.status == ContainerStatus.OCCUPIED) {
-            throw new IllegalStateException("사용 중인 컨테이너는 먼저 회수해야 상태를 변경할 수 있습니다.");
-        }
-        this.status = newStatus;
-    }
-}
+    // ===== 상태 변�

@@ -115,32 +115,4 @@ public class AuthService {
             throw new LocalLoginNotAllowedException();
         }
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다.");
-        }
-
-        if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new IllegalArgumentException("비활성화된 계정입니다.");
-        }
-
-        String token = tokenProvider.createToken(user);
-        return new LoginResponse(token, user);
-    }
-
-    // 내 업체 소속 계정(직원/관리자) 목록 — ADMIN 전용 조회
-    @Transactional(readOnly = true)
-    public java.util.List<UserResponse> listStaff() {
-        Long tenantId = SecurityUtils.getCurrentTenantId();
-        return userRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream()
-                .map(UserResponse::new)
-                .toList();
-    }
-
-    // 내 정보 조회 (토큰의 userId 기준)
-    @Transactional(readOnly = true)
-    public UserResponse getMe(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다. id=" + userId));
-        return new UserResponse(user);
-    }
-}
+        if (!passwordEncoder.matches(request.getPass

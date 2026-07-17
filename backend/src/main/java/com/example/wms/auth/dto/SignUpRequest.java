@@ -22,8 +22,4 @@ public class SignUpRequest {
     private String password;
 
     @NotBlank(message = "이름은 필수입니다")
-    private String name;
-
-    // 미지정 시 서비스에서 STAFF로 처리
-    private UserRole role;
-}
+    private Stri
