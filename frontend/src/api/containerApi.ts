@@ -83,10 +83,4 @@ export const containerApi = {
   async inbound(body: InboundRequest): Promise<void> {
     await api.post('/api/yard/inbound', body)
   },
-  async move(body: MoveRequest): Promise<void> {
-    await api.post('/api/yard/move', body)
-  },
-  async outbound(body: OutboundRequest): Promise<void> {
-    await api.post('/api/yard/outbound', body)
-  },
-}
+  async move(body: MoveRequest)

@@ -6,6 +6,7 @@ import { customerApi, type Customer, type CustomerType } from '@/api/customerApi
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
+import { validateContractPeriod } from '@/lib/dateValidation'
 import Modal from '@/components/ui/Modal'
 import MoneyInput from '@/components/ui/MoneyInput'
 import CustomerSearchField from '@/components/customer/CustomerSearchField'
@@ -277,6 +278,8 @@ function CreateOrderModal({
     }
   }, [open, warehouses])
 
+  const periodError = validateContractPeriod(storageStartDate, expectedEndDate)
+
   function validate(): boolean {
     if (!selectedCustomer) {
       setFormError('고객을 선택하세요.')
@@ -284,6 +287,10 @@ function CreateOrderModal({
     }
     if (!warehouseId) {
       setFormError('창고를 선택하세요.')
+      return false
+    }
+    if (periodError) {
+      setFormError(periodError)
       return false
     }
     if (monthlyFee == null || monthlyFee <= 0) {
@@ -392,7 +399,13 @@ function CreateOrderModal({
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
-              <input type="date" value={expectedEndDate} onChange={(e) => setEndDate(e.target.value)} className={inputCls} />
+              <input
+                type="date"
+                value={expectedEndDate}
+                min={storageStartDate || undefined}
+                onChange={(e) => setEndDate(e.target.value)}
+                className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">월 보관료 *</label>
@@ -410,6 +423,13 @@ function CreateOrderModal({
             </div>
           </div>
 
+          {periodError && (
+            <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              {periodError}
+            </p>
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">메모</label>
             <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} />
@@ -421,7 +441,7 @@ function CreateOrderModal({
             <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
               취소
             </button>
-            <button type="submit" disabled={submitting || isBlacklisted} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
+            <button type="submit" disabled={submitting || isBlacklisted || periodError != null} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
               {submitting ? '등록 중…' : '등록'}
             </button>
           </div>
@@ -503,112 +523,4 @@ function QuickCustomerModal({
         phoneNumber: phoneNumber || undefined,
       })
       onCreated(created)
-    } catch (err) {
-      setFormError(errMsg(err, '고객 등록에 실패했습니다.'))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} title="새 고객 등록">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">고객명 *</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus className={inputCls} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">유형</label>
-            <select value={customerType} onChange={(e) => setType(e.target.value as CustomerType)} className={inputCls}>
-              <option value="INDIVIDUAL">개인</option>
-              <option value="CORPORATE">기업</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">연락처</label>
-            <input value={phoneNumber} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
-          </div>
-        </div>
-
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
-
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
-            취소
-          </button>
-          <button type="submit" disabled={submitting} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
-            {submitting ? '등록 중…' : '등록'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
-
-/* ===== 출고 처리 ===== */
-function ReleaseModal({
-  target,
-  onClose,
-  onDone,
-}: {
-  target: StorageOrder | null
-  onClose: () => void
-  onDone: () => void
-}) {
-  const [actualEndDate, setDate] = useState(today())
-  const [submitting, setSubmitting] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (target) {
-      setDate(today())
-      setFormError(null)
-    }
-  }, [target])
-
-  if (!target) return null
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    setFormError(null)
-    setSubmitting(true)
-    try {
-      await orderApi.release(target!.id, actualEndDate)
-      onDone()
-    } catch (err) {
-      setFormError(errMsg(err, '출고 처리에 실패했습니다.'))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <Modal open onClose={onClose} title={`${target.orderNumber} · 출고 처리`}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-          <span className="font-medium text-slate-800">{target.customerName}</span> 계약을 출고 완료 처리합니다.
-        </p>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">실제 출고일 *</label>
-          <input type="date" value={actualEndDate} onChange={(e) => setDate(e.target.value)} required className={inputCls} />
-        </div>
-
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
-
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
-            취소
-          </button>
-          <button type="submit" disabled={submitting} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700 disabled:opacity-60">
-            {submitting ? '처리 중…' : '출고 완료'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
-
-function errMsg(err: unknown, fallback: string): string {
-  return isAxiosError(err) ? (err.response?.data?.message ?? fallback) : fallback
-}
+    } catch (

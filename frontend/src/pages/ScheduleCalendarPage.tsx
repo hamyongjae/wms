@@ -61,6 +61,15 @@ const todayStr = () => {
 }
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 
+// 입고/출고 이벤트는 상태에 따라 "예정/지연"을 붙여 명확히 보여준다.
+function eventLabel(e: CalendarEvent): string {
+  if (e.type === 'INBOUND' || e.type === 'OUTBOUND') {
+    if (e.status === 'PENDING') return `${e.title} 예정`
+    if (e.status === 'OVERDUE') return `${e.title} 지연`
+  }
+  return e.title
+}
+
 interface Cell {
   dateStr: string
   day: number
@@ -271,9 +280,9 @@ export default function ScheduleCalendarPage() {
                               TYPE_META[e.type].badge,
                               e.status === 'OVERDUE' && 'ring-red-300',
                             )}
-                            title={e.title}
+                            title={eventLabel(e)}
                           >
-                            {TYPE_META[e.type].emoji} {e.title}
+                            {TYPE_META[e.type].emoji} {eventLabel(e)}
                           </span>
                         ))}
                         {dayEvents.length > 3 && (
@@ -452,7 +461,7 @@ function EventCard({
               </span>
             )}
           </div>
-          <p className="mt-1.5 truncate text-sm font-medium text-slate-800">{event.title}</p>
+          <p className="mt-1.5 truncate text-sm font-medium text-slate-800">{eventLabel(event)}</p>
           {event.amount != null && (
             <p className="text-xs text-slate-500">미수 {won(event.amount)}</p>
           )}

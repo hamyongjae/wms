@@ -88,24 +88,4 @@ export default function LoginPage() {
           </button>
           <span className="text-slate-300">|</span>
           <button type="button" onClick={() => setRecovery('password')} className="hover:text-violet-600">
-            비밀번호 재설정
-          </button>
-        </div>
-
-        {/* 회원가입 유도 */}
-        <div className="mt-6 border-t border-slate-100 pt-4 text-center text-sm text-slate-500">
-          아직 회원이 아니신가요?{' '}
-          <Link to="/signup" className="font-semibold text-violet-600 hover:text-violet-700">
-            회원가입
-          </Link>
-        </div>
-      </div>
-
-      <FindAccountModal
-        open={recovery !== null}
-        initialTab={recovery ?? 'username'}
-        onClose={() => setRecovery(null)}
-      />
-    </div>
-  )
-}
+       

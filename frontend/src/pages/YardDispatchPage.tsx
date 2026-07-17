@@ -21,6 +21,7 @@ import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
+import { validateInOut, todayStr } from '@/lib/dateValidation'
 
 /* ===== 타입 명세 ===== */
 // 좌표 + 컨테이너가 결합된 슬롯 (백엔드 YardSlotResponse와 매칭)
@@ -463,9 +464,13 @@ function InboundModal({
   // 컨테이너 번호 자동 배정 (접두사 없이 순번) — 기존 번호 중 최대 정수 +1
   const autoNo = useMemo(() => nextContainerNo(existingNos), [existingNos])
 
+  // 실제 입고 확정이므로 입고일 미래 불가 + 출고예정일 >= 입고일
+  const dateError = validateInOut(inboundDate, outboundDate)
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!customerId) return setFormError('화주(고객)를 선택하세요.')
+    if (dateError) return setFormError(dateError)
     setFormError(null)
     setSubmitting(true)
     try {
@@ -512,13 +517,16 @@ function InboundModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">입고일</label>
-            <input type="date" value={inboundDate} onChange={(e) => setInboundDate(e.target.value)} className={inputCls} />
+            <input type="date" value={inboundDate} max={todayStr()} onChange={(e) => setInboundDate(e.target.value)} className={inputCls} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
-            <input type="date" value={outboundDate} onChange={(e) => setOutboundDate(e.target.value)} className={inputCls} />
+            <input type="date" value={outboundDate} min={inboundDate || undefined} onChange={(e) => setOutboundDate(e.target.value)} className={inputCls} />
           </div>
         </div>
+        {dateError && (
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{dateError}</p>
+        )}
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">특이사항</label>
           <textarea
@@ -536,7 +544,7 @@ function InboundModal({
           <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
             취소
           </button>
-          <button type="submit" disabled={submitting} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
+          <button type="submit" disabled={submitting || dateError != null} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
             {submitting && <Loader2 size={14} className="animate-spin" />}
             입고 배치
           </button>
@@ -630,9 +638,12 @@ function EditModal({
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  const dateError = validateInOut(inboundDate, expectedOutboundDate)
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (slot.containerId == null) return
+    if (dateError) return setFormError(dateError)
     setFormError(null)
     setSubmitting(true)
     try {
@@ -662,13 +673,14 @@ function EditModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">입고일</label>
-            <input type="date" value={inboundDate} onChange={(e) => setInboundDate(e.target.value)} className={inputCls} />
+            <input type="date" value={inboundDate} max={todayStr()} onChange={(e) => setInboundDate(e.target.value)} className={inputCls} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
-            <input type="date" value={expectedOutboundDate} onChange={(e) => setExpectedOutboundDate(e.target.value)} className={inputCls} />
+            <input type="date" value={expectedOutboundDate} min={inboundDate || undefined} onChange={(e) => setExpectedOutboundDate(e.target.value)} className={inputCls} />
           </div>
         </div>
+        {dateError && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{dateError}</p>}
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">특이사항</label>
           <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} />
@@ -678,7 +690,7 @@ function EditModal({
           <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
             취소
           </button>
-          <button type="submit" disabled={submitting} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
+          <button type="submit" disabled={submitting || dateError != null} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
             {submitting ? '저장 중…' : '저장'}
           </button>
         </div>
