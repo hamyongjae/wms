@@ -7,6 +7,7 @@ import com.example.wms.auth.dto.SignUpRequest;
 import com.example.wms.auth.dto.UserResponse;
 import com.example.wms.auth.exception.DuplicateUsernameException;
 import com.example.wms.auth.exception.LocalLoginNotAllowedException;
+import com.example.wms.common.validation.CredentialValidator;
 import com.example.wms.tenant.entity.Tenant;
 import com.example.wms.user.entity.User;
 import com.example.wms.user.entity.UserRole;
@@ -33,6 +34,9 @@ public class AuthService {
     // 신규 업체 셀프 가입: 회사 + 첫 관리자(ADMIN)를 한 번에 생성 (공개)
     @Transactional
     public LoginResponse registerCompany(CompanyRegisterRequest request) {
+
+        // [2차 방어] 프론트 검증을 우회한 원시 요청 대비 — 서비스 최전선에서 규칙 재검증
+        CredentialValidator.validate(request.getAdminUsername(), request.getAdminPassword());
 
         // 사업자번호 중복 검사
         if (tenantRepository.existsByBusinessNumber(request.getBusinessNumber())) {
@@ -73,6 +77,9 @@ public class AuthService {
     public UserResponse signUpStaff(SignUpRequest request) {
 
         // [격리] 소속 업체는 요청 값이 아니라 로그인한 ADMIN의 tenant로 고정
+        // [2차 방어] 아이디/비밀번호 규칙 재검증 (프론트 우회 대비)
+        CredentialValidator.validate(request.getUsername(), request.getPassword());
+
         Long tenantId = SecurityUtils.getCurrentTenantId();
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new IllegalArgumentException(

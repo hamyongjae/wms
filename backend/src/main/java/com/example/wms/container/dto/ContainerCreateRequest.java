@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Positive;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Getter
 @NoArgsConstructor
 public class ContainerCreateRequest {
@@ -21,4 +23,7 @@ public class ContainerCreateRequest {
     private Integer capacityTon;
 
     private String memo;
+
+    private LocalDate inboundDate;            // 입고일
+    private LocalDate expectedOutboundDate;   // 출고 예정일
 }

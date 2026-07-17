@@ -45,6 +45,7 @@ public class ContainerService {
         Container container = new Container(
                 warehouse.getTenant(), warehouse, req.getContainerNo(),
                 req.getCapacityTon(), req.getMemo());
+        container.setStorageDates(req.getInboundDate(), req.getExpectedOutboundDate());
 
         return new ContainerResponse(containerRepository.save(container));
     }
@@ -85,6 +86,7 @@ public class ContainerService {
             throw new IllegalArgumentException("이미 존재하는 컨테이너 번호입니다: " + req.getContainerNo());
         }
         container.updateInfo(req.getContainerNo(), req.getCapacityTon(), req.getMemo());
+        container.setStorageDates(req.getInboundDate(), req.getExpectedOutboundDate());
         return new ContainerResponse(container);
     }
 

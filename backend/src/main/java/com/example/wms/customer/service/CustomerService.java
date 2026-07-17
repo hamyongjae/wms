@@ -41,13 +41,6 @@ public class CustomerService {
                 request.getBusinessNumber(),
                 request.getPhoneNumber(),
                 request.getEmail(),
-                request.getEmergencyContactName(),
-                request.getEmergencyContactPhone(),
-                request.getOriginAddress(),
-                request.getDestinationAddress(),
-                request.getPostalCode(),
-                request.isContractAgreed(),
-                request.isDisposalConsent(),
                 request.getMemo()
         );
 
@@ -90,22 +83,17 @@ public class CustomerService {
                 request.getBusinessNumber(),
                 request.getPhoneNumber(),
                 request.getEmail(),
-                request.getEmergencyContactName(),
-                request.getEmergencyContactPhone(),
-                request.getOriginAddress(),
-                request.getDestinationAddress(),
-                request.getPostalCode(),
                 request.getMemo()
         );
 
         return new CustomerResponse(customer);
     }
 
-    // 고객 상태 변경 (이용중 → 휴면/블랙리스트 등)
+    // 고객 상태 변경 (이용중 ↔ 휴면 ↔ 블랙리스트). 블랙 지정 시 사유 필수.
     @Transactional
     public CustomerResponse changeStatus(Long id, CustomerStatusUpdateRequest request) {
         Customer customer = findCustomerOrThrow(id);
-        customer.changeStatus(request.getStatus());
+        customer.applyStatus(request.getStatus(), request.getReason());
         return new CustomerResponse(customer);
     }
 

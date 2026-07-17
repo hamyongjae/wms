@@ -22,6 +22,9 @@ public interface YardSlotRepository extends JpaRepository<YardSlot, Long> {
     // 창고의 모든 슬롯 (추천 알고리즘용 — 경계가 있는 야적장이라 전량 로드 OK)
     List<YardSlot> findByTenantIdAndWarehouseId(Long tenantId, Long warehouseId);
 
+    // [창고 삭제] 창고에 종속된 슬롯(격자) 일괄 삭제 — 삭제된 행 수 반환
+    long deleteByTenantIdAndWarehouseId(Long tenantId, Long warehouseId);
+
     boolean existsByTenantIdAndWarehouseIdAndBlockAndRowNoAndColumnNoAndTier(
             Long tenantId, Long warehouseId, String block, Integer rowNo, Integer columnNo, Integer tier);
 

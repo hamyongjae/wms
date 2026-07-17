@@ -2,6 +2,7 @@ package com.example.wms.order.service;
 
 import com.example.wms.order.dto.*;
 import com.example.wms.customer.entity.Customer;
+import com.example.wms.customer.exception.BlacklistedCustomerException;
 import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.tenant.entity.Tenant;
 import com.example.wms.warehouse.entity.Warehouse;
@@ -36,6 +37,11 @@ public class StorageOrderService {
         Customer customer = customerRepository.findByIdAndTenantId(request.getCustomerId(), tenantId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "존재하지 않는 고객입니다. id=" + request.getCustomerId()));
+
+        // [하드가드] 블랙리스트 고객은 신규 계약 등록 불가 (데이터 오염 원천 차단)
+        if (customer.isBlacklisted()) {
+            throw new BlacklistedCustomerException(customer.getName());
+        }
 
         Warehouse warehouse = warehouseRepository.findByIdAndTenantId(request.getWarehouseId(), tenantId)
                 .orElseThrow(() -> new IllegalArgumentException(

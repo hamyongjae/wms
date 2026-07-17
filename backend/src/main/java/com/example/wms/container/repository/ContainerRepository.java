@@ -20,6 +20,9 @@ public interface ContainerRepository extends JpaRepository<Container, Long> {
 
     Page<Container> findByTenantId(Long tenantId, Pageable pageable);
 
+    // [캘린더] 해당 테넌트의 전체 컨테이너 (입고/출고 예정 이벤트 파생용)
+    List<Container> findAllByTenantId(Long tenantId);
+
     // 창고별 조회
     Page<Container> findByTenantIdAndWarehouseId(Long tenantId, Long warehouseId, Pageable pageable);
 

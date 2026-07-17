@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+/** 고객 정보 수정 요청 (슬림). */
 @Getter
 @NoArgsConstructor
 public class CustomerUpdateRequest {
@@ -14,15 +15,7 @@ public class CustomerUpdateRequest {
 
     private CustomerType customerType;
     private String businessNumber;
-
     private String phoneNumber;
     private String email;
-    private String emergencyContactName;
-    private String emergencyContactPhone;
-
-    private String originAddress;
-    private String destinationAddress;
-    private String postalCode;
-
     private String memo;
 }

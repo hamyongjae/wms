@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -64,6 +65,13 @@ public class Container {
     @Column(name = "memo", length = 255)
     private String memo;
 
+    // ===== 보관 일정 =====
+    @Column(name = "inbound_date")
+    private LocalDate inboundDate;             // 입고일
+
+    @Column(name = "expected_outbound_date")
+    private LocalDate expectedOutboundDate;    // 출고 예정일
+
     // ===== 동시성 & Auditing =====
     @Version
     @Column(name = "version", nullable = false)
@@ -94,6 +102,12 @@ public class Container {
             this.capacityTon = capacityTon;
         }
         this.memo = memo;
+    }
+
+    // 보관 일정(입고일/출고예정일) 설정·수정
+    public void setStorageDates(LocalDate inboundDate, LocalDate expectedOutboundDate) {
+        this.inboundDate = inboundDate;
+        this.expectedOutboundDate = expectedOutboundDate;
     }
 
     // ===== 계약 배정 (빈 컨테이너 → 사용중) =====

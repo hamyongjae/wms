@@ -68,7 +68,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register-company",
-                                "/api/auth/social/login/**").permitAll()
+                                "/api/auth/social/login/**",
+                                "/api/auth/recovery/**").permitAll()
                         // Swagger 문서 공개
                         .requestMatchers(
                                 "/swagger-ui/**",

@@ -3,6 +3,9 @@ package com.example.wms.customer.dto;
 import com.example.wms.customer.entity.Customer;
 import lombok.Getter;
 
+import java.time.LocalDateTime;
+
+/** 고객 응답 (슬림 + 블랙리스트 메타). */
 @Getter
 public class CustomerResponse {
 
@@ -16,16 +19,10 @@ public class CustomerResponse {
 
     private final String phoneNumber;
     private final String email;
-    private final String emergencyContactName;
-    private final String emergencyContactPhone;
-
-    private final String originAddress;
-    private final String destinationAddress;
-    private final String postalCode;
 
     private final String status;
-    private final boolean contractAgreed;
-    private final boolean disposalConsent;
+    private final String blacklistReason;      // BLACKLISTED일 때만 값
+    private final LocalDateTime blacklistedAt;  // 지정 일자
     private final String memo;
 
     public CustomerResponse(Customer customer) {
@@ -39,16 +36,10 @@ public class CustomerResponse {
 
         this.phoneNumber = customer.getPhoneNumber();
         this.email = customer.getEmail();
-        this.emergencyContactName = customer.getEmergencyContactName();
-        this.emergencyContactPhone = customer.getEmergencyContactPhone();
-
-        this.originAddress = customer.getOriginAddress();
-        this.destinationAddress = customer.getDestinationAddress();
-        this.postalCode = customer.getPostalCode();
 
         this.status = customer.getStatus().name();
-        this.contractAgreed = customer.isContractAgreed();
-        this.disposalConsent = customer.isDisposalConsent();
+        this.blacklistReason = customer.getBlacklistReason();
+        this.blacklistedAt = customer.getBlacklistedAt();
         this.memo = customer.getMemo();
     }
 }

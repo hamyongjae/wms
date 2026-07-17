@@ -1,7 +1,8 @@
 package com.example.wms.auth.dto;
 
+import com.example.wms.common.validation.ValidationPatterns;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -29,11 +30,11 @@ public class CompanyRegisterRequest {
 
     // ===== 첫 관리자 계정 =====
     @NotBlank(message = "관리자 아이디는 필수입니다")
-    @Size(min = 4, max = 50, message = "아이디는 4~50자여야 합니다")
+    @Pattern(regexp = ValidationPatterns.USERNAME, message = ValidationPatterns.USERNAME_MESSAGE)
     private String adminUsername;
 
     @NotBlank(message = "비밀번호는 필수입니다")
-    @Size(min = 8, max = 64, message = "비밀번호는 8자 이상이어야 합니다")
+    @Pattern(regexp = ValidationPatterns.PASSWORD, message = ValidationPatterns.PASSWORD_MESSAGE)
     private String adminPassword;
 
     @NotBlank(message = "관리자 이름은 필수입니다")

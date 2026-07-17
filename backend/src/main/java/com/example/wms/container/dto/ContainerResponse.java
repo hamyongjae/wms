@@ -4,6 +4,7 @@ import com.example.wms.container.entity.Container;
 import com.example.wms.container.entity.ContainerStatus;
 import lombok.Getter;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -19,6 +20,8 @@ public class ContainerResponse {
     private final Long currentOrderId;
     private final String currentOrderNumber;
     private final String memo;
+    private final LocalDate inboundDate;
+    private final LocalDate expectedOutboundDate;
     private final Long version;
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
@@ -34,6 +37,8 @@ public class ContainerResponse {
         this.currentOrderId = c.getCurrentOrder() != null ? c.getCurrentOrder().getId() : null;
         this.currentOrderNumber = c.getCurrentOrder() != null ? c.getCurrentOrder().getOrderNumber() : null;
         this.memo = c.getMemo();
+        this.inboundDate = c.getInboundDate();
+        this.expectedOutboundDate = c.getExpectedOutboundDate();
         this.version = c.getVersion();
         this.createdAt = c.getCreatedAt();
         this.updatedAt = c.getUpdatedAt();

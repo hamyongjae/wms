@@ -6,6 +6,9 @@ import com.example.wms.billing.repository.BillingLedgerRepository;
 import com.example.wms.calendar.dto.CalendarEventResponse;
 import com.example.wms.calendar.dto.CalendarEventStatus;
 import com.example.wms.calendar.dto.CalendarEventType;
+import com.example.wms.container.entity.Container;
+import com.example.wms.container.entity.ContainerStatus;
+import com.example.wms.container.repository.ContainerRepository;
 import com.example.wms.order.entity.OrderStatus;
 import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.order.repository.StorageOrderRepository;
@@ -18,6 +21,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 입고/출고/청구를 하나의 캘린더 이벤트 시계열로 정규화하는 서비스.
@@ -33,9 +38,11 @@ import java.util.List;
 public class CalendarService {
 
     private static final LocalTime EVENT_TIME = LocalTime.of(9, 0);
+    private static final Pattern OWNER_TAG = Pattern.compile("^\\[([^\\]]+)\\]");
 
     private final StorageOrderRepository orderRepository;
     private final BillingLedgerRepository ledgerRepository;
+    private final ContainerRepository containerRepository;
 
     @Transactional(readOnly = true)
     public List<CalendarEventResponse> getEvents(LocalDate from, LocalDate to) {
@@ -107,7 +114,51 @@ public class CalendarService {
                     CalendarEventType.BILLING, status, customer, ledger.getBalance()));
         }
 
+        // ===== 컨테이너 → 입고/출고(예정) =====
+        for (Container container : containerRepository.findAllByTenantId(tenantId)) {
+            String owner = ownerFromMemo(container.getMemo(), container.getContainerNo());
+
+            LocalDate inDate = container.getInboundDate();
+            if (inDate != null && inRange(inDate, from, to)) {
+                CalendarEventStatus status =
+                        inDate.isAfter(today) ? CalendarEventStatus.PENDING : CalendarEventStatus.COMPLETED;
+                events.add(event(container.getId(), "[" + owner + "] 입고", inDate,
+                        CalendarEventType.INBOUND, status, owner, null));
+            }
+
+            LocalDate outDate = container.getExpectedOutboundDate();
+            if (outDate != null && inRange(outDate, from, to)) {
+                // 아직 적재 중인데 출고 예정일이 지났으면 지연
+                boolean overdue = outDate.isBefore(today) && container.getStatus() == ContainerStatus.OCCUPIED;
+                CalendarEventStatus status =
+                        overdue ? CalendarEventStatus.OVERDUE : CalendarEventStatus.PENDING;
+                events.add(event(container.getId(), "[" + owner + "] 출고", outDate,
+                        CalendarEventType.OUTBOUND, status, owner, null));
+            }
+        }
+
         return events;
+    }
+
+    /** 컨테이너 memo 앞 [화주] 태그에서 화주명을 뽑되, 규격/소유구분 토큰은 제외. 없으면 fallback(번호). */
+    private String ownerFromMemo(String memo, String fallback) {
+        if (memo != null) {
+            Matcher m = OWNER_TAG.matcher(memo);
+            if (m.find()) {
+                List<String> keep = new ArrayList<>();
+                for (String token : m.group(1).split("·")) {
+                    String t = token.trim();
+                    if (t.isEmpty() || t.matches("(?i)\\d+ft") || t.equals("자가") || t.equals("임차")) {
+                        continue;
+                    }
+                    keep.add(t);
+                }
+                if (!keep.isEmpty()) {
+                    return String.join(" · ", keep);
+                }
+            }
+        }
+        return fallback;
     }
 
     private CalendarEventResponse event(Long id, String title, LocalDate date,
