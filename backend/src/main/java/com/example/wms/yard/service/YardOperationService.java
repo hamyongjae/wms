@@ -92,6 +92,7 @@ public class YardOperationService {
 
         YardSlot target = lockSlot(req.getTargetSlotId(), tenantId);
         target.place(container);   // 이미 차 있으면 LocationFullException → 409
+        container.markPlacedInYard();   // 가용 → 사용중
         return new YardSlotResponse(target);
     }
 
@@ -125,6 +126,7 @@ public class YardOperationService {
 
         from.vacate();
         target.place(container);   // 대상이 차 있으면 LocationFullException → 409
+        container.markPlacedInYard();   // 안전상 사용중 유지
         return new YardSlotResponse(target);
     }
 
@@ -142,13 +144,10 @@ public class YardOperationService {
 
         YardSlot from = lockSlot(current.getId(), tenantId);
         from.vacate();
+        container.markRemovedFromYard();   // 사용중 → 가용
         return new YardSlotResponse(from);
     }
 
     // ===================== 내부 =====================
 
-    private YardSlot lockSlot(Long slotId, Long tenantId) {
-        return yardSlotRepository.findForUpdate(slotId, tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 슬롯입니다. id=" + slotId));
-    }
-}
+    private YardSlot lockSlot(Long slotId, Long tena

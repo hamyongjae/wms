@@ -110,22 +110,21 @@ public class Container {
         this.expectedOutboundDate = expectedOutboundDate;
     }
 
+    // ===== 야적장 적재/반출에 따른 상태 전환 (계약 배정과는 별개) =====
+    /** 야적장 슬롯에 적재됨 → 사용중. (점검/폐기 상태는 건드리지 않음) */
+    public void markPlacedInYard() {
+        if (this.status == ContainerStatus.AVAILABLE) {
+            this.status = ContainerStatus.OCCUPIED;
+        }
+    }
+
+    /** 야적장에서 반출됨 → 가용. (계약에 배정돼 있으면 그대로 유지) */
+    public void markRemovedFromYard() {
+        if (this.status == ContainerStatus.OCCUPIED && this.currentOrder == null) {
+            this.status = ContainerStatus.AVAILABLE;
+        }
+    }
+
     // ===== 계약 배정 (빈 컨테이너 → 사용중) =====
     public void assignTo(StorageOrder order) {
-        if (this.status != ContainerStatus.AVAILABLE) {
-            throw new IllegalStateException("배정은 빈(AVAILABLE) 컨테이너만 가능합니다. 현재=" + status);
-        }
-        this.currentOrder = order;
-        this.status = ContainerStatus.OCCUPIED;
-    }
-
-    // ===== 계약 회수 (사용중 → 빈) =====
-    public void release() {
-        if (this.status != ContainerStatus.OCCUPIED) {
-            throw new IllegalStateException("회수는 사용 중(OCCUPIED) 컨테이너만 가능합니다. 현재=" + status);
-        }
-        this.currentOrder = null;
-        this.status = ContainerStatus.AVAILABLE;
-    }
-
-    // ===== 상태 변�
+        if (this.
