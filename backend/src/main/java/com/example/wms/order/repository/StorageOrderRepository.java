@@ -17,6 +17,9 @@ public interface StorageOrderRepository extends JpaRepository<StorageOrder, Long
 
     Page<StorageOrder> findByTenantId(Long tenantId, Pageable pageable);
 
+    // [캘린더] 해당 테넌트의 전체 계약 (입고/출고 이벤트 파생용)
+    List<StorageOrder> findAllByTenantId(Long tenantId);
+
     boolean existsByOrderNumber(String orderNumber);
 
     // [배치] 전 테넌트 대상 활성 계약 조회 (스케줄러 월 청구 생성용)

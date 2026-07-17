@@ -120,6 +120,15 @@ public class AuthService {
         return new LoginResponse(token, user);
     }
 
+    // 내 업체 소속 계정(직원/관리자) 목록 — ADMIN 전용 조회
+    @Transactional(readOnly = true)
+    public java.util.List<UserResponse> listStaff() {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return userRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream()
+                .map(UserResponse::new)
+                .toList();
+    }
+
     // 내 정보 조회 (토큰의 userId 기준)
     @Transactional(readOnly = true)
     public UserResponse getMe(Long userId) {

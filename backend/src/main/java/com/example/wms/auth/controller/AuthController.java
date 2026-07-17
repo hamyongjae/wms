@@ -44,6 +44,13 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    // 내 업체 직원/관리자 목록 (GET /api/auth/staff) — ADMIN 전용
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/staff")
+    public ResponseEntity<java.util.List<UserResponse>> listStaff() {
+        return ResponseEntity.ok(authService.listStaff());
+    }
+
     // 로그인 (POST /api/auth/login) → JWT 반환
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
