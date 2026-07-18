@@ -237,20 +237,17 @@ export default function DashboardPage() {
                 <p className="mt-6 text-center text-sm text-slate-400">등록된 계약이 없습니다.</p>
               ) : (
                 <ul className="mt-3 divide-y divide-slate-100">
-                  {recentOrders.map((o) => {
-                    const containerNo = getContainerNumber(o.id, containers)
-                    return (
-                      <li key={o.id} className="flex items-center justify-between py-2.5 text-sm">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-slate-800">{o.customerName}</p>
-                          <p className="text-xs text-slate-400">
-                            {o.warehouseName} {containerNo && `· ${containerNo}`} · {o.storageStartDate}~{o.actualEndDate ?? o.expectedEndDate ?? '미정'}
-                          </p>
-                        </div>
-                        <span className="shrink-0 whitespace-nowrap text-slate-600">{formatContractPrice(o.monthlyFee, o.storageStartDate, o.actualEndDate ?? o.expectedEndDate)}</span>
-                      </li>
-                    )
-                  })}
+                  {recentOrders.map((o) => (
+                    <li key={o.id} className="flex items-center justify-between py-2.5 text-sm">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-800">{o.customerName}</p>
+                        <p className="text-xs text-slate-400">
+                          {o.warehouseName} · {o.storageStartDate}~{o.actualEndDate ?? o.expectedEndDate ?? '미정'}
+                        </p>
+                      </div>
+                      <span className="shrink-0 whitespace-nowrap text-slate-600">{formatContractPrice(o.monthlyFee, o.storageStartDate, o.actualEndDate ?? o.expectedEndDate)}</span>
+                    </li>
+                  ))}
                 </ul>
               )}
             </section>
