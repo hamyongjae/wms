@@ -11,9 +11,11 @@ import { cn } from '@/lib/cn'
 import { validateContractPeriod } from '@/lib/dateValidation'
 import { calcDailyFee } from '@/lib/fee'
 import { extractOwner } from '@/lib/owner'
+import { nextContainerNo } from '@/lib/containerNo'
 import Modal from '@/components/ui/Modal'
 import MoneyInput from '@/components/ui/MoneyInput'
 import CustomerListPicker from '@/components/customer/CustomerListPicker'
+import LocationPickerField from '@/components/yard/LocationPickerField'
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
@@ -36,6 +38,30 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 const today = () => new Date().toISOString().slice(0, 10)
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const isActive = (s: OrderStatus) => s === 'RECEIVED' || s === 'IN_STORAGE'
+
+/**
+ * 특정 계약(주문)에 컨테이너를 만들어 지정 슬롯에 적재·배정하는 파이프라인.
+ * 컨테이너 생성 → 계약 배정(assign) → 슬롯 적재(inbound). 화주명은 memo 태그로 함께 남긴다.
+ */
+async function placeContainerAtSlot(
+  orderId: number,
+  warehouseId: number,
+  slotId: number,
+  opts: { customerName?: string; inboundDate?: string; outboundDate?: string },
+) {
+  const existing = await containerApi.list({ warehouseId })
+  const no = nextContainerNo(new Set(existing.map((c) => c.containerNo)))
+  const memo = opts.customerName ? `[${opts.customerName}]` : undefined
+  const created = await containerApi.create({
+    warehouseId,
+    containerNo: no,
+    memo,
+    inboundDate: opts.inboundDate,
+    expectedOutboundDate: opts.outboundDate,
+  })
+  await containerApi.assign(created.id, orderId)
+  await containerApi.inbound({ containerId: created.id, targetSlotId: slotId })
+}
 
 export default function OrdersPage() {
   const isAdmin = authStorage.getUser()?.role === 'ADMIN'
@@ -349,6 +375,10 @@ function EditOrderModal({
   const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  // 위치: 선택 슬롯 / 현재(원래) 슬롯·컨테이너
+  const [slotId, setSlotId] = useState<number | null>(null)
+  const [currentSlotId, setCurrentSlotId] = useState<number | null>(null)
+  const [currentContainerId, setCurrentContainerId] = useState<number | null>(null)
 
   useEffect(() => {
     if (target) {
@@ -358,6 +388,31 @@ function EditOrderModal({
       setVolume(target.totalVolume != null ? String(target.totalVolume) : '')
       setMemo(target.memo ?? '')
       setFormError(null)
+    }
+  }, [target])
+
+  // 이 계약에 배정·적재된 컨테이너의 현재 자리를 조회 (수정 모드 강조/이동 기준)
+  useEffect(() => {
+    if (!target) return
+    let alive = true
+    setSlotId(null)
+    setCurrentSlotId(null)
+    setCurrentContainerId(null)
+    Promise.all([containerApi.list({ warehouseId: target.warehouseId }), yardApi.slots(target.warehouseId)])
+      .then(([containers, slots]) => {
+        if (!alive) return
+        const ct = containers.find((c) => c.currentOrderId === target.id)
+        if (!ct) return
+        setCurrentContainerId(ct.id)
+        const slot = slots.find((s) => s.containerId === ct.id)
+        if (slot) {
+          setCurrentSlotId(slot.id)
+          setSlotId(slot.id)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
     }
   }, [target])
 
@@ -386,6 +441,24 @@ function EditOrderModal({
         totalVolume: totalVolume ? Number(totalVolume) : undefined,
         memo: memo || undefined,
       })
+      // 위치 변경 반영 (이동 / 신규 배정 / 미지정 해제)
+      if (slotId !== currentSlotId) {
+        try {
+          if (currentSlotId != null && slotId != null && currentContainerId != null) {
+            await containerApi.move({ containerId: currentContainerId, targetSlotId: slotId })
+          } else if (currentSlotId == null && slotId != null) {
+            await placeContainerAtSlot(target!.id, target!.warehouseId, slotId, {
+              customerName: target!.customerName,
+              inboundDate: storageStartDate || undefined,
+              outboundDate: expectedEndDate || undefined,
+            })
+          } else if (currentSlotId != null && slotId == null && currentContainerId != null) {
+            await containerApi.outbound({ containerId: currentContainerId })
+          }
+        } catch {
+          window.alert('계약은 저장됐지만 위치 변경에 실패했습니다. 컨테이너 관리에서 다시 시도해 주세요.')
+        }
+      }
       onDone()
     } catch (err) {
       setFormError(errMsg(err, '계약 수정에 실패했습니다.'))
@@ -393,6 +466,8 @@ function EditOrderModal({
       setSubmitting(false)
     }
   }
+
+  const locationChanged = slotId !== currentSlotId
 
   return (
     <Modal open onClose={onClose} title={`계약 수정`}>
@@ -450,13 +525,34 @@ function EditOrderModal({
         )}
 
         <div>
+          <div className="mb-1 flex items-center justify-between">
+            <label className="text-sm font-medium text-slate-700">컨테이너 위치</label>
+            {locationChanged && (
+              <button
+                type="button"
+                onClick={() => setSlotId(currentSlotId)}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                되돌리기
+              </button>
+            )}
+          </div>
+          <LocationPickerField
+            warehouseId={target.warehouseId}
+            value={slotId}
+            onChange={setSlotId}
+            currentSlotId={currentSlotId}
+          />
+        </div>
+
+        <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">메모 (특이사항)</label>
           <textarea
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
-            rows={6}
+            rows={4}
             placeholder="계약 특이사항이나 부대 정보를 자유롭게 입력하세요."
-            className={cn(inputCls, 'min-h-[140px] w-full resize-y leading-relaxed')}
+            className={cn(inputCls, 'min-h-[100px] w-full resize-y leading-relaxed')}
           />
         </div>
 
@@ -493,6 +589,7 @@ function CreateOrderModal({
 }) {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [warehouseId, setWarehouseId] = useState('')
+  const [slotId, setSlotId] = useState<number | null>(null) // 선택 슬롯(null=미지정)
   const [storageStartDate, setStartDate] = useState(today())
   const [expectedEndDate, setEndDate] = useState('')
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
@@ -517,6 +614,7 @@ function CreateOrderModal({
     if (open) {
       setSelectedCustomer(null)
       setWarehouseId(warehouses[0] ? String(warehouses[0].id) : '')
+      setSlotId(null)
       setStartDate(today())
       setEndDate('')
       setMonthlyFee(null)
@@ -552,7 +650,7 @@ function CreateOrderModal({
   async function doCreate() {
     setSubmitting(true)
     try {
-      await orderApi.create({
+      const order = await orderApi.create({
         customerId: selectedCustomer!.id,
         warehouseId: Number(warehouseId),
         storageStartDate,
@@ -560,6 +658,18 @@ function CreateOrderModal({
         monthlyFee: monthlyFee!,
         memo: memo || undefined,
       })
+      // 위치를 지정했으면 컨테이너 생성·배정·적재까지 이어서 처리(미지정이면 생략)
+      if (slotId != null) {
+        try {
+          await placeContainerAtSlot(order.id, Number(warehouseId), slotId, {
+            customerName: selectedCustomer?.name,
+            inboundDate: storageStartDate,
+            outboundDate: expectedEndDate || undefined,
+          })
+        } catch {
+          window.alert('계약은 등록됐지만 위치 배치에 실패했습니다. 컨테이너 관리에서 자리를 지정해 주세요.')
+        }
+      }
       onDone()
     } catch (err) {
       setFormError(errMsg(err, '계약 등록에 실패했습니다.'))
@@ -647,7 +757,14 @@ function CreateOrderModal({
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">창고 *</label>
-                <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={inputCls}>
+                <select
+                  value={warehouseId}
+                  onChange={(e) => {
+                    setWarehouseId(e.target.value)
+                    setSlotId(null) // 창고가 바뀌면 이전 자리 선택 초기화
+                  }}
+                  className={inputCls}
+                >
                   <option value="">창고 선택…</option>
                   {warehouses.map((w) => (
                     <option key={w.id} value={w.id}>
@@ -655,6 +772,15 @@ function CreateOrderModal({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">컨테이너 위치 지정</label>
+                <LocationPickerField
+                  warehouseId={warehouseId ? Number(warehouseId) : null}
+                  value={slotId}
+                  onChange={setSlotId}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

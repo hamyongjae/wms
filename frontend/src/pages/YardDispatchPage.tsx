@@ -26,6 +26,7 @@ import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { calcDailyFee } from '@/lib/fee'
 import { extractOwner } from '@/lib/owner'
+import { nextContainerNo } from '@/lib/containerNo'
 import { validateInOut, todayStr } from '@/lib/dateValidation'
 
 /* ===== 타입 명세 ===== */
@@ -1018,14 +1019,3 @@ function stripOwnerTag(memo?: string | null): string {
   return memo.replace(/^\[[^\]]*\]\s*/, '').trim()
 }
 
-/** 접두사 없이 순번 컨테이너 번호 자동 생성 — 기존 숫자 번호 중 최대값 +1 (없으면 1001). */
-function nextContainerNo(existing: Set<string>): string {
-  let max = 1000
-  for (const no of existing) {
-    if (/^\d+$/.test(no)) {
-      const n = parseInt(no, 10)
-      if (n > max) max = n
-    }
-  }
-  return String(max + 1)
-}
