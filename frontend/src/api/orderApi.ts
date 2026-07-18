@@ -1,7 +1,7 @@
 import { api } from '@/lib/api'
 import type { Page } from '@/api/yardApi'
 
-export type OrderStatus = 'PENDING' | 'IN_STORAGE' | 'PENDING_RELEASE' | 'RELEASED' | 'CANCELLED'
+export type OrderStatus = 'INBOUND' | 'OUTBOUND'
 export type PaymentType = 'PREPAID' | 'POSTPAID'
 
 export interface StorageOrder {
@@ -13,8 +13,6 @@ export interface StorageOrder {
   warehouseId: number
   warehouseName: string
   status: OrderStatus
-  computedStatus?: OrderStatus  // 실시간 계산된 상태 (변경 감지용)
-  slotAssigned: boolean  // 슬롯 지정 여부
   storageStartDate: string
   expectedEndDate: string | null
   actualEndDate: string | null
@@ -64,6 +62,11 @@ export const orderApi = {
   },
   async unreleased(id: number): Promise<StorageOrder> {
     const { data } = await api.patch<StorageOrder>(`/api/orders/${id}/unreleased`, {})
+    return data
+  },
+  // [단일 토글] 입고 ↔ 출고 전환
+  async toggle(id: number): Promise<StorageOrder> {
+    const { data } = await api.patch<StorageOrder>(`/api/orders/${id}/toggle`, {})
     return data
   },
   async remove(id: number): Promise<void> {

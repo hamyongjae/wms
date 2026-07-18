@@ -24,59 +24,34 @@ const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
 
 /**
- * [실시간 상태 시각화]
+ * [단순 이진 상태 시각화]
  *
- * 4가지 상태별 색상 및 UI:
- * 1. 입고예정 (PENDING): 파란색 - 준비 상태
- * 2. 보관중 (IN_STORAGE): 초록색 - 정상 청구 상태
- * 3. 출고예정 (PENDING_RELEASE): 주황색 + ⚠️ - 미납/연체 경고
- * 4. 출고완료 (RELEASED): 회색 - 최종 마감 상태
- *
- * @PostLoad로 조회 시마다 자동 계산되므로 항상 최신 상태
+ * 2가지 상태로만 계약 흐름을 표시:
+ * 1. 입고 (INBOUND): 초록색 - 창고에 보관 중
+ * 2. 출고 (OUTBOUND): 회색 - 창고에서 나감 (종료)
  */
-const STATUS_META: Record<OrderStatus, { label: string; cls: string; icon?: string; animation?: string }> = {
-  PENDING: {
-    label: '입고예정',
-    cls: 'bg-blue-50 text-blue-700 ring-blue-200',
+const STATUS_META: Record<OrderStatus, { label: string; cls: string; icon?: string }> = {
+  INBOUND: {
+    label: '입고',
+    cls: 'bg-[#E9EFEA] text-[#5C7C6B] ring-[#D3DFD6]',
     icon: '📦',
   },
-  IN_STORAGE: {
-    label: '보관중',
-    cls: 'bg-[#E9EFEA] text-[#5C7C6B] ring-[#D3DFD6]',
-    icon: '📍',
-  },
-  PENDING_RELEASE: {
-    label: '출고예정',
-    cls: 'bg-amber-50 text-amber-700 ring-amber-200 border-2 border-amber-300',
-    icon: '⚠️',
-    animation: 'animate-pulse',  // 연체 상태 강조
-  },
-  RELEASED: {
-    label: '출고완료',
+  OUTBOUND: {
+    label: '출고',
     cls: 'bg-slate-100 text-slate-500 ring-slate-200',
     icon: '✅',
   },
-  CANCELLED: {
-    label: '취소',
-    cls: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]',
-    icon: '❌',
-  },
 }
 
-type FilterKey = 'ALL' | 'PENDING' | 'IN_STORAGE' | 'PENDING_RELEASE' | 'RELEASED' | 'CANCELLED'
+type FilterKey = 'ALL' | 'INBOUND' | 'OUTBOUND'
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'ALL', label: '전체' },
-  { key: 'PENDING', label: '입고예정' },
-  { key: 'IN_STORAGE', label: '보관중' },
-  { key: 'PENDING_RELEASE', label: '출고예정' },
-  { key: 'RELEASED', label: '출고완료' },
-  { key: 'CANCELLED', label: '취소' },
+  { key: 'INBOUND', label: '입고' },
+  { key: 'OUTBOUND', label: '출고' },
 ]
 
 const today = () => new Date().toISOString().slice(0, 10)
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
-const isActive = (s: OrderStatus) => s === 'PENDING' || s === 'IN_STORAGE'
-const canRelease = (s: OrderStatus) => s === 'IN_STORAGE' || s === 'PENDING_RELEASE'
 
 /** yyyy-MM-dd 에 일수 더하기 (UTC 기준) */
 function addDays(dateStr: string, days: number): string {
@@ -130,8 +105,8 @@ export default function OrdersPage() {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<StorageOrder | null>(null)
-  const [releaseTarget, setReleaseTarget] = useState<StorageOrder | null>(null)
   const [billingTarget, setBillingTarget] = useState<StorageOrder | null>(null) // 정산 타임라인
+  const [togglingId, setTogglingId] = useState<number | null>(null) // 상태 토글 진행 중인 계약 id
   // 계약 id → 배치된 슬롯 위치 라벨 목록 (창고+화주 기준으로 조인)
   const [locationsByOrder, setLocationsByOrder] = useState<Map<number, string[]>>(new Map())
 
@@ -215,28 +190,34 @@ export default function OrdersPage() {
     return orders.filter((o) => o.status === filter)
   }, [orders, filter])
 
-  async function handleUnrelease(o: StorageOrder) {
-    if (!window.confirm(`'${o.customerName}' 계약의 출고 처리를 취소할까요?`)) return
+  // [단일 토글] 입고 ↔ 출고 전환 — 화면 새로고침 없이 해당 행만 즉시 갱신
+  async function handleToggle(o: StorageOrder) {
+    const toOutbound = o.status === 'INBOUND'
+    const msg = toOutbound
+      ? `'${o.customerName}' 계약을 출고 처리할까요?`
+      : `'${o.customerName}' 계약을 입고 상태로 되돌릴까요?`
+    if (!window.confirm(msg)) return
+
+    setTogglingId(o.id)
     try {
-      await orderApi.unreleased(o.id)
-      reload()
+      const updated = await orderApi.toggle(o.id)
+      // 전체 재조회 없이 해당 계약만 교체 (비동기 부분 갱신)
+      setOrders((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
     } catch (err) {
-      alert(errMsg(err, '출고 취소에 실패했습니다.'))
+      alert(errMsg(err, '상태 전환에 실패했습니다.'))
+    } finally {
+      setTogglingId(null)
     }
   }
 
   async function handleDelete(o: StorageOrder) {
-    if (!window.confirm(`'${o.customerName}' 계약을 삭제할까요?\n(연결된 청구 원장도 함께 삭제됩니다)`)) return
+    if (!window.confirm(`'${o.customerName}' 계약을 삭제할까요?\n(연결된 청구 원장·입금 내역도 함께 삭제됩니다)`)) return
     try {
       await orderApi.remove(o.id)
-      reload()
+      // 화면에서 즉시 제거 (비동기 부분 갱신)
+      setOrders((prev) => prev.filter((x) => x.id !== o.id))
     } catch (err) {
-      const errorMsg = errMsg(err, '')
-      if (errorMsg.includes('foreign key') || errorMsg.includes('참조')) {
-        alert('계약에 연결된 청구 원장이 있습니다.\n청구 정산 화면에서 해당 원장들을 먼저 삭제해주세요.')
-      } else {
-        alert(errMsg(err, '계약 삭제에 실패했습니다.'))
-      }
+      alert(errMsg(err, '계약 삭제에 실패했습니다.'))
     }
   }
 
@@ -351,56 +332,27 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-5 py-3 text-right text-slate-700">{won(o.monthlyFee)}</td>
                   <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1',
-                          STATUS_META[o.status].cls,
-                          STATUS_META[o.status].animation,
-                        )}
-                      >
-                        {STATUS_META[o.status].icon && <span>{STATUS_META[o.status].icon}</span>}
-                        {STATUS_META[o.status].label}
-                      </span>
-
-                      {/* [실시간 상태 변화 감지] 계산된 상태가 저장 상태와 다르면 강조 */}
-                      {o.computedStatus && o.computedStatus !== o.status && (
-                        <span
-                          className="text-[11px] font-semibold text-amber-600 px-1.5 py-0.5 bg-amber-50 rounded"
-                          title={`상태가 ${STATUS_META[o.status].label}에서 ${STATUS_META[o.computedStatus].label}로 변경됨`}
-                        >
-                          ↻ 업데이트됨
-                        </span>
+                    {/* [단일 토글] 배지를 클릭하면 입고 ↔ 출고 즉시 전환 (화면 새로고침 없음) */}
+                    <button
+                      type="button"
+                      onClick={() => handleToggle(o)}
+                      disabled={togglingId === o.id}
+                      title={o.status === 'INBOUND' ? '클릭하여 출고 처리' : '클릭하여 입고로 되돌리기'}
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition hover:brightness-95 disabled:opacity-50',
+                        STATUS_META[o.status].cls,
                       )}
-                    </div>
+                    >
+                      {togglingId === o.id ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        STATUS_META[o.status].icon && <span>{STATUS_META[o.status].icon}</span>
+                      )}
+                      {STATUS_META[o.status].label}
+                    </button>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-1">
-                      {canRelease(o.status) && (
-                        <button
-                          type="button"
-                          onClick={() => setReleaseTarget(o)}
-                          className={cn(
-                            'flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition',
-                            o.status === 'PENDING_RELEASE'
-                              ? 'text-red-600 hover:bg-red-50'
-                              : 'text-amber-600 hover:bg-amber-50'
-                          )}
-                        >
-                          <LogOut size={14} />
-                          출고 처리
-                        </button>
-                      )}
-                      {o.status === 'RELEASED' && (
-                        <button
-                          type="button"
-                          onClick={() => handleUnrelease(o)}
-                          className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100"
-                        >
-                          <LogOut size={14} />
-                          출고 취소
-                        </button>
-                      )}
                       <button
                         type="button"
                         onClick={() => setBillingTarget(o)}
@@ -452,15 +404,6 @@ export default function OrdersPage() {
         onClose={() => setEditTarget(null)}
         onDone={() => {
           setEditTarget(null)
-          reload()
-        }}
-      />
-
-      <ReleaseModal
-        target={releaseTarget}
-        onClose={() => setReleaseTarget(null)}
-        onDone={() => {
-          setReleaseTarget(null)
           reload()
         }}
       />
@@ -1431,162 +1374,6 @@ function QuickCustomerModal({
   )
 }
 
-/* ===== 출고 처리 (+중도출고 일할 정산) =====
- * 실제 출고일 입력 → 이 계약의 미결 원장을 찾아 일할 정산 미리보기(preview)를 띄우고,
- * '정산 반영' 체크 시 출고와 함께 applyMidRelease 로 원장에 확정한다.
- * 정산 실패가 출고를 막지 않도록(짐은 나가야 하므로) 출고 성공 후 정산은 별도 경고로 처리.
- */
-function ReleaseModal({
-  target,
-  onClose,
-  onDone,
-}: {
-  target: StorageOrder | null
-  onClose: () => void
-  onDone: () => void
-}) {
-  const [actualEndDate, setDate] = useState(today())
-  const [submitting, setSubmitting] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-  // 정산 대상 원장 + 미리보기
-  const [ledger, setLedger] = useState<BillingLedger | null>(null)
-  const [preview, setPreview] = useState<MidReleaseSettlement | null>(null)
-  const [previewError, setPreviewError] = useState<string | null>(null)
-  const [settle, setSettle] = useState(true)
-
-  useEffect(() => {
-    if (target) {
-      setDate(today())
-      setFormError(null)
-      setPreview(null)
-      setPreviewError(null)
-      setSettle(true)
-      // 이 계약의 미결(발행/부분수금) 원장 중 최신 회차를 정산 대상으로
-      billingApi
-        .list()
-        .then((all) => {
-          const open = all
-            .filter((l) => l.storageOrderId === target.id && isOpenLedger(l))
-            .sort((a, b) => (a.periodStart < b.periodStart ? 1 : -1))
-          setLedger(open[0] ?? null)
-        })
-        .catch(() => setLedger(null))
-    }
-  }, [target])
-
-  // 출고일·원장이 정해지면 일할 정산 미리보기 (원장 변경 없음)
-  useEffect(() => {
-    if (!target || !ledger || !actualEndDate) return
-    let alive = true
-    setPreview(null)
-    setPreviewError(null)
-    billingApi
-      .previewMidRelease(ledger.id, actualEndDate)
-      .then((p) => alive && setPreview(p))
-      .catch((e) => alive && setPreviewError(errMsg(e, '정산 미리보기를 계산하지 못했습니다.')))
-    return () => {
-      alive = false
-    }
-  }, [target, ledger, actualEndDate])
-
-  if (!target) return null
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    setFormError(null)
-    setSubmitting(true)
-    try {
-      await orderApi.release(target!.id, actualEndDate)
-    } catch (err) {
-      setFormError(errMsg(err, '출고 처리에 실패했습니다.'))
-      setSubmitting(false)
-      return
-    }
-    // 출고 성공 후 정산 확정 (실패해도 출고는 유지 — 청구 화면에서 재시도 가능)
-    if (settle && ledger && preview && !previewError) {
-      try {
-        await billingApi.applyMidRelease(ledger.id, actualEndDate)
-      } catch (err) {
-        window.alert(`출고는 완료됐지만 정산 반영에 실패했습니다.\n청구·정산 화면에서 다시 처리해 주세요.\n(${errMsg(err, '원인 미상')})`)
-      }
-    }
-    setSubmitting(false)
-    onDone()
-  }
-
-  return (
-    <Modal open onClose={onClose} title={`${target.customerName} · 출고 처리`}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-          <span className="font-medium text-slate-800">{target.customerName}</span> 계약을 출고 완료 처리합니다.
-        </p>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">실제 출고일 *</label>
-          <input type="date" value={actualEndDate} onChange={(e) => setDate(e.target.value)} required className={inputCls} />
-        </div>
-
-        {/* ===== 중도출고 정산 미리보기 ===== */}
-        {ledger && (
-          <div className="space-y-2 rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200/70">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-slate-500">
-                보관료 정산 <span className="font-normal text-slate-400">· {ledger.periodStart} ~ {ledger.periodEnd}</span>
-              </p>
-              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-600">
-                <input type="checkbox" checked={settle} onChange={(e) => setSettle(e.target.checked)} className="accent-indigo-600" />
-                출고와 함께 정산 반영
-              </label>
-            </div>
-
-            {previewError && <p className="text-xs text-[#A65B44]">{previewError}</p>}
-
-            {preview && (
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between text-slate-600">
-                  <span>실사용 보관료 ({ledger.periodStart} ~ {preview.effectiveEndDate})</span>
-                  <span className="font-medium text-slate-800">{won(preview.actualUsageAmount)}</span>
-                </div>
-                {preview.refundAmount > 0 && (
-                  <div className="flex justify-between text-[#5C7C6B]">
-                    <span>환급(잔여 기간 차감)</span>
-                    <span className="font-semibold">-{won(preview.refundAmount)}</span>
-                  </div>
-                )}
-                {preview.additionalChargeAmount > 0 && (
-                  <div className="flex justify-between text-[#A65B44]">
-                    <span>추가 청구</span>
-                    <span className="font-semibold">+{won(preview.additionalChargeAmount)}</span>
-                  </div>
-                )}
-                {ledger.balance > 0 && (
-                  <p className="mt-1.5 rounded-lg bg-[#F2E8E3] px-2.5 py-1.5 text-xs font-medium text-[#A65B44]">
-                    이 계약에 미수 잔액 {won(ledger.balance)}이 남아 있습니다. 출고 후에도 원장에 유지됩니다.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-        {!ledger && (
-          <p className="rounded-lg border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-400">
-            정산할 미결 청구 원장이 없습니다. (원장은 매월 자동 생성되며, 청구·정산 화면에서 확인할 수 있습니다)
-          </p>
-        )}
-
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
-
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
-            취소
-          </button>
-          <button type="submit" disabled={submitting} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700 disabled:opacity-60">
-            {submitting ? '처리 중…' : settle && ledger ? '정산 확정 + 출고 완료' : '출고 완료'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
 
 function errMsg(err: unknown, fallback: string): string {
   return isAxiosError(err) ? (err.response?.data?.message ?? fallback) : fallback
