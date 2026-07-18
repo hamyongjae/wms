@@ -72,7 +72,7 @@ export default function WarehousesPage() {
   }
 
   async function handleDelete(w: Warehouse) {
-    if (!window.confirm(`'${w.name}' 창고를 삭제할까요?`)) return
+    if (!window.confirm(`'${w.name}' 창고를 삭제할까요?\n이 창고의 자리(격자)와 등록된 컨테이너도 함께 삭제됩니다.`)) return
     try {
       await warehouseApi.remove(w.id)
       load()
