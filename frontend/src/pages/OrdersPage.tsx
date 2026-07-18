@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
 import { Plus, Loader2, Trash2, LogOut, FileText, ShieldAlert, AlertTriangle, Pencil, X, Wallet } from 'lucide-react'
-import { orderApi, type StorageOrder, type OrderStatus } from '@/api/orderApi'
+import { orderApi, type StorageOrder, type OrderStatus, type PaymentType } from '@/api/orderApi'
 import { billingApi, type BillingLedger, type MidReleaseSettlement, type PaymentMethod } from '@/api/billingApi'
 import { displayStatus, isOpenLedger } from '@/lib/billing'
 import { customerApi, type Customer, type CustomerType } from '@/api/customerApi'
@@ -924,6 +924,7 @@ function CreateOrderModal({
   const [storageStartDate, setStartDate] = useState(today())
   const [expectedEndDate, setEndDate] = useState('')
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
+  const [paymentType, setPaymentType] = useState<PaymentType>('PREPAID')
   const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -949,6 +950,7 @@ function CreateOrderModal({
       setStartDate(today())
       setEndDate(addDays(today(), 7))
       setMonthlyFee(null)
+      setPaymentType('PREPAID')
       setMemo('')
       setFormError(null)
       setDormantConfirm(false)
@@ -994,8 +996,35 @@ function CreateOrderModal({
         storageStartDate,
         expectedEndDate: expectedEndDate || undefined,
         monthlyFee: monthlyFee!,
+        paymentType,
         memo: memo || undefined,
       })
+      // [선불 계약] 청구서 자동 생성 + 자동 발행 + 전액 입금 처리
+      if (paymentType === 'PREPAID') {
+        try {
+          // 청구서 생성 (기간은 계약 기간 또는 1개월)
+          const ledgerStart = storageStartDate
+          const ledgerEnd = expectedEndDate || addMonths(storageStartDate, 1)
+          const created = await billingApi.createLedger({
+            storageOrderId: order.id,
+            billingPeriodStart: ledgerStart,
+            billingPeriodEnd: ledgerEnd,
+            baseAmount: monthlyFee!,
+            dueDate: storageStartDate, // 선불이므로 당일이 납기
+          })
+          // 청구서 자동 발행
+          await billingApi.issue(created.id)
+          // 전액 입금 기록 (선불)
+          await billingApi.recordPayment(created.id, {
+            amount: monthlyFee!,
+            method: 'BANK_TRANSFER',
+            paidOn: storageStartDate,
+            memo: '선불 계약 - 자동 처리',
+          })
+        } catch (e) {
+          window.alert(`계약은 등록됐지만 선불 청구 처리에 실패했습니다.\n(${errMsg(e, '원인 미상')})`)
+        }
+      }
       // 위치를 지정했으면 컨테이너 생성·배정·적재까지 이어서 처리(미지정이면 생략)
       if (slotId != null) {
         try {
@@ -1153,6 +1182,13 @@ function CreateOrderModal({
                     {dailyFee != null ? won(dailyFee) : ''}
                   </div>
                   <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">결제 방식 *</label>
+                  <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={inputCls}>
+                    <option value="PREPAID">선불 (당일 완납)</option>
+                    <option value="POSTPAID">후불 (매월 청구)</option>
+                  </select>
                 </div>
               </div>
 

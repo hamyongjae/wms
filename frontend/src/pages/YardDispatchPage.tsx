@@ -17,7 +17,7 @@ import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { yardApi, type YardSlot } from '@/api/yardApi'
 import { containerApi, type Container } from '@/api/containerApi'
 import { customerApi, type Customer } from '@/api/customerApi'
-import { orderApi, type StorageOrder } from '@/api/orderApi'
+import { orderApi, type StorageOrder, type PaymentType } from '@/api/orderApi'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
 import Fab from '@/components/ui/Fab'
@@ -46,6 +46,7 @@ export interface QuickInboundDto {
   customerName?: string
   orderId?: number // 선택 시 해당 계약에 배정 / 없으면 새 계약 생성
   monthlyFee?: number // 새 계약 생성 시 보관료
+  paymentType?: PaymentType // 새 계약 생성 시 결제 방식
   inboundDate?: string
   outboundDate?: string
   memo?: string
@@ -189,9 +190,34 @@ export default function YardDispatchPage() {
         storageStartDate: body.inboundDate ?? todayStr(),
         expectedEndDate: body.outboundDate,
         monthlyFee: body.monthlyFee ?? 0,
+        paymentType: body.paymentType,
         memo: body.memo,
       })
       orderId = order.id
+
+      // [선불 계약] 청구서 자동 생성 + 자동 발행 + 전액 입금 처리
+      if (body.paymentType === 'PREPAID' && body.monthlyFee != null && body.monthlyFee > 0) {
+        try {
+          const ledgerStart = body.inboundDate ?? todayStr()
+          const ledgerEnd = body.outboundDate || addDays(ledgerStart, 7)
+          const created = await billingApi.createLedger({
+            storageOrderId: order.id,
+            billingPeriodStart: ledgerStart,
+            billingPeriodEnd: ledgerEnd,
+            baseAmount: body.monthlyFee,
+            dueDate: ledgerStart,
+          })
+          await billingApi.issue(created.id)
+          await billingApi.recordPayment(created.id, {
+            amount: body.monthlyFee,
+            method: 'BANK_TRANSFER',
+            paidOn: ledgerStart,
+            memo: '선불 계약 - 자동 처리',
+          })
+        } catch (e) {
+          window.alert(`계약은 등록됐지만 선불 청구 처리에 실패했습니다.\n(${errMsg(e, '원인 미상')})`)
+        }
+      }
     }
 
     const tag = body.customerName ? `[${body.customerName}]` : ''
@@ -614,6 +640,7 @@ function InboundModal({
   const [customerId, setCustomerId] = useState('')
   const [orderId, setOrderId] = useState('') // 선택 계약(빈 값이면 배정 안 함)
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
+  const [paymentType, setPaymentType] = useState<PaymentType>('PREPAID')
   const today = new Date().toISOString().slice(0, 10)
   const [inboundDate, setInboundDate] = useState(today)
   const [outboundDate, setOutboundDate] = useState(addDays(today, 7))
@@ -682,6 +709,7 @@ function InboundModal({
         customerName: selectedCustomer?.name,
         orderId: orderId ? Number(orderId) : undefined,
         monthlyFee: monthlyFee ?? undefined,
+        paymentType: !orderId ? paymentType : undefined,
         inboundDate: inboundDate || undefined,
         outboundDate: outboundDate || undefined,
         memo: memo.trim() || undefined,
@@ -778,6 +806,13 @@ function InboundModal({
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
                 <input type="date" value={outboundDate} min={inboundDate || undefined} onChange={(e) => setOutboundDate(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">결제 방식 (신규 계약 시)</label>
+                <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={inputCls}>
+                  <option value="PREPAID">선불 (당일 완납)</option>
+                  <option value="POSTPAID">후불 (매월 청구)</option>
+                </select>
               </div>
             </div>
             <div>

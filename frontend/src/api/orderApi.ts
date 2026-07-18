@@ -2,6 +2,7 @@ import { api } from '@/lib/api'
 import type { Page } from '@/api/yardApi'
 
 export type OrderStatus = 'RECEIVED' | 'IN_STORAGE' | 'RELEASED' | 'CANCELLED'
+export type PaymentType = 'PREPAID' | 'POSTPAID'
 
 export interface StorageOrder {
   id: number
@@ -17,6 +18,7 @@ export interface StorageOrder {
   actualEndDate: string | null
   monthlyFee: number
   totalVolume: number | null
+  paymentType: PaymentType
   memo: string | null
 }
 
@@ -26,6 +28,7 @@ export interface OrderCreate {
   storageStartDate: string
   expectedEndDate?: string
   monthlyFee: number
+  paymentType?: PaymentType
   totalVolume?: number
   memo?: string
 }
