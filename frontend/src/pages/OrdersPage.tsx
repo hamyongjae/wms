@@ -712,7 +712,7 @@ function CreateOrderModal({
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title="계약 등록" widthClass="max-w-3xl">
+      <Modal open={open} onClose={onClose} title="계약 등록" widthClass="max-w-5xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* 좌: 계약 정보 폼 / 우: 고객(화주) 검색 리스트 */}
           <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_19rem]">
