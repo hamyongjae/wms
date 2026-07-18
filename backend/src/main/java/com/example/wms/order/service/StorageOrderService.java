@@ -148,12 +148,11 @@ public class StorageOrderService {
     /**
      * [배치 작업] 모든 활성 계약의 상태를 현재 날짜 기준으로 재평가
      * 매일 자정에 실행되어 시간 기반 상태 전이를 처리
+     * (배치 컨텍스트에서는 SecurityUtils가 없으므로 전 테넌트 대상 평가)
      */
     @Transactional
     public void evaluateAllOrdersStatus() {
-        Long tenantId = SecurityUtils.getCurrentTenantId();
-        var activeOrders = storageOrderRepository.findByTenantIdAndStatusNotIn(
-                tenantId,
+        var activeOrders = storageOrderRepository.findByStatusNotIn(
                 java.util.List.of(OrderStatus.RELEASED, OrderStatus.CANCELLED)
         );
         for (StorageOrder order : activeOrders) {
