@@ -707,7 +707,7 @@ function InboundModal({
                 onChange={(e) => setMemo(e.target.value)}
                 rows={3}
                 placeholder="컨테이너 특이사항을 자유롭게 입력하세요."
-                className={cn(inputCls, 'min-h-20 resize-y')}
+                className={cn(inputCls, 'min-h-55 resize-y')}
               />
             </div>
           </div>

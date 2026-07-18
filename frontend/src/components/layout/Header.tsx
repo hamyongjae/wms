@@ -25,11 +25,12 @@ interface HeaderProps {
 export default function Header({ collapsed, onToggle }: HeaderProps) {
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-slate-200 bg-white/70 px-4 backdrop-blur">
+      {/* 사이드바 토글은 md 이상에서만 — 모바일은 하단 탭 바가 내비게이션을 맡는다 */}
       <button
         type="button"
         onClick={onToggle}
         title="사이드바 접기/펼치기"
-        className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+        className="hidden h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 md:flex"
       >
         {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
       </button>

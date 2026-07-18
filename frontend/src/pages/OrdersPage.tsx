@@ -20,11 +20,12 @@ import LocationPickerField from '@/components/yard/LocationPickerField'
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
 
+/* [뮤티드 상태색] 채도를 눌러 익힌 톤 — 경고조차 품위 있게 (마스터플랜 2.1) */
 const STATUS_META: Record<OrderStatus, { label: string; cls: string }> = {
   RECEIVED: { label: '입고완료', cls: 'bg-indigo-50 text-indigo-700 ring-indigo-200' },
-  IN_STORAGE: { label: '보관중', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  IN_STORAGE: { label: '보관중', cls: 'bg-[#E9EFEA] text-[#5C7C6B] ring-[#D3DFD6]' },
   RELEASED: { label: '출고완료', cls: 'bg-slate-100 text-slate-500 ring-slate-200' },
-  CANCELLED: { label: '취소', cls: 'bg-red-50 text-red-600 ring-red-200' },
+  CANCELLED: { label: '취소', cls: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]' },
 }
 
 type FilterKey = 'ALL' | 'ACTIVE' | 'RELEASED' | 'CANCELLED'

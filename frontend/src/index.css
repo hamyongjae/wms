@@ -91,6 +91,63 @@ body,
   height: 100%;
 }
 
+/* [프리미엄 타이포] 숫자는 항상 고정폭 — 금액·수량이 세로 정렬돼 장부의 신뢰감을 준다 */
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * ===== Quiet Precision — 프리미엄 모바일 유틸 =====
+ * 마스터플랜(docs/mobile-premium-uiux-masterplan.md)의 시각 규격 구현.
+ */
+
+/* 넓고 옅은 한 겹 그림자 — 진한 드롭섀도 대신 "종이 한 장 떠 있는" 부양감 */
+.shadow-soft {
+  box-shadow: 0 6px 24px rgba(43, 51, 63, 0.07);
+}
+
+/* 카드 촉감 — 누르는 순간 살짝 눌리고, 떼면 부드럽게 복귀 */
+.card-press {
+  transition: transform 160ms ease-out, box-shadow 160ms ease-out;
+}
+.card-press:active {
+  transform: scale(0.98);
+}
+
+/* 바텀 시트 등장 — 부드러운 감속(iOS풍 이징)으로 하단에서 올라온다 */
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-sheet-up {
+  animation: sheet-up 340ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.animate-scrim-in {
+  animation: scrim-in 240ms ease-out;
+}
+
+/* 노치·홈 인디케이터 세이프 에어리어 */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 접근성 — OS "동작 줄이기" 설정 시 애니메이션 제거 */
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-up,
+  .animate-scrim-in {
+    animation: none;
+  }
+  .card-press,
+  .card-press:active {
+    transition: none;
+    transform: none;
+  }
+}
+
 /*
  * ===== 창고/보관창고 컨셉 배경 유틸 (테마 변수 연동) =====
  */
@@ -103,12 +160,12 @@ body,
     linear-gradient(135deg, var(--hero-from) 0%, var(--hero-via) 48%, var(--hero-to) 100%);
 }
 
-/* 보관창고 격자 패턴 (컨테이너 야드를 연상시키는 옅은 그리드) */
+/* 보관창고 격자 패턴 — 순백 대신 미색(Off-white) 베이스: 카드가 종이처럼 떠 보인다 */
 .bg-yard-grid {
-  background-color: #f8fafc;
+  background-color: #f5f4f0;
   background-image:
-    linear-gradient(rgba(100, 116, 139, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(100, 116, 139, 0.06) 1px, transparent 1px);
+    linear-gradient(rgba(120, 113, 108, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 113, 108, 0.05) 1px, transparent 1px);
   background-size: 28px 28px;
 }
 
