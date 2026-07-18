@@ -118,7 +118,7 @@ export default function YardDispatchPage() {
       .finally(() => setLoading(false))
   }, [selectedId, refreshKey])
 
-  const blocks = useMemo(() => groupByBlock(slots), [slots])
+  const floors = useMemo(() => groupByFloor(slots), [slots])
   const kpi = useMemo(() => {
     const total = slots.length
     const occupied = slots.filter((s) => s.occupied).length
@@ -223,7 +223,7 @@ export default function YardDispatchPage() {
             onClick={() => setGridOpen(true)}
             className="flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
           >
-            <Plus size={16} /> 구역 생성
+            <Plus size={16} /> 자리 생성
           </button>
         )}
       </div>
@@ -299,7 +299,7 @@ export default function YardDispatchPage() {
           <Grid3x3 size={26} className="text-slate-300" />
           <p className="mt-3 text-base font-semibold text-slate-700">이 창고에 슬롯이 없습니다</p>
           <p className="mt-1 text-sm text-slate-400">
-            {isAdmin ? '우측 상단 "구역 생성"으로 격자를 만드세요.' : '관리자가 격자를 생성하면 표시됩니다.'}
+            {isAdmin ? '우측 상단 "자리 생성"으로 층별 자리를 만드세요.' : '관리자가 자리를 생성하면 표시됩니다.'}
           </p>
         </div>
       )}
@@ -318,35 +318,33 @@ export default function YardDispatchPage() {
             </div>
 
             <div className="space-y-6">
-              {blocks.map(({ block, bays }) => (
-                <div key={block}>
-                  <p className="mb-2 text-sm font-medium text-slate-700">{block} 구역</p>
-                  <div className="flex flex-wrap gap-3">
-                    {bays.map((bay) => (
-                      <div key={bay.key} className="flex flex-col gap-1">
-                          {bay.tiers.map((s) => (
-                            <SlotCell
-                              key={s.id}
-                              slot={s}
-                              container={s.containerId != null ? containersById.get(s.containerId) : undefined}
-                              highlighted={matchSlot(s)}
-                              dragActive={dragging != null}
-                              isDragSource={dragging?.fromSlotId === s.id}
-                              onClick={() => (s.occupied ? setActionSlot(s) : setInboundSlot(s))}
-                              onDragStartCell={() => {
-                                if (s.occupied && s.containerId != null) {
-                                  setDragging({
-                                    containerId: s.containerId,
-                                    fromSlotId: s.id,
-                                    label: extractOwner(s.containerId != null ? containersById.get(s.containerId)?.memo : null) ?? s.containerNo ?? '컨테이너',
-                                  })
-                                }
-                              }}
-                              onDropCell={() => handleDropMove(s)}
-                              onDragEndCell={() => setDragging(null)}
-                            />
-                          ))}
-                      </div>
+              {floors.map(({ tier, cells }) => (
+                <div key={tier}>
+                  <p className="mb-2 text-sm font-medium text-slate-700">
+                    {tier}층 <span className="text-xs font-normal text-slate-400">· {cells.length}칸</span>
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {cells.map((s) => (
+                      <SlotCell
+                        key={s.id}
+                        slot={s}
+                        container={s.containerId != null ? containersById.get(s.containerId) : undefined}
+                        highlighted={matchSlot(s)}
+                        dragActive={dragging != null}
+                        isDragSource={dragging?.fromSlotId === s.id}
+                        onClick={() => (s.occupied ? setActionSlot(s) : setInboundSlot(s))}
+                        onDragStartCell={() => {
+                          if (s.occupied && s.containerId != null) {
+                            setDragging({
+                              containerId: s.containerId,
+                              fromSlotId: s.id,
+                              label: extractOwner(s.containerId != null ? containersById.get(s.containerId)?.memo : null) ?? s.containerNo ?? '컨테이너',
+                            })
+                          }
+                        }}
+                        onDropCell={() => handleDropMove(s)}
+                        onDragEndCell={() => setDragging(null)}
+                      />
                     ))}
                   </div>
                 </div>
@@ -493,7 +491,11 @@ function SlotCell({
         highlighted && 'animate-pulse ring-2 ring-amber-400 ring-offset-1',
       )}
     >
-      {slot.occupied ? <span className="truncate px-1">{cellLabel}</span> : <Plus size={14} />}
+      {slot.occupied ? (
+        <span className="truncate px-1">{cellLabel}</span>
+      ) : (
+        <span className="text-slate-400">{slot.columnNo}</span>
+      )}
     </button>
   )
 }
@@ -875,7 +877,7 @@ function EditModal({
   )
 }
 
-/* ===== 구역 생성 ===== */
+/* ===== 자리 생성 (층별) ===== */
 function GridModal({
   warehouseId,
   onClose,
@@ -885,20 +887,36 @@ function GridModal({
   onClose: () => void
   onDone: () => void
 }) {
-  const [block, setBlock] = useState('A')
-  const [rows, setRows] = useState('3')
-  const [columns, setColumns] = useState('3')
-  const [tiers, setTiers] = useState('3')
+  // 인덱스 = 층-1, 값 = 그 층의 자리 개수
+  const [counts, setCounts] = useState<string[]>(['10', '10', '10'])
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-  const total = (Number(rows) || 0) * (Number(columns) || 0) * (Number(tiers) || 0)
+
+  const total = counts.reduce((sum, c) => sum + (Number(c) || 0), 0)
+
+  function setCount(i: number, v: string) {
+    setCounts((prev) => prev.map((c, idx) => (idx === i ? v : c)))
+  }
+  function addFloor() {
+    setCounts((prev) => [...prev, '10'])
+  }
+  function removeFloor(i: number) {
+    setCounts((prev) => prev.filter((_, idx) => idx !== i))
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    const floors = counts
+      .map((c, i) => ({ tier: i + 1, count: Number(c) || 0 }))
+      .filter((f) => f.count > 0)
+    if (floors.length === 0) {
+      setFormError('층별 자리 개수를 1 이상 입력하세요.')
+      return
+    }
     setFormError(null)
     setSubmitting(true)
     try {
-      await yardApi.generateGrid({ warehouseId, block, rows: Number(rows), columns: Number(columns), tiers: Number(tiers) })
+      await yardApi.generateFloors({ warehouseId, floors })
       onDone()
     } catch (err) {
       setFormError(errMsg(err, '생성에 실패했습니다.'))
@@ -908,28 +926,50 @@ function GridModal({
   }
 
   return (
-    <Modal open onClose={onClose} title="보관창고 구역(격자) 생성">
+    <Modal open onClose={onClose} title="보관창고 자리 생성 (층별)">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">구역(Block)</label>
-          <input value={block} onChange={(e) => setBlock(e.target.value)} required className={inputCls} />
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          층마다 자리 개수를 지정합니다. 자리 이름은 <b>"1층-15"</b>처럼 <b>층-번호</b>로 매겨집니다.
+          재생성 시 <b>비어있는 기존 자리</b>는 정리되고 새로 만들어집니다. (적재된 자리는 유지)
+        </p>
+
+        <div className="space-y-2">
+          {counts.map((c, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="w-10 shrink-0 text-sm font-medium text-slate-700">{i + 1}층</span>
+              <input
+                type="number"
+                min={0}
+                value={c}
+                onChange={(e) => setCount(i, e.target.value)}
+                className={cn(inputCls, 'flex-1')}
+                placeholder="자리 개수"
+              />
+              <span className="shrink-0 text-xs text-slate-400">칸</span>
+              {counts.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeFloor(i)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                  title="이 층 삭제"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+          ))}
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">가로</label>
-            <input type="number" min={1} value={rows} onChange={(e) => setRows(e.target.value)} className={inputCls} />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">세로</label>
-            <input type="number" min={1} value={columns} onChange={(e) => setColumns(e.target.value)} className={inputCls} />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">층</label>
-            <input type="number" min={1} value={tiers} onChange={(e) => setTiers(e.target.value)} className={inputCls} />
-          </div>
-        </div>
+
+        <button
+          type="button"
+          onClick={addFloor}
+          className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+        >
+          <Plus size={14} /> 층 추가
+        </button>
+
         <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-          총 <span className="font-semibold text-slate-700">{total}</span>칸 생성 (이미 있는 좌표는 건너뜀)
+          총 <span className="font-semibold text-slate-700">{total}</span>칸 생성
         </p>
         {formError && <p className="text-sm text-red-600">{formError}</p>}
         <div className="flex justify-end gap-2 pt-2">
@@ -968,38 +1008,16 @@ function Legend() {
   )
 }
 
-interface Bay {
-  key: string
-  row: number
-  col: number
-  tiers: YardSlot[]
-}
-
-function groupByBlock(slots: YardSlot[]): Array<{ block: string; bays: Bay[] }> {
-  const blockMap = new Map<string, YardSlot[]>()
+// 층(tier)별로 묶어 높은 층이 위로, 각 층은 자리 번호(columnNo) 오름차순
+function groupByFloor(slots: YardSlot[]): Array<{ tier: number; cells: YardSlot[] }> {
+  const map = new Map<number, YardSlot[]>()
   for (const s of slots) {
-    if (!blockMap.has(s.block)) blockMap.set(s.block, [])
-    blockMap.get(s.block)!.push(s)
+    if (!map.has(s.tier)) map.set(s.tier, [])
+    map.get(s.tier)!.push(s)
   }
-  return [...blockMap.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([block, blockSlots]) => {
-      const bayMap = new Map<string, YardSlot[]>()
-      for (const s of blockSlots) {
-        const key = `${s.rowNo}|${s.columnNo}`
-        if (!bayMap.has(key)) bayMap.set(key, [])
-        bayMap.get(key)!.push(s)
-      }
-      const bays: Bay[] = [...bayMap.entries()]
-        .map(([key, arr]) => ({
-          key,
-          row: arr[0].rowNo,
-          col: arr[0].columnNo,
-          tiers: [...arr].sort((x, y) => y.tier - x.tier),
-        }))
-        .sort((a, b) => a.row - b.row || a.col - b.col)
-      return { block, bays }
-    })
+  return [...map.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([tier, list]) => ({ tier, cells: [...list].sort((x, y) => x.columnNo - y.columnNo) }))
 }
 
 function errMsg(err: unknown, fallback: string): string {

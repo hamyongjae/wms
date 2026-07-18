@@ -50,9 +50,19 @@ export interface GridGenerateRequest {
   tiers: number
 }
 
+/** 층별 자리 생성: 층(tier)마다 자리 개수(count) 지정 */
+export interface FloorGridRequest {
+  warehouseId: number
+  floors: Array<{ tier: number; count: number }>
+}
+
 export const yardApi = {
   async generateGrid(body: GridGenerateRequest): Promise<void> {
     await api.post('/api/yard/slots/generate', body)
+  },
+  /** 층별 개수로 자리 재생성 (빈 자리 정리 후 N층-번호로 생성) */
+  async generateFloors(body: FloorGridRequest): Promise<void> {
+    await api.post('/api/yard/slots/generate-floors', body)
   },
   async warehouseOccupancy(warehouseId: number): Promise<WarehouseOccupancy> {
     const { data } = await api.get<WarehouseOccupancy>(`/api/yard/occupancy/${warehouseId}`)

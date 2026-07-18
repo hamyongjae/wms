@@ -43,34 +43,19 @@ export default function LocationPickerField({
     }
   }, [warehouseId])
 
-  // 구역(block) → 베이(행·열 묶음) → 층. '컨테이너 관리' 화면과 동일하게:
-  //  - 베이는 행·열 오름차순으로 가로 배치
-  //  - 베이 안의 층은 내림차순(높은 층이 위)으로 세로 스택
-  const blocks = useMemo(() => {
-    const blockMap = new Map<string, YardSlot[]>()
+  // 층(tier)별로 묶어 높은 층이 위로 오게 정렬. 각 층은 자리 번호(columnNo) 오름차순.
+  const floors = useMemo(() => {
+    const map = new Map<number, YardSlot[]>()
     for (const s of slots) {
-      if (!blockMap.has(s.block)) blockMap.set(s.block, [])
-      blockMap.get(s.block)!.push(s)
+      if (!map.has(s.tier)) map.set(s.tier, [])
+      map.get(s.tier)!.push(s)
     }
-    return [...blockMap.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([block, list]) => {
-        const bayMap = new Map<string, YardSlot[]>()
-        for (const s of list) {
-          const k = `${s.rowNo}|${s.columnNo}`
-          if (!bayMap.has(k)) bayMap.set(k, [])
-          bayMap.get(k)!.push(s)
-        }
-        const bays = [...bayMap.entries()]
-          .map(([k, arr]) => ({
-            key: k,
-            row: arr[0].rowNo,
-            col: arr[0].columnNo,
-            tiers: [...arr].sort((x, y) => y.tier - x.tier), // 높은 층이 위
-          }))
-          .sort((a, b) => a.row - b.row || a.col - b.col)
-        return { block, bays }
-      })
+    return [...map.entries()]
+      .sort((a, b) => b[0] - a[0]) // 3층 → 1층
+      .map(([tier, list]) => ({
+        tier,
+        cells: [...list].sort((x, y) => x.columnNo - y.columnNo),
+      }))
   }, [slots])
 
   const emptyCount = useMemo(() => slots.filter((s) => !s.occupied).length, [slots])
@@ -122,47 +107,43 @@ export default function LocationPickerField({
           </p>
         ) : (
           <div className="space-y-4">
-            {blocks.map(({ block, bays }) => (
-              <div key={block}>
-                <p className="mb-1.5 text-[11px] font-semibold text-slate-400">{block} 구역</p>
-                <div className="flex flex-wrap gap-2">
-                  {bays.map((bay) => (
-                    <div key={bay.key} className="flex flex-col gap-1">
-                      {bay.tiers.map((s) => {
-                        const isSelected = s.id === value
-                        const isCurrent = s.id === currentSlotId
-                        const selectable = !disabled && (!s.occupied || isCurrent)
-                        return (
-                          <button
-                            key={s.id}
-                            type="button"
-                            disabled={!selectable}
-                            onClick={() => onChange(isSelected ? null : s.id)}
-                            title={
-                              s.occupied && !isCurrent ? `사용중 (${s.containerNo ?? '점유'})` : s.locationLabel
-                            }
-                            className={cn(
-                              'relative flex h-11 w-11 items-center justify-center rounded-lg border text-[10px] font-medium transition',
-                              isSelected
-                                ? 'border-indigo-600 bg-indigo-600 text-white shadow'
-                                : isCurrent
-                                  ? 'border-dashed border-indigo-400 bg-indigo-50 text-indigo-700'
-                                  : s.occupied
-                                    ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                                    : 'border-dashed border-slate-300 text-slate-500 hover:border-indigo-400 hover:bg-indigo-50',
-                            )}
-                          >
-                            {isSelected ? <Check size={14} /> : `${s.tier}층`}
-                            {isCurrent && !isSelected && (
-                              <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 rounded bg-indigo-500 px-1 text-[8px] leading-tight text-white">
-                                현재
-                              </span>
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  ))}
+            {floors.map(({ tier, cells }) => (
+              <div key={tier}>
+                <p className="mb-1.5 text-[11px] font-semibold text-slate-400">
+                  {tier}층 <span className="text-slate-300">· {cells.length}칸</span>
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {cells.map((s) => {
+                    const isSelected = s.id === value
+                    const isCurrent = s.id === currentSlotId
+                    const selectable = !disabled && (!s.occupied || isCurrent)
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        disabled={!selectable}
+                        onClick={() => onChange(isSelected ? null : s.id)}
+                        title={s.occupied && !isCurrent ? `사용중 (${s.containerNo ?? '점유'})` : s.locationLabel}
+                        className={cn(
+                          'relative flex h-10 w-10 items-center justify-center rounded-lg border text-[11px] font-medium transition',
+                          isSelected
+                            ? 'border-indigo-600 bg-indigo-600 text-white shadow'
+                            : isCurrent
+                              ? 'border-dashed border-indigo-400 bg-indigo-50 text-indigo-700'
+                              : s.occupied
+                                ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                                : 'border-dashed border-slate-300 text-slate-500 hover:border-indigo-400 hover:bg-indigo-50',
+                        )}
+                      >
+                        {isSelected ? <Check size={14} /> : s.columnNo}
+                        {isCurrent && !isSelected && (
+                          <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 rounded bg-indigo-500 px-1 text-[8px] leading-tight text-white">
+                            현재
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             ))}
