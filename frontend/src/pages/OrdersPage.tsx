@@ -182,24 +182,39 @@ export default function OrdersPage() {
   }, [orders, filter])
 
   async function handleDelete(o: StorageOrder) {
-    if (!window.confirm(`'${o.customerName}' 계약을 삭제할까요?\n(연결된 청구 원장도 함께 삭제됩니다)`)) return
+    if (!window.confirm(`'${o.customerName}' 계약을 삭제할까요?`)) return
     try {
-      // 계약 삭제 전에 관련된 청구 원장 삭제
-      const ledgers = await billingApi.list()
-      const relatedLedgers = ledgers.filter((l) => l.storageOrderId === o.id)
-      for (const ledger of relatedLedgers) {
-        try {
-          await billingApi.deleteLedger(ledger.id)
-        } catch (e) {
-          // DRAFT가 아닌 원장은 삭제 불가능하므로 무시하고 계속 진행
-          console.warn(`원장 ${ledger.id} 삭제 실패: ${errMsg(e, '원인 미상')}`)
+      // 계약 삭제 전에 관련된 청구 원장 정리 시도
+      try {
+        const ledgers = await billingApi.list()
+        const relatedLedgers = ledgers.filter((l) => l.storageOrderId === o.id)
+        let deletedCount = 0
+        let failedCount = 0
+
+        for (const ledger of relatedLedgers) {
+          try {
+            await billingApi.deleteLedger(ledger.id)
+            deletedCount++
+          } catch (e) {
+            // 삭제 실패는 기록하되 계속 진행
+            failedCount++
+            console.warn(`원장 ${ledger.id} 삭제 실패`)
+          }
         }
+
+        if (failedCount > 0) {
+          window.alert(`${failedCount}개의 청구 원장(발행/수금된 건)은 자동 삭제되지 않습니다.\n관리자가 수동으로 정리해주세요.`)
+        }
+      } catch (e) {
+        // 청구 원장 조회 실패해도 계약 삭제는 시도
+        console.warn('청구 원장 조회 실패, 계약 삭제 진행')
       }
-      // 청구 원장 삭제 후 계약 삭제
+
+      // 계약 삭제
       await orderApi.remove(o.id)
       reload()
     } catch (err) {
-      alert(errMsg(err, '삭제에 실패했습니다. 청구 원장을 먼저 정리해주세요.'))
+      alert(errMsg(err, '계약 삭제에 실패했습니다.'))
     }
   }
 
