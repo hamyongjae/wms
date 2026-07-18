@@ -42,10 +42,12 @@ function formatContractPrice(monthlyFee: number, startDate: string, endDate: str
   return `${won(monthlyFee)} / ${durationDays}일`
 }
 
-/** 계약에 배정된 컨테이너 번호 조회 */
-function getContainerNumber(orderId: number, containers: Container[]): string {
+/** 계약에 배정된 컨테이너의 슬롯 위치 조회 (예: "3층-1") */
+function getSlotLocation(orderId: number, containers: Container[], slots: YardSlot[]): string {
   const container = containers.find((c) => c.currentOrderId === orderId)
-  return container?.containerNo ?? ''
+  if (!container) return ''
+  const slot = slots.find((s) => s.containerId === container.id)
+  return slot?.locationLabel ?? ''
 }
 
 
@@ -63,6 +65,7 @@ export default function DashboardPage() {
   const [ledgers, setLedgers] = useState<BillingLedger[]>([])
   const [occupancy, setOccupancy] = useState<WarehouseOccupancy[]>([])
   const [containers, setContainers] = useState<Container[]>([])
+  const [slots, setSlots] = useState<YardSlot[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -70,15 +73,22 @@ export default function DashboardPage() {
       orderApi.list().catch(() => [] as StorageOrder[]),
       billingApi.list().catch(() => [] as BillingLedger[]),
       yardApi.tenantOccupancy().catch(() => [] as WarehouseOccupancy[]),
-      containerApi.list({}).catch(() => [] as Container[]),
     ])
-      .then(([o, l, occ, c]) => {
+      .then(([o, l, occ]) => {
         setOrders(o)
         setLedgers(l)
         setOccupancy(occ)
-        setContainers(c)
       })
       .finally(() => setLoading(false))
+
+    // 컨테이너·슬롯은 별도 비동기 로드 (에러 무시)
+    Promise.allSettled([
+      containerApi.list({}),
+      yardApi.slots(),
+    ]).then((results) => {
+      if (results[0].status === 'fulfilled') setContainers(results[0].value)
+      if (results[1].status === 'fulfilled') setSlots(results[1].value)
+    })
   }, [])
 
   const stats = useMemo(() => {
@@ -235,13 +245,13 @@ export default function DashboardPage() {
               ) : (
                 <ul className="mt-3 divide-y divide-slate-100">
                   {recentOrders.map((o) => {
-                    const containerNo = getContainerNumber(o.id, containers)
+                    const location = getSlotLocation(o.id, containers, slots)
                     return (
                       <li key={o.id} className="flex items-center justify-between py-2.5 text-sm">
                         <div className="min-w-0">
                           <p className="truncate font-medium text-slate-800">{o.customerName}</p>
                           <p className="text-xs text-slate-400">
-                            {o.warehouseName} {containerNo && `· ${containerNo}`} · {o.storageStartDate}~{o.actualEndDate ?? o.expectedEndDate ?? '미정'}
+                            {o.warehouseName} {location && `· ${location}`} · {o.storageStartDate}~{o.actualEndDate ?? o.expectedEndDate ?? '미정'}
                           </p>
                         </div>
                         <span className="shrink-0 whitespace-nowrap text-slate-600">{formatContractPrice(o.monthlyFee, o.storageStartDate, o.actualEndDate ?? o.expectedEndDate)}</span>
