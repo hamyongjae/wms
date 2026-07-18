@@ -202,8 +202,10 @@ export default function YardDispatchPage() {
           const ledgerEnd = body.outboundDate || addDays(ledgerStart, 7)
           const created = await billingApi.createLedger({
             storageOrderId: order.id,
-            billingPeriodStart: ledgerStart,
-            billingPeriodEnd: ledgerEnd,
+            billingType: 'MONTHLY',
+            settlementType: 'PREPAID',
+            periodStart: ledgerStart,
+            periodEnd: ledgerEnd,
             baseAmount: body.monthlyFee,
             dueDate: ledgerStart,
           })

@@ -1007,8 +1007,10 @@ function CreateOrderModal({
           const ledgerEnd = expectedEndDate || addMonths(storageStartDate, 1)
           const created = await billingApi.createLedger({
             storageOrderId: order.id,
-            billingPeriodStart: ledgerStart,
-            billingPeriodEnd: ledgerEnd,
+            billingType: 'MONTHLY',
+            settlementType: 'PREPAID',
+            periodStart: ledgerStart,
+            periodEnd: ledgerEnd,
             baseAmount: monthlyFee!,
             dueDate: storageStartDate, // 선불이므로 당일이 납기
           })
