@@ -121,19 +121,6 @@ public class StorageOrder {
         this.actualEndDate = null;
     }
 
-    // ===== [상태 토글] 현재 상태의 반대로 전환 =====
-    /**
-     * 입고 ↔ 출고 단일 토글.
-     * @param actualEndDate 출고로 전환 시 기록할 실제 출고일 (입고로 전환 시 무시)
-     */
-    public void toggleStatus(LocalDate actualEndDate) {
-        if (this.status == OrderStatus.INBOUND) {
-            release(actualEndDate != null ? actualEndDate : LocalDate.now());
-        } else {
-            unreleased();
-        }
-    }
-
     // ===== 편의 판별 =====
     public boolean isInbound() {
         return this.status == OrderStatus.INBOUND;

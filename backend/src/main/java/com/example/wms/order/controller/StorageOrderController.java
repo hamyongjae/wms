@@ -43,19 +43,7 @@ public class StorageOrderController {
         return ResponseEntity.ok(storageOrderService.updateOrder(id, request));
     }
 
-    @PatchMapping("/{id}/release")
-    public ResponseEntity<StorageOrderResponse> releaseOrder(
-            @PathVariable Long id,
-            @Valid @RequestBody StorageOrderReleaseRequest request) {
-        return ResponseEntity.ok(storageOrderService.releaseOrder(id, request));
-    }
-
-    @PatchMapping("/{id}/unreleased")
-    public ResponseEntity<StorageOrderResponse> unreleaseOrder(@PathVariable Long id) {
-        return ResponseEntity.ok(storageOrderService.unreleaseOrder(id));
-    }
-
-    // [단일 토글] 입고 ↔ 출고 전환 — 현재 상태의 반대로 변경
+    // [단일 토글] 입고 ↔ 출고 전환 — 유일한 상태 변경 진입점
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<StorageOrderResponse> toggleStatus(@PathVariable Long id) {
         return ResponseEntity.ok(storageOrderService.toggleStatus(id));

@@ -14,6 +14,7 @@ import com.example.wms.billing.entity.BillingLedger;
 import com.example.wms.billing.repository.BillingLedgerRepository;
 import com.example.wms.billing.repository.PaymentHistoryRepository;
 import com.example.wms.billing.repository.BillingAdjustmentRepository;
+import com.example.wms.yard.repository.YardSlotRepository;
 import com.example.wms.order.repository.StorageOrderRepository;
 import com.example.wms.warehouse.repository.WarehouseRepository;
 import com.example.wms.security.SecurityUtils;
@@ -36,6 +37,7 @@ public class StorageOrderService {
     private final BillingLedgerRepository billingLedgerRepository;
     private final PaymentHistoryRepository paymentHistoryRepository;
     private final BillingAdjustmentRepository billingAdjustmentRepository;
+    private final YardSlotRepository yardSlotRepository;
 
     // 보관 계약 등록
     @Transactional
@@ -111,28 +113,6 @@ public class StorageOrderService {
         return new StorageOrderResponse(order);
     }
 
-    // ===== [출고 처리] 입고 → 출고 =====
-    @Transactional
-    public StorageOrderResponse releaseOrder(Long id, StorageOrderReleaseRequest request) {
-        StorageOrder order = findOrderOrThrow(id);
-        // [날짜 정합성] 실제 출고일은 보관 시작일보다 빠를 수 없다
-        TemporalValidator.validateContractPeriod(order.getStorageStartDate(), request.getActualEndDate());
-        order.release(request.getActualEndDate());
-        // [일정 동기화] 출고 완료 시 배정 컨테이너의 출고예정일을 실제 출고일로 확정한다.
-        syncContainerSchedule(order, order.getStorageStartDate(), request.getActualEndDate());
-        return new StorageOrderResponse(order);
-    }
-
-    // ===== [출고 취소] 출고 → 입고 =====
-    @Transactional
-    public StorageOrderResponse unreleaseOrder(Long id) {
-        StorageOrder order = findOrderOrThrow(id);
-        order.unreleased();
-        // [일정 동기화] 출고 취소 시 배정 컨테이너의 출고예정일을 원래 예정일로 복구한다.
-        syncContainerSchedule(order, order.getStorageStartDate(), order.getExpectedEndDate());
-        return new StorageOrderResponse(order);
-    }
-
     // ===== [상태 토글] 입고 ↔ 출고 단일 전환 =====
     /**
      * 현재 상태의 반대로 토글한다.
@@ -168,25 +148,35 @@ public class StorageOrderService {
         }
     }
 
-    // ===== [계약 삭제 - Cascade] 연결된 컨테이너 링크 해제 + 청구 원장/입금/조정 함께 삭제 =====
+    // ===== [계약 삭제 - 연쇄 정리] =====
+    /**
+     * 계약 삭제 시 하위 자원을 모순 없이 연쇄 정리한다 (단일 트랜잭션 — 전부 성공 또는 전부 롤백).
+     *
+     *  1. 보관창고 슬롯 공석 처리  : 계약에 배정된 컨테이너가 적재된 슬롯을 vacate → 자원(자리) 즉시 해제
+     *  2. 컨테이너 삭제           : 계약 등록 시 자동 생성된 물리 단위이므로 유령 데이터로 남기지 않고 제거
+     *  3. 청구 원장 연쇄 삭제      : 입금 내역 → 조정 내역 → 원장 순 (FK 역순)
+     *  4. 계약 삭제
+     */
     @Transactional
     public void deleteOrder(Long id) {
         StorageOrder order = findOrderOrThrow(id);
         Long tenantId = SecurityUtils.getCurrentTenantId();
 
-        // 1. 이 계약을 점유 중인 컨테이너의 링크를 먼저 해제 (FK 제약 방지)
+        // 1~2. 컨테이너: 슬롯 공석 처리 후 삭제 (컨테이너 관리 화면의 '입고' 유령 노출 차단)
         for (Container c : containerRepository.findByTenantIdAndCurrentOrderId(tenantId, order.getId())) {
-            c.release();
+            yardSlotRepository.findByTenantIdAndContainerId(tenantId, c.getId())
+                    .ifPresent(slot -> slot.vacate());
+            containerRepository.delete(c);
         }
 
-        // 2. 연결된 청구 원장의 하위 데이터(입금·조정)부터 삭제 후 원장 삭제
+        // 3. 청구 원장의 하위 데이터(입금·조정)부터 삭제 후 원장 삭제
         for (BillingLedger ledger : billingLedgerRepository.findByStorageOrderId(order.getId())) {
             paymentHistoryRepository.deleteByBillingLedgerId(ledger.getId());
             billingAdjustmentRepository.deleteByBillingLedgerId(ledger.getId());
             billingLedgerRepository.delete(ledger);
         }
 
-        // 3. 계약 삭제
+        // 4. 계약 삭제
         storageOrderRepository.delete(order);
     }
 
