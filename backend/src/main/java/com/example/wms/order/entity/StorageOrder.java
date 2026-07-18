@@ -40,8 +40,8 @@ public class StorageOrder {
     @Column(name = "status", nullable = false, length = 20)
     private OrderStatus status = OrderStatus.PENDING;
 
-    @Column(name = "slot_assigned", nullable = false)
-    private boolean slotAssigned = false;  // 슬롯 위치 지정 여부
+    @Column(name = "slot_assigned")
+    private Boolean slotAssigned = false;  // 슬롯 위치 지정 여부
 
     // ===== 기간 =====
     @Column(name = "storage_start_date", nullable = false)

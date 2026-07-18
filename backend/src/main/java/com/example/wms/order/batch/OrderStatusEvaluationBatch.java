@@ -36,11 +36,16 @@ public class OrderStatusEvaluationBatch {
     /**
      * [서버 기동 시] 애플리케이션 초기화 시점에 배치 한 번 실행
      * 서버 시작 직후 계약 상태를 현재 기준으로 재평가
+     * (데이터베이스 마이그레이션 후 실행)
      */
     @PostConstruct
     public void initOnStartup() {
-        log.info("[초기화] 서버 기동 시 계약 상태 평가 실행");
-        evaluateAllOrdersStatus();
+        try {
+            log.info("[초기화] 서버 기동 시 계약 상태 평가 실행");
+            evaluateAllOrdersStatus();
+        } catch (Exception e) {
+            log.warn("[초기화] 계약 상태 평가 실패 (DB 미준비): {}", e.getMessage());
+        }
     }
 
     /**
