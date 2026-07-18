@@ -173,12 +173,12 @@ export default function CustomersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
-                <th className="px-5 py-3 font-medium">고객명</th>
-                <th className="px-5 py-3 font-medium">유형</th>
-                <th className="px-5 py-3 font-medium">연락처</th>
-                <th className="px-5 py-3 font-medium">이메일</th>
-                <th className="px-5 py-3 font-medium">상태</th>
-                <th className="px-5 py-3 text-right font-medium">작업</th>
+                <th className="px-4 py-3 font-medium">고객명</th>
+                <th className="px-3 py-3 font-medium">유형</th>
+                <th className="px-3 py-3 font-medium">연락처</th>
+                <th className="px-4 py-3 font-medium">메모</th>
+                <th className="px-4 py-3 font-medium">상태</th>
+                <th className="px-3 py-3 text-right font-medium">작업</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -190,21 +190,25 @@ export default function CustomersPage() {
                     c.status === 'BLACKLISTED' ? 'bg-red-50/60 hover:bg-red-50' : 'hover:bg-slate-50',
                   )}
                 >
-                  <td className="px-5 py-3 font-medium text-slate-800">
+                  <td className="px-4 py-3 font-medium text-slate-800">
                     <span className="flex items-center gap-1.5">
                       {c.status === 'BLACKLISTED' && <ShieldAlert size={15} className="text-red-500" />}
                       {c.name}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-slate-500">
-                    <span className="inline-flex items-center gap-1">
+                  <td className="px-3 py-3 text-slate-500">
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
                       {c.customerType === 'CORPORATE' ? <Building2 size={14} /> : <UserIcon size={14} />}
                       {c.customerType === 'CORPORATE' ? '기업' : '개인'}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-slate-500">{c.phoneNumber || '—'}</td>
-                  <td className="px-5 py-3 text-slate-500">{c.email || '—'}</td>
-                  <td className="px-5 py-3">
+                  <td className="px-3 py-3 text-slate-500">{c.phoneNumber || '—'}</td>
+                  <td className="px-4 py-3 text-slate-500">
+                    <span className="truncate text-xs" title={c.memo || ''}>
+                      {c.memo || '—'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
                     <select
                       value={c.status}
                       onChange={(e) => handleStatus(c, e.target.value as CustomerStatus)}
@@ -226,7 +230,7 @@ export default function CustomersPage() {
                       </p>
                     )}
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-3 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         type="button"
