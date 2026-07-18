@@ -182,39 +182,17 @@ export default function OrdersPage() {
   }, [orders, filter])
 
   async function handleDelete(o: StorageOrder) {
-    if (!window.confirm(`'${o.customerName}' 계약을 삭제할까요?`)) return
+    if (!window.confirm(`'${o.customerName}' 계약을 삭제할까요?\n(연결된 청구 원장도 함께 삭제됩니다)`)) return
     try {
-      // 계약 삭제 전에 관련된 청구 원장 정리 시도
-      try {
-        const ledgers = await billingApi.list()
-        const relatedLedgers = ledgers.filter((l) => l.storageOrderId === o.id)
-        let deletedCount = 0
-        let failedCount = 0
-
-        for (const ledger of relatedLedgers) {
-          try {
-            await billingApi.deleteLedger(ledger.id)
-            deletedCount++
-          } catch (e) {
-            // 삭제 실패는 기록하되 계속 진행
-            failedCount++
-            console.warn(`원장 ${ledger.id} 삭제 실패`)
-          }
-        }
-
-        if (failedCount > 0) {
-          window.alert(`${failedCount}개의 청구 원장(발행/수금된 건)은 자동 삭제되지 않습니다.\n관리자가 수동으로 정리해주세요.`)
-        }
-      } catch (e) {
-        // 청구 원장 조회 실패해도 계약 삭제는 시도
-        console.warn('청구 원장 조회 실패, 계약 삭제 진행')
-      }
-
-      // 계약 삭제
       await orderApi.remove(o.id)
       reload()
     } catch (err) {
-      alert(errMsg(err, '계약 삭제에 실패했습니다.'))
+      const errorMsg = errMsg(err, '')
+      if (errorMsg.includes('foreign key') || errorMsg.includes('참조')) {
+        alert('계약에 연결된 청구 원장이 있습니다.\n청구 정산 화면에서 해당 원장들을 먼저 삭제해주세요.')
+      } else {
+        alert(errMsg(err, '계약 삭제에 실패했습니다.'))
+      }
     }
   }
 
