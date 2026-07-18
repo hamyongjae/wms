@@ -23,8 +23,23 @@ public class CorsConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // 개발용 프론트 출처 (운영 배포 시 실제 도메인 추가)
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
+        // [개발/모바일] 사설망(LAN) 어느 기기에서 접속해도 허용되도록 IP 대역 패턴 사용.
+        //   - localhost: PC 개발
+        //   - 192.168.x.x / 10.x.x.x / 172.16~31.x.x: 공유기 사설망(모바일 테스트)
+        //   - *.trycloudflare.com / *.ngrok-free.app: 터널링(HTTPS) 접속
+        //   운영 배포 시 실제 도메인을 여기에 추가한다.
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "http://192.168.*.*:*",
+                "http://10.*.*.*:*",
+                "http://172.16.*.*:*", "http://172.17.*.*:*", "http://172.18.*.*:*", "http://172.19.*.*:*",
+                "http://172.20.*.*:*", "http://172.21.*.*:*", "http://172.22.*.*:*", "http://172.23.*.*:*",
+                "http://172.24.*.*:*", "http://172.25.*.*:*", "http://172.26.*.*:*", "http://172.27.*.*:*",
+                "http://172.28.*.*:*", "http://172.29.*.*:*", "http://172.30.*.*:*", "http://172.31.*.*:*",
+                "https://*.trycloudflare.com",
+                "https://*.ngrok-free.app"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));      // Authorization, Content-Type 등 모두 허용
         config.setExposedHeaders(List.of("Authorization"));
