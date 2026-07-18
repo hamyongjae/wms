@@ -322,10 +322,11 @@ export default function OrdersPage() {
                   <td className="px-5 py-3">
                     <span
                       className={cn(
-                        'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1',
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1',
                         STATUS_META[o.status].cls,
                       )}
                     >
+                      {STATUS_META[o.status].icon && <span>{STATUS_META[o.status].icon}</span>}
                       {STATUS_META[o.status].label}
                     </span>
                   </td>
