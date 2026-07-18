@@ -43,6 +43,20 @@ const today = () => new Date().toISOString().slice(0, 10)
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const isActive = (s: OrderStatus) => s === 'RECEIVED' || s === 'IN_STORAGE'
 
+/** yyyy-MM-dd 에 일수 더하기 (UTC 기준) */
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+/** yyyy-MM-dd 에 개월 더하기 (하루 빼서 '한 달 구간'으로: 1/15~2/14) */
+function addMonths(dateStr: string, months: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`)
+  d.setUTCMonth(d.getUTCMonth() + months)
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
 /**
  * 특정 계약(주문)에 컨테이너를 만들어 지정 슬롯에 적재·배정하는 파이프라인.
  * 컨테이너 생성 → 계약 배정(assign) → 슬롯 적재(inbound). 화주명은 memo 태그로 함께 남긴다.
@@ -378,7 +392,7 @@ export default function OrdersPage() {
         }}
       />
 
-      <OrderBillingModal target={billingTarget} onClose={() => setBillingTarget(null)} />
+      <OrderBillingModal target={billingTarget} isAdmin={isAdmin} onClose={() => setBillingTarget(null)} />
     </div>
   )
 }
@@ -387,7 +401,7 @@ export default function OrdersPage() {
  * "이 고객 정산 어떻게 돼가?"에 화면 한 장으로 답한다.
  * 회차(원장)별 기간·상태·수금/잔액을 시간순으로 보여주고, 그 자리에서 바로 입금을 기록한다.
  */
-function OrderBillingModal({ target, onClose }: { target: StorageOrder | null; onClose: () => void }) {
+function OrderBillingModal({ target, isAdmin, onClose }: { target: StorageOrder | null; isAdmin: boolean; onClose: () => void }) {
   const [ledgers, setLedgers] = useState<BillingLedger[]>([])
   const [loading, setLoading] = useState(true)
   const [payTarget, setPayTarget] = useState<BillingLedger | null>(null) // 입금 기록 중인 회차
@@ -396,6 +410,14 @@ function OrderBillingModal({ target, onClose }: { target: StorageOrder | null; o
   const [paidOn, setPaidOn] = useState(today())
   const [saving, setSaving] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
+  // 청구서 생성
+  const [creating, setCreating] = useState(false)
+  const [genOpen, setGenOpen] = useState(false)
+  const [genStart, setGenStart] = useState('')
+  const [genEnd, setGenEnd] = useState('')
+  const [genAmount, setGenAmount] = useState<number | null>(null)
+  const [genDue, setGenDue] = useState('')
+  const [genError, setGenError] = useState<string | null>(null)
 
   function load(orderId: number) {
     setLoading(true)
@@ -448,6 +470,55 @@ function OrderBillingModal({ target, onClose }: { target: StorageOrder | null; o
     }
   }
 
+  // 다음 청구 회차 기본값 프리필: 시작 = 마지막 회차 종료 다음날(없으면 계약 시작일), 종료 = +1개월
+  function openGenerator() {
+    const last = [...ledgers].sort((a, b) => (a.periodEnd < b.periodEnd ? -1 : 1)).at(-1)
+    const start = last ? addDays(last.periodEnd, 1) : (target!.storageStartDate ?? today())
+    setGenStart(start)
+    setGenEnd(addMonths(start, 1))
+    setGenAmount(target!.monthlyFee ?? null)
+    setGenDue(start) // 선납 기준 납기 = 기간 시작일 (필요 시 조정)
+    setGenError(null)
+    setGenOpen(true)
+  }
+
+  // 청구서 생성 → 곧바로 발행(ISSUED)까지 → 입금 기록 가능 상태로
+  async function submitGenerate(e: FormEvent) {
+    e.preventDefault()
+    if (!genStart || !genEnd) return setGenError('청구 기간을 입력하세요.')
+    if (genAmount == null || genAmount <= 0) return setGenError('청구 금액을 입력하세요.')
+    if (genEnd < genStart) return setGenError('종료일은 시작일보다 빠를 수 없습니다.')
+    setCreating(true)
+    try {
+      const created = await billingApi.createLedger({
+        storageOrderId: target!.id,
+        billingType: 'MONTHLY',
+        settlementType: 'PREPAID',
+        periodStart: genStart,
+        periodEnd: genEnd,
+        baseAmount: genAmount,
+        dueDate: genDue || undefined,
+      })
+      await billingApi.issue(created.id, genDue || undefined) // 발행해야 수금 가능
+      setGenOpen(false)
+      load(target!.id)
+    } catch (err) {
+      setGenError(errMsg(err, '청구서 생성에 실패했습니다.'))
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  // DRAFT 원장 즉시 발행
+  async function issueLedger(l: BillingLedger) {
+    try {
+      await billingApi.issue(l.id, l.dueDate ?? undefined)
+      load(target!.id)
+    } catch (err) {
+      window.alert(errMsg(err, '발행에 실패했습니다.'))
+    }
+  }
+
   const totalBalance = ledgers.reduce((s, l) => s + (isOpenLedger(l) ? l.balance : 0), 0)
 
   return (
@@ -462,6 +533,49 @@ function OrderBillingModal({ target, onClose }: { target: StorageOrder | null; o
           </span>
         </div>
 
+        {/* 청구서 생성 (관리자) — 원장이 없으면 여기서 만들어야 정산이 시작된다 */}
+        {isAdmin && !genOpen && (
+          <button
+            type="button"
+            onClick={openGenerator}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-indigo-300 bg-indigo-50/50 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
+          >
+            <Plus size={15} /> 청구서 생성 (이번 회차)
+          </button>
+        )}
+        {genOpen && (
+          <form onSubmit={submitGenerate} className="space-y-2.5 rounded-xl bg-indigo-50/40 p-3.5 ring-1 ring-indigo-200/60">
+            <p className="text-xs font-semibold text-slate-600">청구서 생성 · 생성 즉시 발행되어 입금 기록이 가능합니다</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="mb-0.5 block text-[11px] text-slate-500">청구 시작일</label>
+                <input type="date" value={genStart} max={genEnd || undefined} onChange={(e) => setGenStart(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="mb-0.5 block text-[11px] text-slate-500">청구 종료일</label>
+                <input type="date" value={genEnd} min={genStart || undefined} onChange={(e) => setGenEnd(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="mb-0.5 block text-[11px] text-slate-500">청구 금액</label>
+                <MoneyInput value={genAmount} onChange={setGenAmount} required className={cn(inputCls, 'pr-8')} />
+              </div>
+              <div>
+                <label className="mb-0.5 block text-[11px] text-slate-500">납기일</label>
+                <input type="date" value={genDue} onChange={(e) => setGenDue(e.target.value)} className={inputCls} />
+              </div>
+            </div>
+            {genError && <p className="text-xs text-red-600">{genError}</p>}
+            <div className="flex justify-end gap-1.5">
+              <button type="button" onClick={() => setGenOpen(false)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 transition hover:bg-white">
+                취소
+              </button>
+              <button type="submit" disabled={creating} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
+                {creating ? '생성 중…' : '생성 + 발행'}
+              </button>
+            </div>
+          </form>
+        )}
+
         {loading && (
           <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
             <Loader2 className="animate-spin" size={16} />
@@ -471,7 +585,8 @@ function OrderBillingModal({ target, onClose }: { target: StorageOrder | null; o
 
         {!loading && ledgers.length === 0 && (
           <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
-            아직 생성된 청구 회차가 없습니다. 원장은 매월 1일 자동 생성됩니다.
+            아직 생성된 청구 회차가 없습니다.
+            {isAdmin ? ' 위 "청구서 생성"으로 이번 회차를 만들면 바로 입금을 기록할 수 있습니다.' : ' 원장은 매월 1일 자동 생성됩니다.'}
           </p>
         )}
 
@@ -495,6 +610,15 @@ function OrderBillingModal({ target, onClose }: { target: StorageOrder | null; o
                       <span className="text-slate-300"> / </span>
                       {won(l.baseAmount + l.carriedOverIn + l.adjustmentTotal)}
                     </span>
+                    {l.status === 'DRAFT' && isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => issueLedger(l)}
+                        className="rounded-lg border border-indigo-300 bg-white px-2.5 py-1 text-xs font-medium text-indigo-700 transition hover:bg-indigo-50"
+                      >
+                        발행
+                      </button>
+                    )}
                     {isOpenLedger(l) && l.balance > 0 && !paying && (
                       <button
                         type="button"

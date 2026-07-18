@@ -85,6 +85,18 @@ export interface CarryOverRequest {
   nextDueDate?: string
 }
 
+export interface LedgerCreateRequest {
+  storageOrderId: number
+  billingType: BillingType
+  settlementType: SettlementType
+  periodStart: string
+  periodEnd: string
+  baseAmount?: number // 미지정 시 서버가 계약 요금으로 산정
+  dailyRate?: number
+  carriedOverIn?: number
+  dueDate?: string
+}
+
 /** 중도 출고 일할 정산 결과 (preview/apply 공용) */
 export interface MidReleaseSettlement {
   actualUsageAmount: number // 실제 사용 기간 청구액
@@ -103,6 +115,11 @@ export const billingApi = {
   },
   async detail(id: number): Promise<LedgerDetail> {
     const { data } = await api.get<LedgerDetail>(`/api/billing/ledgers/${id}/detail`)
+    return data
+  },
+  // [수동 청구] 특정 계약에 대해 청구 원장 1건 생성 (관리자) — DRAFT 상태로 반환
+  async createLedger(body: LedgerCreateRequest): Promise<BillingLedger> {
+    const { data } = await api.post<BillingLedger>('/api/billing/ledgers', body)
     return data
   },
   async issue(id: number, dueDate?: string): Promise<BillingLedger> {
