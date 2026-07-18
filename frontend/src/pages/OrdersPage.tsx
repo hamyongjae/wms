@@ -93,22 +93,35 @@ export default function OrdersPage() {
         if (s.occupied && s.containerId != null) locByContainer.set(s.containerId, s.locationLabel)
       }
 
-      // (창고 + 화주) → 위치 라벨 목록
+      const map = new Map<number, string[]>() // orderId → 위치 라벨[] (정식 배정 우선)
       const key = (wid: number, owner: string) => `${wid}|${owner}`
-      const byKey = new Map<string, string[]>()
+      const byKey = new Map<string, string[]>() // (창고+화주) → 위치[] (배정 없는 컨테이너 폴백용)
+
       for (const ct of containers) {
-        const owner = extractOwner(ct.memo)
         const loc = locByContainer.get(ct.id)
-        if (!owner || !loc) continue
-        const k = key(ct.warehouseId, owner)
-        const arr = byKey.get(k) ?? []
-        arr.push(loc)
-        byKey.set(k, arr)
+        if (!loc) continue
+        if (ct.currentOrderId != null) {
+          // [정식 배정] 컨테이너가 계약에 직접 연결된 경우 — 정확한 매칭
+          const arr = map.get(ct.currentOrderId) ?? []
+          arr.push(loc)
+          map.set(ct.currentOrderId, arr)
+        } else {
+          // 배정 안 된 컨테이너는 창고+화주명 매칭으로 폴백
+          const owner = extractOwner(ct.memo)
+          if (!owner) continue
+          const k = key(ct.warehouseId, owner)
+          const arr = byKey.get(k) ?? []
+          arr.push(loc)
+          byKey.set(k, arr)
+        }
       }
 
-      const map = new Map<number, string[]>()
+      // 정식 배정된 위치가 하나도 없는 계약만 화주명 매칭으로 보완
       for (const o of orderList) {
-        map.set(o.id, byKey.get(key(o.warehouseId, o.customerName)) ?? [])
+        if (!map.has(o.id)) {
+          const nm = byKey.get(key(o.warehouseId, o.customerName))
+          if (nm) map.set(o.id, nm)
+        }
       }
       setLocationsByOrder(map)
     } catch {

@@ -86,6 +86,10 @@ export const containerApi = {
   },
 
   // ===== 보관창고 배치(입고/이동/반출) — 현장(STAFF+) =====
+  /** 컨테이너를 특정 계약(주문)에 배정 — 빈(AVAILABLE) 컨테이너 → 사용중 + currentOrder 설정 */
+  async assign(containerId: number, orderId: number): Promise<void> {
+    await api.post(`/api/containers/${containerId}/assign`, { orderId })
+  },
   async inbound(body: InboundRequest): Promise<void> {
     await api.post('/api/yard/inbound', body)
   },

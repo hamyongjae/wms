@@ -17,6 +17,7 @@ import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { yardApi, type YardSlot } from '@/api/yardApi'
 import { containerApi, type Container } from '@/api/containerApi'
 import { customerApi, type Customer } from '@/api/customerApi'
+import { orderApi, type StorageOrder } from '@/api/orderApi'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
 import MoneyInput from '@/components/ui/MoneyInput'
@@ -38,6 +39,7 @@ export interface QuickInboundDto {
   containerNo: string
   capacityTon: number
   customerName?: string
+  orderId?: number // 선택 시 해당 계약에 컨테이너를 정식 배정
   inboundDate?: string
   outboundDate?: string
   memo?: string
@@ -63,6 +65,7 @@ export default function YardDispatchPage() {
   const [slots, setSlots] = useState<YardSlot[]>([])
   const [containersById, setContainersById] = useState<Map<number, Container>>(new Map())
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [orders, setOrders] = useState<StorageOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -102,11 +105,13 @@ export default function YardDispatchPage() {
       yardApi.slots(selectedId),
       containerApi.list({ warehouseId: selectedId }),
       customerApi.list().catch(() => [] as Customer[]),
+      orderApi.list().catch(() => [] as StorageOrder[]),
     ])
-      .then(([sl, cs, cu]) => {
+      .then(([sl, cs, cu, os]) => {
         setSlots(sl)
         setContainersById(new Map(cs.map((c) => [c.id, c])))
         setCustomers(cu)
+        setOrders(os)
       })
       .catch(() => setError('보관창고 현황을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
@@ -157,7 +162,7 @@ export default function YardDispatchPage() {
 
   /* ===== 액션 ===== */
   async function doQuickInbound(body: QuickInboundDto) {
-    // 파이프라인: 컨테이너 생성 → 해당 슬롯에 입고 배치
+    // 파이프라인: 컨테이너 생성 → (선택) 계약 배정 → 해당 슬롯에 입고 배치
     // 화주는 memo 앞 태그로, 입고/출고예정일은 정식 필드로 저장.
     const tag = body.customerName ? `[${body.customerName}]` : ''
     const composedMemo = [tag, body.memo].filter(Boolean).join(' ').trim() || undefined
@@ -169,6 +174,10 @@ export default function YardDispatchPage() {
       inboundDate: body.inboundDate,
       expectedOutboundDate: body.outboundDate,
     })
+    // 계약 연결 선택 시: 적재(OCCUPIED) 전에 배정해야 함(assignTo 는 AVAILABLE 상태만 허용)
+    if (body.orderId != null) {
+      await containerApi.assign(created.id, body.orderId)
+    }
     await containerApi.inbound({ containerId: created.id, targetSlotId: body.targetSlotId })
   }
 
@@ -352,6 +361,7 @@ export default function YardDispatchPage() {
           slot={inboundSlot}
           warehouseId={selectedId}
           customers={customers}
+          orders={orders}
           existingNos={new Set([...containersById.values()].map((c) => c.containerNo))}
           onClose={() => setInboundSlot(null)}
           onSubmit={doQuickInbound}
@@ -492,6 +502,7 @@ function InboundModal({
   slot,
   warehouseId,
   customers,
+  orders,
   existingNos,
   onClose,
   onSubmit,
@@ -500,12 +511,14 @@ function InboundModal({
   slot: YardSlot
   warehouseId: number
   customers: Customer[]
+  orders: StorageOrder[]
   existingNos: Set<string>
   onClose: () => void
   onSubmit: (body: QuickInboundDto) => Promise<void>
   onDone: () => void
 }) {
   const [customerId, setCustomerId] = useState('')
+  const [orderId, setOrderId] = useState('') // 선택 계약(빈 값이면 배정 안 함)
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
   const [inboundDate, setInboundDate] = useState(new Date().toISOString().slice(0, 10))
   const [outboundDate, setOutboundDate] = useState('')
@@ -520,6 +533,22 @@ function InboundModal({
     () => customers.find((c) => String(c.id) === customerId) ?? null,
     [customers, customerId],
   )
+
+  // 선택된 화주 + 이 창고의 '보관중/입고완료' 계약만 연결 대상으로 노출
+  const contractOptions = useMemo(() => {
+    if (!selectedCustomer) return []
+    return orders.filter(
+      (o) =>
+        o.customerId === selectedCustomer.id &&
+        o.warehouseId === warehouseId &&
+        (o.status === 'RECEIVED' || o.status === 'IN_STORAGE'),
+    )
+  }, [orders, selectedCustomer, warehouseId])
+
+  // 화주를 바꾸면 이전 계약 선택은 초기화
+  useEffect(() => {
+    setOrderId('')
+  }, [customerId])
 
   // [실시간] 하루 보관료 = 보관료 ÷ (입고일~출고예정일 일수, 당일 포함).
   // 보관료·입고일·출고예정일이 모두 유효할 때만 값, 아니면 null(빈 값).
@@ -547,6 +576,7 @@ function InboundModal({
         containerNo: autoNo,
         capacityTon: 5, // 기본 5톤 임대 단위(용량 입력칸 제거)
         customerName: customers.find((c) => String(c.id) === customerId)?.name,
+        orderId: orderId ? Number(orderId) : undefined,
         inboundDate: inboundDate || undefined,
         outboundDate: outboundDate || undefined,
         memo: noteBody,
@@ -594,6 +624,27 @@ function InboundModal({
                 </p>
               )}
             </div>
+
+            {/* 계약 연결(선택) — 화주 선택 시 이 창고의 활성 계약을 골라 정식 배정 */}
+            {selectedCustomer && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">계약 연결 (선택)</label>
+                {contractOptions.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-400">
+                    이 창고에 연결할 활성 계약이 없습니다. (배정 없이 입고됩니다)
+                  </p>
+                ) : (
+                  <select value={orderId} onChange={(e) => setOrderId(e.target.value)} className={inputCls}>
+                    <option value="">배정 안 함</option>
+                    {contractOptions.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.storageStartDate}~{o.expectedEndDate ?? '미정'} · {fmt(o.monthlyFee)}원/월
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
