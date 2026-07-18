@@ -42,10 +42,12 @@ function formatContractPrice(monthlyFee: number, startDate: string, endDate: str
   return `${won(monthlyFee)} / ${durationDays}일`
 }
 
-/** 계약에 배정된 컨테이너 번호 조회 */
-function getContainerNumber(orderId: number, containers: Container[]): string {
+/** 계약에 배정된 컨테이너의 슬롯 위치 조회 */
+function getSlotLocation(orderId: number, containers: Container[], slots: YardSlot[]): string {
   const container = containers.find((c) => c.currentOrderId === orderId)
-  return container?.containerNo ?? ''
+  if (!container) return ''
+  const slot = slots.find((s) => s.containerId === container.id)
+  return slot?.locationLabel ?? ''
 }
 
 
@@ -63,6 +65,7 @@ export default function DashboardPage() {
   const [ledgers, setLedgers] = useState<BillingLedger[]>([])
   const [occupancy, setOccupancy] = useState<WarehouseOccupancy[]>([])
   const [containers, setContainers] = useState<Container[]>([])
+  const [slots, setSlots] = useState<YardSlot[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -75,6 +78,24 @@ export default function DashboardPage() {
         setOrders(o)
         setLedgers(l)
         setOccupancy(occ)
+
+        // 최근 계약의 warehouse ID만 추출
+        const recentWarehouseIds = Array.from(new Set(o.slice(0, 5).map((order) => order.warehouseId)))
+
+        // 그 warehouse들의 슬롯만 조회 (필요한 것만)
+        if (recentWarehouseIds.length > 0) {
+          Promise.all(
+            recentWarehouseIds.map((warehouseId) =>
+              yardApi.slots(warehouseId).catch(() => [] as YardSlot[]),
+            ),
+          )
+            .then((results) => {
+              setSlots(results.flat())
+            })
+            .catch(() => {
+              // 슬롯 조회 실패해도 무시
+            })
+        }
       })
       .finally(() => setLoading(false))
 
@@ -237,17 +258,20 @@ export default function DashboardPage() {
                 <p className="mt-6 text-center text-sm text-slate-400">등록된 계약이 없습니다.</p>
               ) : (
                 <ul className="mt-3 divide-y divide-slate-100">
-                  {recentOrders.map((o) => (
-                    <li key={o.id} className="flex items-center justify-between py-2.5 text-sm">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-slate-800">{o.customerName}</p>
-                        <p className="text-xs text-slate-400">
-                          {o.warehouseName} · {o.storageStartDate}~{o.actualEndDate ?? o.expectedEndDate ?? '미정'}
-                        </p>
-                      </div>
-                      <span className="shrink-0 whitespace-nowrap text-slate-600">{formatContractPrice(o.monthlyFee, o.storageStartDate, o.actualEndDate ?? o.expectedEndDate)}</span>
-                    </li>
-                  ))}
+                  {recentOrders.map((o) => {
+                    const location = getSlotLocation(o.id, containers, slots)
+                    return (
+                      <li key={o.id} className="flex items-center justify-between py-2.5 text-sm">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-800">{o.customerName}</p>
+                          <p className="text-xs text-slate-400">
+                            {o.warehouseName} {location && `· ${location}`} · {o.storageStartDate}~{o.actualEndDate ?? o.expectedEndDate ?? '미정'}
+                          </p>
+                        </div>
+                        <span className="shrink-0 whitespace-nowrap text-slate-600">{formatContractPrice(o.monthlyFee, o.storageStartDate, o.actualEndDate ?? o.expectedEndDate)}</span>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </section>
