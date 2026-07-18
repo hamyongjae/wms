@@ -53,8 +53,11 @@ const ADJ_LABEL: Record<AdjustmentType, string> = {
   CORRECTION: '정정',
 }
 
-const FILTERS: Array<{ key: 'ALL' | BillingStatus; label: string }> = [
+/* '연체'는 저장 상태가 아니라 시점 해석 — 클라이언트 파생 필터로 제공한다 */
+type FilterKey = 'ALL' | BillingStatus | 'OVERDUE'
+const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'ALL', label: '전체' },
+  { key: 'OVERDUE', label: '연체' },
   { key: 'ISSUED', label: '발행' },
   { key: 'PARTIALLY_PAID', label: '부분수금' },
   { key: 'PAID', label: '완납' },
@@ -71,11 +74,38 @@ const isOverdue = (l: BillingLedger) =>
   l.dueDate != null &&
   l.dueDate < today()
 
+/** 납기일 기준 경과/잔여 일수 (오늘 - 납기일, UTC 일 단위) */
+function daysFromDue(dueDate: string): number {
+  const due = new Date(`${dueDate}T00:00:00Z`).getTime()
+  const now = new Date(`${today()}T00:00:00Z`).getTime()
+  return Math.round((now - due) / 86_400_000)
+}
+
+/**
+ * [파생 표시 상태] 저장 상태 × 납기일 → 화면 표기 (운영 가이드 2.2)
+ *  - 발행/부분수금 + 납기 전  → '입금예정' (더스티블루)
+ *  - 발행/부분수금 + 납기 경과·잔액>0 → '연체 N일' (클레이)
+ *  - 그 외는 저장 상태 그대로
+ */
+function displayStatus(l: BillingLedger): { label: string; cls: string } {
+  if (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID') {
+    if (isOverdue(l)) {
+      const d = daysFromDue(l.dueDate!)
+      return { label: `연체 ${d}일`, cls: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]' }
+    }
+    return {
+      label: l.status === 'PARTIALLY_PAID' ? '부분수금 · 입금예정' : '입금예정',
+      cls: 'bg-[#E9EEF3] text-[#5A748F] ring-[#D4DDE7]',
+    }
+  }
+  return STATUS_META[l.status]
+}
+
 export default function BillingPage() {
   const isAdmin = authStorage.getUser()?.role === 'ADMIN'
 
   const [ledgers, setLedgers] = useState<BillingLedger[]>([])
-  const [statusFilter, setStatusFilter] = useState<'ALL' | BillingStatus>('ALL')
+  const [statusFilter, setStatusFilter] = useState<FilterKey>('ALL')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -102,10 +132,11 @@ export default function BillingPage() {
     return { outstanding, collected, overdueCount, count: ledgers.length }
   }, [ledgers])
 
-  const visible = useMemo(
-    () => (statusFilter === 'ALL' ? ledgers : ledgers.filter((l) => l.status === statusFilter)),
-    [ledgers, statusFilter],
-  )
+  const visible = useMemo(() => {
+    if (statusFilter === 'ALL') return ledgers
+    if (statusFilter === 'OVERDUE') return ledgers.filter(isOverdue) // 파생 필터
+    return ledgers.filter((l) => l.status === statusFilter)
+  }, [ledgers, statusFilter])
 
   async function handleOverdueNotify() {
     if (!window.confirm('미납(연체) 원장 전체에 촉구 알림을 발송할까요?')) return
@@ -154,7 +185,12 @@ export default function BillingPage() {
 
       <div className="flex flex-wrap items-center gap-1.5">
         {FILTERS.map((f) => {
-          const count = f.key === 'ALL' ? ledgers.length : ledgers.filter((l) => l.status === f.key).length
+          const count =
+            f.key === 'ALL'
+              ? ledgers.length
+              : f.key === 'OVERDUE'
+                ? ledgers.filter(isOverdue).length
+                : ledgers.filter((l) => l.status === f.key).length
           return (
             <button
               key={f.key}
@@ -224,20 +260,32 @@ export default function BillingPage() {
                       {won(l.balance)}
                     </td>
                     <td className="px-5 py-3">
-                      <span className={cn('text-xs', overdue ? 'font-semibold text-red-600' : 'text-slate-500')}>
-                        {l.dueDate ?? '—'}
-                        {overdue && ' (연체)'}
-                      </span>
+                      {(() => {
+                        // 납기 표기: 연체=클레이, 납기 7일 이내=D-n 강조, 그 외=날짜만
+                        if (l.dueDate == null) return <span className="text-xs text-slate-400">—</span>
+                        const d = daysFromDue(l.dueDate)
+                        const pending = l.balance > 0 && (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
+                        return (
+                          <span className={cn('text-xs', overdue ? 'font-semibold text-[#A65B44]' : 'text-slate-500')}>
+                            {l.dueDate}
+                            {pending && !overdue && d >= -7 && (
+                              <span className="ml-1.5 rounded bg-[#E9EEF3] px-1 py-0.5 text-[10px] font-semibold text-[#5A748F]">
+                                {d === 0 ? 'D-DAY' : `D${d}`}
+                              </span>
+                            )}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td className="px-5 py-3">
-                      <span
-                        className={cn(
-                          'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1',
-                          STATUS_META[l.status].cls,
-                        )}
-                      >
-                        {STATUS_META[l.status].label}
-                      </span>
+                      {(() => {
+                        const ds = displayStatus(l)
+                        return (
+                          <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>
+                            {ds.label}
+                          </span>
+                        )
+                      })()}
                     </td>
                   </tr>
                 )
