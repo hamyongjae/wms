@@ -33,6 +33,32 @@ const today = () => new Date().toISOString().slice(0, 10)
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const isActive = (s: OrderStatus) => s === 'RECEIVED' || s === 'IN_STORAGE'
 
+/**
+ * 두 날짜(YYYY-MM-DD) 사이의 보관 일수 — 당일 포함(inclusive).
+ * - 빈 값/형식오류/역전(시작>종료) → null (계산 불가)
+ * - 시작==종료(당일 계약) → 1일. (0으로 나눔 방지)
+ * UTC 기준으로 계산해 타임존/DST 영향 없이 정확한 일수를 낸다.
+ */
+function storageDays(startStr: string, endStr: string): number | null {
+  if (!startStr || !endStr) return null
+  const s = Date.parse(`${startStr}T00:00:00Z`)
+  const e = Date.parse(`${endStr}T00:00:00Z`)
+  if (Number.isNaN(s) || Number.isNaN(e)) return null
+  const days = Math.floor((e - s) / 86_400_000) + 1 // 당일 포함
+  return days >= 1 ? days : null // 역전/0 이하 → 계산 불가
+}
+
+/**
+ * 하루 보관료 = 보관료 ÷ 보관일수. 세 값이 모두 유효할 때만 숫자, 아니면 null(빈 값).
+ * 반올림 정수로 반환. (0으로 나눔은 storageDays 가 null 을 반환하므로 원천 차단)
+ */
+function calcDailyFee(fee: number | null, startStr: string, endStr: string): number | null {
+  if (fee == null || fee <= 0) return null
+  const days = storageDays(startStr, endStr)
+  if (days == null) return null
+  return Math.round(fee / days)
+}
+
 export default function OrdersPage() {
   const isAdmin = authStorage.getUser()?.role === 'ADMIN'
 
@@ -421,11 +447,12 @@ function CreateOrderModal({
   const [custOpen, setCustOpen] = useState(false)
   const [dormantConfirm, setDormantConfirm] = useState(false)
 
-  // [실시간 계산] 보관료(월) → 하루 보관료. 한 달을 30일 평균으로 환산.
-  // 값이 비었거나 0 이하면 null → NaN 노출 없이 안전하게 '—' 로 표기된다.
+  // [실시간 계산] 하루 보관료 = 보관료 ÷ (보관시작일~출고예정일 총 일수, 당일 포함).
+  // 보관료·시작일·출고예정일 세 값이 모두 유효할 때만 값이 나오고, 그 외(출고예정일 미입력,
+  // 날짜 역전 등)엔 null → 화면엔 빈 값으로 표기. 입력 3종이 바뀔 때만 재계산된다.
   const dailyFee = useMemo(
-    () => (monthlyFee != null && monthlyFee > 0 ? Math.round(monthlyFee / 30) : null),
-    [monthlyFee],
+    () => calcDailyFee(monthlyFee, storageStartDate, expectedEndDate),
+    [monthlyFee, storageStartDate, expectedEndDate],
   )
 
   const isBlacklisted = selectedCustomer?.status === 'BLACKLISTED'
@@ -584,11 +611,11 @@ function CreateOrderModal({
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">하루 보관료</label>
-              {/* 보관료 입력에 따라 실시간 자동 계산되는 읽기 전용 표시 */}
+              {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
               <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
-                {dailyFee != null ? won(dailyFee) : <span className="font-normal text-slate-400">—</span>}
+                {dailyFee != null ? won(dailyFee) : ''}
               </div>
-              <p className="mt-1 text-[11px] text-slate-400">월 보관료 ÷ 30일 기준</p>
+              <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
             </div>
           </div>
 
