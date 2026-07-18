@@ -214,8 +214,8 @@ export default function BillingPage() {
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
                 <th className="px-5 py-3 font-medium">고객</th>
-                <th className="px-5 py-3 font-medium">청구기간</th>
-                <th className="px-5 py-3 text-right font-medium">청구총액</th>
+                <th className="px-5 py-3 font-medium">보관기간</th>
+                <th className="px-5 py-3 text-right font-medium">보관료</th>
                 <th className="px-5 py-3 text-right font-medium">미수금</th>
                 <th className="px-5 py-3 font-medium">납기</th>
                 <th className="px-5 py-3 font-medium">상태</th>
