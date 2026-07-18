@@ -49,7 +49,8 @@ async function placeContainerAtSlot(
   slotId: number,
   opts: { customerName?: string; inboundDate?: string; outboundDate?: string },
 ) {
-  const existing = await containerApi.list({ warehouseId })
+  // 컨테이너 번호는 '업체 전체'에서 유일해야 하므로 전 창고 컨테이너를 기준으로 채번한다.
+  const existing = await containerApi.list({})
   const no = nextContainerNo(new Set(existing.map((c) => c.containerNo)))
   const memo = opts.customerName ? `[${opts.customerName}]` : undefined
   const created = await containerApi.create({
@@ -455,8 +456,8 @@ function EditOrderModal({
           } else if (currentSlotId != null && slotId == null && currentContainerId != null) {
             await containerApi.outbound({ containerId: currentContainerId })
           }
-        } catch {
-          window.alert('계약은 저장됐지만 위치 변경에 실패했습니다. 컨테이너 관리에서 다시 시도해 주세요.')
+        } catch (e) {
+          window.alert(`계약은 저장됐지만 위치 변경에 실패했습니다.\n(${errMsg(e, '원인 미상')})`)
         }
       }
       onDone()
@@ -681,8 +682,8 @@ function CreateOrderModal({
             inboundDate: storageStartDate,
             outboundDate: expectedEndDate || undefined,
           })
-        } catch {
-          window.alert('계약은 등록됐지만 위치 배치에 실패했습니다. 컨테이너 관리에서 자리를 지정해 주세요.')
+        } catch (e) {
+          window.alert(`계약은 등록됐지만 위치 배치에 실패했습니다.\n(${errMsg(e, '원인 미상')})`)
         }
       }
       onDone()

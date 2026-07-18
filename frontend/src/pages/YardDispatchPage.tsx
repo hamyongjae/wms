@@ -167,9 +167,12 @@ export default function YardDispatchPage() {
     // 화주는 memo 앞 태그로, 입고/출고예정일은 정식 필드로 저장.
     const tag = body.customerName ? `[${body.customerName}]` : ''
     const composedMemo = [tag, body.memo].filter(Boolean).join(' ').trim() || undefined
+    // 컨테이너 번호는 업체 전체에서 유일해야 하므로 전 창고 기준으로 채번(충돌 방지)
+    const allContainers = await containerApi.list({})
+    const containerNo = nextContainerNo(new Set(allContainers.map((c) => c.containerNo)))
     const created = await containerApi.create({
       warehouseId: body.warehouseId,
-      containerNo: body.containerNo,
+      containerNo,
       capacityTon: body.capacityTon,
       memo: composedMemo,
       inboundDate: body.inboundDate,
