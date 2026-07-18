@@ -3,11 +3,12 @@ import { cn } from '@/lib/cn'
 
 type Tone = 'slate' | 'indigo' | 'emerald' | 'amber'
 
+/* [뮤티드 상태색] 원색 대신 채도를 눌러 익힌 톤 (세이지·웜그레이) */
 const toneMap: Record<Tone, string> = {
   slate: 'bg-slate-100 text-slate-600',
   indigo: 'bg-indigo-50 text-indigo-600',
-  emerald: 'bg-emerald-50 text-emerald-600',
-  amber: 'bg-amber-50 text-amber-600',
+  emerald: 'bg-[#E9EFEA] text-[#5C7C6B]',
+  amber: 'bg-[#EFEBE4] text-[#8A8172]',
 }
 
 export default function StatCard({
@@ -24,7 +25,7 @@ export default function StatCard({
   tone?: Tone
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="card-hover rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-200/60">
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">{label}</p>
         <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl', toneMap[tone])}>

@@ -118,7 +118,7 @@ export default function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="animate-scrim-in absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={onClose} />
-      <div className={`shadow-soft relative w-full ${widthClass} rounded-2xl border border-slate-200 bg-white p-6`}>
+      <div className={`animate-dialog-in shadow-soft relative w-full ${widthClass} rounded-2xl bg-white p-6 ring-1 ring-slate-200/70`}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-slate-800">{title}</h3>
           <button

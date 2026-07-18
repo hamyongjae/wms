@@ -151,7 +151,7 @@ export default function SignupPage({ isSocialSignup: isSocialProp }: { isSocialS
           <span className="text-lg font-bold text-slate-800">WMS 회원가입</span>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="rounded-2xl bg-white p-6 shadow-soft ring-1 ring-slate-200/60 sm:p-8">
           <StepIndicator step={step} isSocialSignup={isSocialSignup} />
 
           {socialTokenMissing ? (

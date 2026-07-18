@@ -85,7 +85,7 @@ export default function LoginPage() {
 
       {/* ===== 우측 로그인 폼 ===== */}
       <main className="flex flex-1 items-center justify-center px-4 py-10">
-        <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-soft ring-1 ring-slate-200/60">
           {/* 모바일 브랜드 */}
           <div className="mb-6 flex items-center gap-2.5 lg:hidden">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-sm">

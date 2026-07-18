@@ -242,7 +242,7 @@ export default function OrdersPage() {
       )}
 
       {!loading && !error && visible.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
@@ -263,7 +263,13 @@ export default function OrdersPage() {
                   <td className="px-5 py-3 text-slate-500">
                     {(() => {
                       const locs = locationsByOrder.get(o.id) ?? []
-                      if (locs.length === 0) return <span className="text-slate-300">미배치</span>
+                      // [우아한 미지정] 결함이 아니라 '유연 배정' 상태 — 웜그레이 점선 pill로 표현
+                      if (locs.length === 0)
+                        return (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#E2DCD1] bg-[#EFEBE4]/60 px-2 py-0.5 text-xs font-medium text-[#8A8172]">
+                            위치 미지정
+                          </span>
+                        )
                       return (
                         <span title={locs.join(', ')} className="inline-flex items-center gap-1">
                           <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">

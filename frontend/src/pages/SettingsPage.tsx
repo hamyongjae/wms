@@ -81,7 +81,7 @@ export default function SettingsPage() {
       )}
 
       {!loading && !error && tenant && (
-        <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl bg-white p-6 shadow-soft ring-1 ring-slate-200/60">
           <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
               <Building2 size={20} />

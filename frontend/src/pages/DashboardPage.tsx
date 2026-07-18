@@ -138,7 +138,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 월별 청구·수금 추이 */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-2xl bg-white p-6 shadow-soft ring-1 ring-slate-200/60">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-700">월별 청구 · 수금 추이</h3>
               <span className="text-xs text-slate-400">최근 6개월</span>
@@ -156,7 +156,7 @@ export default function DashboardPage() {
 
           {/* 오늘의 입출고 + 최근 계약 */}
           <div className="grid gap-4 lg:grid-cols-3">
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="rounded-2xl bg-white p-6 shadow-soft ring-1 ring-slate-200/60">
               <h3 className="text-sm font-semibold text-slate-700">오늘의 입출고</h3>
               <div className="mt-4 space-y-3">
                 <TodayRow
@@ -180,7 +180,7 @@ export default function DashboardPage() {
               </Link>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
+            <section className="rounded-2xl bg-white p-6 shadow-soft ring-1 ring-slate-200/60 lg:col-span-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-700">최근 계약</h3>
                 <Link to="/orders" className="text-xs font-medium text-indigo-600 hover:text-indigo-700">
@@ -261,7 +261,7 @@ function QuickLink({
   return (
     <Link
       to={to}
-      className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-300 hover:shadow"
+      className="group flex items-center gap-4 rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-200/60 transition hover:border-indigo-300 hover:shadow"
     >
       <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
         <Icon size={20} />

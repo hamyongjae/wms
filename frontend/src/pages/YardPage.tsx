@@ -129,7 +129,7 @@ export default function YardPage() {
           ) : (
             <>
               {occupancy.blocks && occupancy.blocks.length > 0 && (
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="rounded-2xl bg-white p-6 shadow-soft ring-1 ring-slate-200/60">
                   <h3 className="text-sm font-semibold text-slate-700">구역별 점유율</h3>
                   <div className="mt-4 space-y-3">
                     {occupancy.blocks.map((b) => (
@@ -150,7 +150,7 @@ export default function YardPage() {
                 </section>
               )}
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <section className="rounded-2xl bg-white p-6 shadow-soft ring-1 ring-slate-200/60">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-slate-700">적재 현황</h3>
                   <Legend />

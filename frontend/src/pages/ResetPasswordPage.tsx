@@ -55,7 +55,7 @@ export default function ResetPasswordPage() {
           <span className="text-lg font-bold text-slate-800">비밀번호 재설정</span>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="rounded-2xl bg-white p-6 shadow-soft ring-1 ring-slate-200/60 sm:p-8">
           {!token ? (
             <div className="text-center">
               <AlertCircle size={26} className="mx-auto text-amber-500" />

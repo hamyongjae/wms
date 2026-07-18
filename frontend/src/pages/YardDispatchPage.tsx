@@ -343,7 +343,7 @@ export default function YardDispatchPage() {
             <StatCard label="공실" value={fmt(kpi.empty)} icon={Square} tone="emerald" />
           </div>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <section className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-200/60 sm:p-6">
             <div className="mb-4 flex items-center justify-end">
               <Legend />
             </div>
@@ -562,14 +562,17 @@ function SlotCell({
       onDragEnd={onDragEndCell}
       title={tooltip}
       className={cn(
-        'flex h-9 w-16 items-center justify-center rounded-md text-[11px] font-medium transition',
+        // [프리미엄 타일] 라운드 + 은은한 그라데이션 + 소프트 섀도 + 호버 리프트 (금융 앱 타일 감성)
+        'flex h-9 w-16 items-center justify-center rounded-lg text-[11px] font-medium',
+        'transition-[transform,box-shadow,background-color,border-color] duration-200 ease-out',
         slot.occupied
-          ? 'cursor-grab bg-indigo-500 text-white shadow-sm hover:bg-indigo-600 active:cursor-grabbing'
+          ? 'cursor-grab bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-[0_2px_8px_rgba(43,51,63,0.18)] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(43,51,63,0.22)] active:translate-y-0 active:cursor-grabbing'
           : dropTarget
-            ? 'border-2 border-dashed border-emerald-400 bg-emerald-50 text-emerald-500'
-            : 'border border-dashed border-slate-300 text-slate-300 hover:border-indigo-400 hover:text-indigo-500',
+            ? 'border-2 border-dashed border-[#5C7C6B] bg-[#E9EFEA] text-[#5C7C6B]'
+            : 'border border-dashed border-slate-200 bg-slate-50/60 text-slate-300 hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-white hover:text-indigo-500 hover:shadow-[0_4px_12px_rgba(43,51,63,0.08)]',
         isDragSource && 'opacity-40',
-        highlighted && 'animate-pulse ring-2 ring-amber-400 ring-offset-1',
+        // [선택 강조] 브래스 링 — 화면당 한 번의 포인트
+        highlighted && 'animate-pulse ring-2 ring-[#B08D57] ring-offset-1',
       )}
     >
       {slot.occupied ? (
@@ -1086,10 +1089,10 @@ function Legend() {
   return (
     <div className="flex items-center gap-4 text-xs text-slate-500">
       <span className="flex items-center gap-1.5">
-        <span className="h-3 w-3 rounded bg-indigo-500" /> 적재중
+        <span className="h-3 w-3 rounded bg-gradient-to-b from-indigo-500 to-indigo-600" /> 적재중
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="h-3 w-3 rounded border border-dashed border-slate-300" /> 공실
+        <span className="h-3 w-3 rounded border border-dashed border-slate-200 bg-slate-50" /> 공실
       </span>
     </div>
   )

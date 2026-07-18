@@ -217,7 +217,7 @@ export default function ScheduleCalendarPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         {/* 달력 */}
         <div className="lg:col-span-3">
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60">
             <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/70">
               {WEEKDAYS.map((w, i) => (
                 <div
@@ -372,7 +372,7 @@ function DetailPanel({
   const label = `${y}년 ${m}월 ${d}일`
 
   return (
-    <div className={cn(!embedded && 'rounded-2xl border border-slate-200 bg-white shadow-sm')}>
+    <div className={cn(!embedded && 'rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60')}>
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <div>
           <p className="text-sm font-semibold text-slate-800">{label}</p>
