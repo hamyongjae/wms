@@ -34,16 +34,11 @@ function getDurationDays(startDate: string, endDate: string | null | undefined):
   return Math.round((end - start) / 86_400_000) + 1 // 당일 포함
 }
 
-/** 계약 가격 표시: 1개월 이상이면 "X원/개월 · Y원/일", 미만이면 "Y원/일" */
+/** 계약 가격 표시: "보관료 / 보관일수" 형식 */
 function formatContractPrice(monthlyFee: number, startDate: string, endDate: string | null | undefined): string {
   const durationDays = getDurationDays(startDate, endDate)
-  const dailyFee = calcDailyFee(monthlyFee, startDate, endDate)
-
-  if (!dailyFee) return won(monthlyFee) + '/월'
-  if (durationDays >= 30) {
-    return `${won(monthlyFee)}/월 · ${won(dailyFee)}/일`
-  }
-  return `${won(dailyFee)}/일`
+  if (durationDays <= 0) return won(monthlyFee)
+  return `${won(monthlyFee)} / ${durationDays}일`
 }
 
 /** [연체 예방 지표] 납기 7일 이내로 다가온 입금예정 원장 (오늘 포함, 연체 제외) */
@@ -233,10 +228,10 @@ export default function DashboardPage() {
                       <div className="min-w-0">
                         <p className="truncate font-medium text-slate-800">{o.customerName}</p>
                         <p className="text-xs text-slate-400">
-                          {o.warehouseName} · {o.storageStartDate}~{o.actualEndDate ?? o.expectedEndDate ?? '미정'}
+                          {o.warehouseName}({o.warehouseId}) · {o.storageStartDate}~{o.actualEndDate ?? o.expectedEndDate ?? '미정'}
                         </p>
                       </div>
-                      <span className="shrink-0 text-slate-600">{formatContractPrice(o.monthlyFee, o.storageStartDate, o.actualEndDate ?? o.expectedEndDate)}</span>
+                      <span className="shrink-0 whitespace-nowrap text-slate-600">{formatContractPrice(o.monthlyFee, o.storageStartDate, o.actualEndDate ?? o.expectedEndDate)}</span>
                     </li>
                   ))}
                 </ul>
