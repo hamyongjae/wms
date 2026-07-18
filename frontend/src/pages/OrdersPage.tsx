@@ -4,10 +4,13 @@ import { Plus, Loader2, Trash2, LogOut, FileText, ShieldAlert, AlertTriangle, Pe
 import { orderApi, type StorageOrder, type OrderStatus } from '@/api/orderApi'
 import { customerApi, type Customer, type CustomerType } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
+import { containerApi } from '@/api/containerApi'
+import { yardApi } from '@/api/yardApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { validateContractPeriod } from '@/lib/dateValidation'
 import { calcDailyFee } from '@/lib/fee'
+import { extractOwner } from '@/lib/owner'
 import Modal from '@/components/ui/Modal'
 import MoneyInput from '@/components/ui/MoneyInput'
 import CustomerListPicker from '@/components/customer/CustomerListPicker'
@@ -48,6 +51,8 @@ export default function OrdersPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<StorageOrder | null>(null)
   const [releaseTarget, setReleaseTarget] = useState<StorageOrder | null>(null)
+  // 계약 id → 배치된 슬롯 위치 라벨 목록 (창고+화주 기준으로 조인)
+  const [locationsByOrder, setLocationsByOrder] = useState<Map<number, string[]>>(new Map())
 
   const reload = () => setRefreshKey((k) => k + 1)
 
@@ -59,10 +64,57 @@ export default function OrdersPage() {
         setOrders(o)
         setCustomers(c)
         setWarehouses(w)
+        void loadPlacements(o)
       })
       .catch(() => setError('계약 목록을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [refreshKey])
+
+  /**
+   * 계약별 배치 위치 계산 (부가 정보 — 실패해도 목록은 정상 표시).
+   * 이 앱은 계약↔컨테이너 직접 링크가 없으므로, 계약의 '창고 + 고객(화주)'과
+   * 슬롯에 적재된 컨테이너의 '창고 + memo 화주 태그'를 매칭해 위치 라벨을 모은다.
+   */
+  async function loadPlacements(orderList: StorageOrder[]) {
+    try {
+      const whIds = [...new Set(orderList.map((o) => o.warehouseId))]
+      if (whIds.length === 0) {
+        setLocationsByOrder(new Map())
+        return
+      }
+      const [containers, ...slotLists] = await Promise.all([
+        containerApi.list({}),
+        ...whIds.map((id) => yardApi.slots(id)),
+      ])
+
+      // 적재된 슬롯: containerId → 위치 라벨
+      const locByContainer = new Map<number, string>()
+      for (const s of slotLists.flat()) {
+        if (s.occupied && s.containerId != null) locByContainer.set(s.containerId, s.locationLabel)
+      }
+
+      // (창고 + 화주) → 위치 라벨 목록
+      const key = (wid: number, owner: string) => `${wid}|${owner}`
+      const byKey = new Map<string, string[]>()
+      for (const ct of containers) {
+        const owner = extractOwner(ct.memo)
+        const loc = locByContainer.get(ct.id)
+        if (!owner || !loc) continue
+        const k = key(ct.warehouseId, owner)
+        const arr = byKey.get(k) ?? []
+        arr.push(loc)
+        byKey.set(k, arr)
+      }
+
+      const map = new Map<number, string[]>()
+      for (const o of orderList) {
+        map.set(o.id, byKey.get(key(o.warehouseId, o.customerName)) ?? [])
+      }
+      setLocationsByOrder(map)
+    } catch {
+      setLocationsByOrder(new Map()) // 위치는 부가 정보이므로 조용히 생략
+    }
+  }
 
   const visible = useMemo(() => {
     if (filter === 'ALL') return orders
@@ -151,8 +203,9 @@ export default function OrdersPage() {
               <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
                 <th className="px-5 py-3 font-medium">고객</th>
                 <th className="px-5 py-3 font-medium">창고</th>
+                <th className="px-5 py-3 font-medium">위치</th>
                 <th className="px-5 py-3 font-medium">보관기간</th>
-                <th className="px-5 py-3 text-right font-medium">월 보관료</th>
+                <th className="px-5 py-3 text-right font-medium">보관료</th>
                 <th className="px-5 py-3 font-medium">상태</th>
                 <th className="px-5 py-3 text-right font-medium">작업</th>
               </tr>
@@ -162,6 +215,20 @@ export default function OrdersPage() {
                 <tr key={o.id} className="transition hover:bg-slate-50">
                   <td className="px-5 py-3 font-medium text-slate-800">{o.customerName}</td>
                   <td className="px-5 py-3 text-slate-500">{o.warehouseName}</td>
+                  <td className="px-5 py-3 text-slate-500">
+                    {(() => {
+                      const locs = locationsByOrder.get(o.id) ?? []
+                      if (locs.length === 0) return <span className="text-slate-300">미배치</span>
+                      return (
+                        <span title={locs.join(', ')} className="inline-flex items-center gap-1">
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">
+                            {locs[0]}
+                          </span>
+                          {locs.length > 1 && <span className="text-xs text-slate-400">외 {locs.length - 1}</span>}
+                        </span>
+                      )
+                    })()}
+                  </td>
                   <td className="px-5 py-3 text-slate-500">
                     {o.storageStartDate}
                     <span className="text-slate-300"> ~ </span>

@@ -24,6 +24,7 @@ import CustomerListPicker from '@/components/customer/CustomerListPicker'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { calcDailyFee } from '@/lib/fee'
+import { extractOwner } from '@/lib/owner'
 import { validateInOut, todayStr } from '@/lib/dateValidation'
 
 /* ===== 타입 명세 ===== */
@@ -951,22 +952,6 @@ function groupByBlock(slots: YardSlot[]): Array<{ block: string; bays: Bay[] }> 
 
 function errMsg(err: unknown, fallback: string): string {
   return isAxiosError(err) ? (err.response?.data?.message ?? fallback) : fallback
-}
-
-/**
- * memo 앞의 [ ... ] 태그에서 화주명만 추출.
- * 과거 데이터의 규격(20ft/40ft)·소유구분(자가/임차) 토큰은 걸러낸다.
- * 예: "[20ft · 자가 · 대원]" → "대원", "[대원]" → "대원", "[20ft · 자가]" → null
- */
-function extractOwner(memo?: string | null): string | null {
-  if (!memo) return null
-  const m = memo.match(/^\[([^\]]+)\]/)
-  if (!m) return null
-  const tokens = m[1]
-    .split('·')
-    .map((t) => t.trim())
-    .filter((t) => t && !/^\d+ft$/i.test(t) && t !== '자가' && t !== '임차')
-  return tokens.length > 0 ? tokens.join(' · ') : null
 }
 
 /** memo 앞머리의 [ ... ] 화주 태그 원문(대괄호 포함). 없으면 빈 문자열. */
