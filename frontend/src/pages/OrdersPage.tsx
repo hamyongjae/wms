@@ -415,12 +415,18 @@ function CreateOrderModal({
   const [storageStartDate, setStartDate] = useState(today())
   const [expectedEndDate, setEndDate] = useState('')
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
-  const [totalVolume, setVolume] = useState('')
   const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [custOpen, setCustOpen] = useState(false)
   const [dormantConfirm, setDormantConfirm] = useState(false)
+
+  // [실시간 계산] 보관료(월) → 하루 보관료. 한 달을 30일 평균으로 환산.
+  // 값이 비었거나 0 이하면 null → NaN 노출 없이 안전하게 '—' 로 표기된다.
+  const dailyFee = useMemo(
+    () => (monthlyFee != null && monthlyFee > 0 ? Math.round(monthlyFee / 30) : null),
+    [monthlyFee],
+  )
 
   const isBlacklisted = selectedCustomer?.status === 'BLACKLISTED'
   const isDormant = selectedCustomer?.status === 'DORMANT'
@@ -432,7 +438,6 @@ function CreateOrderModal({
       setStartDate(today())
       setEndDate('')
       setMonthlyFee(null)
-      setVolume('')
       setMemo('')
       setFormError(null)
       setDormantConfirm(false)
@@ -455,7 +460,7 @@ function CreateOrderModal({
       return false
     }
     if (monthlyFee == null || monthlyFee <= 0) {
-      setFormError('월 보관료를 입력하세요.')
+      setFormError('보관료를 입력하세요.')
       return false
     }
     setFormError(null)
@@ -471,7 +476,6 @@ function CreateOrderModal({
         storageStartDate,
         expectedEndDate: expectedEndDate || undefined,
         monthlyFee: monthlyFee!,
-        totalVolume: totalVolume ? Number(totalVolume) : undefined,
         memo: memo || undefined,
       })
       onDone()
@@ -569,7 +573,7 @@ function CreateOrderModal({
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">월 보관료 *</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">보관료 *</label>
               <MoneyInput
                 value={monthlyFee}
                 onChange={setMonthlyFee}
@@ -579,8 +583,12 @@ function CreateOrderModal({
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">총 부피(㎥)</label>
-              <input type="number" min={0} step="0.1" value={totalVolume} onChange={(e) => setVolume(e.target.value)} className={inputCls} />
+              <label className="mb-1 block text-sm font-medium text-slate-700">하루 보관료</label>
+              {/* 보관료 입력에 따라 실시간 자동 계산되는 읽기 전용 표시 */}
+              <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                {dailyFee != null ? won(dailyFee) : <span className="font-normal text-slate-400">—</span>}
+              </div>
+              <p className="mt-1 text-[11px] text-slate-400">월 보관료 ÷ 30일 기준</p>
             </div>
           </div>
 
@@ -593,7 +601,13 @@ function CreateOrderModal({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">메모</label>
-            <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} />
+            <textarea
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              rows={5}
+              placeholder="계약 특이사항이나 부대 정보를 자유롭게 입력하세요."
+              className={cn(inputCls, 'min-h-[120px] w-full resize-y leading-relaxed')}
+            />
           </div>
 
           {formError && <p className="text-sm text-red-600">{formError}</p>}
