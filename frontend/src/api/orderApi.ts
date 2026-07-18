@@ -60,6 +60,10 @@ export const orderApi = {
     const { data } = await api.patch<StorageOrder>(`/api/orders/${id}/release`, { actualEndDate })
     return data
   },
+  async unreleased(id: number): Promise<StorageOrder> {
+    const { data } = await api.patch<StorageOrder>(`/api/orders/${id}/unreleased`, {})
+    return data
+  },
   async remove(id: number): Promise<void> {
     await api.delete(`/api/orders/${id}`)
   },

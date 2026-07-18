@@ -181,6 +181,16 @@ export default function OrdersPage() {
     return orders.filter((o) => o.status === filter)
   }, [orders, filter])
 
+  async function handleUnrelease(o: StorageOrder) {
+    if (!window.confirm(`'${o.customerName}' 계약의 출고 처리를 취소할까요?`)) return
+    try {
+      await orderApi.unreleased(o.id)
+      reload()
+    } catch (err) {
+      alert(errMsg(err, '출고 취소에 실패했습니다.'))
+    }
+  }
+
   async function handleDelete(o: StorageOrder) {
     if (!window.confirm(`'${o.customerName}' 계약을 삭제할까요?\n(연결된 청구 원장도 함께 삭제됩니다)`)) return
     try {
@@ -329,25 +339,32 @@ export default function OrdersPage() {
                         <Wallet size={15} />
                       </button>
                       {isActive(o.status) && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setReleaseTarget(o)}
-                            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-amber-600 transition hover:bg-amber-50"
-                          >
-                            <LogOut size={14} />
-                            출고 처리
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditTarget(o)}
-                            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
-                          >
-                            <Pencil size={14} />
-                          </button>
-
-                        </>
+                        <button
+                          type="button"
+                          onClick={() => setReleaseTarget(o)}
+                          className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-amber-600 transition hover:bg-amber-50"
+                        >
+                          <LogOut size={14} />
+                          출고 처리
+                        </button>
                       )}
+                      {o.status === 'RELEASED' && (
+                        <button
+                          type="button"
+                          onClick={() => handleUnrelease(o)}
+                          className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100"
+                        >
+                          <LogOut size={14} />
+                          출고 취소
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setEditTarget(o)}
+                        className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+                      >
+                        <Pencil size={14} />
+                      </button>
                       {isAdmin && (
                         <button
                           type="button"
