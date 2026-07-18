@@ -32,6 +32,7 @@ export interface BillingLedger {
   balance: number
   status: BillingStatus
   carriedOverToLedgerId: number | null
+  taxInvoiceIssued: boolean
   version: number
   createdAt: string
   updatedAt: string

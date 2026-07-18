@@ -213,13 +213,13 @@ export default function BillingPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
-                <th className="px-5 py-3 font-medium">원장번호</th>
                 <th className="px-5 py-3 font-medium">고객</th>
                 <th className="px-5 py-3 font-medium">청구기간</th>
                 <th className="px-5 py-3 text-right font-medium">청구총액</th>
                 <th className="px-5 py-3 text-right font-medium">미수금</th>
                 <th className="px-5 py-3 font-medium">납기</th>
                 <th className="px-5 py-3 font-medium">상태</th>
+                <th className="px-5 py-3 font-medium">세금계산서</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -231,7 +231,6 @@ export default function BillingPage() {
                     onClick={() => setSelectedId(l.id)}
                     className="cursor-pointer transition hover:bg-slate-50"
                   >
-                    <td className="px-5 py-3 font-medium text-slate-800">{l.ledgerNo}</td>
                     <td className="px-5 py-3 text-slate-600">{l.customerName}</td>
                     <td className="px-5 py-3 text-slate-500">
                       {l.periodStart} ~ {l.periodEnd}
@@ -267,6 +266,9 @@ export default function BillingPage() {
                           </span>
                         )
                       })()}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className="text-xs text-slate-600">{l.taxInvoiceIssued ? '발행' : '미발행'}</span>
                     </td>
                   </tr>
                 )
