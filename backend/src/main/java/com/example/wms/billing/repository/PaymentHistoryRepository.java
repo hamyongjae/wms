@@ -11,4 +11,7 @@ public interface PaymentHistoryRepository extends JpaRepository<PaymentHistory, 
     Optional<PaymentHistory> findByIdAndTenantId(Long id, Long tenantId);
 
     List<PaymentHistory> findByBillingLedgerIdAndTenantIdOrderByPaidOnAsc(Long billingLedgerId, Long tenantId);
+
+    // [계약 삭제] 원장에 연결된 입금 내역 일괄 삭제 (cascade)
+    void deleteByBillingLedgerId(Long billingLedgerId);
 }

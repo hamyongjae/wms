@@ -31,6 +31,9 @@ public interface BillingLedgerRepository extends JpaRepository<BillingLedger, Lo
     // [배치] 같은 계약·같은 청구기간 원장이 이미 있는지 (월 청구 중복 생성 방지)
     boolean existsByStorageOrderIdAndBillingPeriodStart(Long storageOrderId, LocalDate billingPeriodStart);
 
+    // [계약 삭제] 특정 계약에 연결된 모든 청구 원장 조회 (cascade 삭제용)
+    List<BillingLedger> findByStorageOrderId(Long storageOrderId);
+
     /**
      * [동시성] 수금/조정 같은 임계 구간용 비관적 쓰기 락.
      * 같은 원장을 두 트랜잭션이 동시에 갱신하면 한쪽은 대기 → 갱신 유실 방지.

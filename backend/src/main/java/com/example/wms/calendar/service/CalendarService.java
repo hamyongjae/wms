@@ -6,7 +6,6 @@ import com.example.wms.billing.repository.BillingLedgerRepository;
 import com.example.wms.calendar.dto.CalendarEventResponse;
 import com.example.wms.calendar.dto.CalendarEventStatus;
 import com.example.wms.calendar.dto.CalendarEventType;
-import com.example.wms.order.entity.OrderStatus;
 import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.order.repository.StorageOrderRepository;
 import com.example.wms.security.SecurityUtils;
@@ -48,9 +47,6 @@ public class CalendarService {
 
         // ===== 계약 → 입고/출고 (일정의 단일 소스) =====
         for (StorageOrder order : orderRepository.findAllByTenantId(tenantId)) {
-            if (order.getStatus() == OrderStatus.CANCELLED) {
-                continue;
-            }
             String customer = order.getCustomer().getName();
 
             java.math.BigDecimal fee = order.getMonthlyFee() != null

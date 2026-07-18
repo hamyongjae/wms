@@ -5,12 +5,15 @@ import com.example.wms.common.validation.TemporalValidator;
 import com.example.wms.customer.entity.Customer;
 import com.example.wms.customer.exception.BlacklistedCustomerException;
 import com.example.wms.order.entity.StorageOrder;
-import com.example.wms.order.entity.OrderStatus;
 import com.example.wms.tenant.entity.Tenant;
 import com.example.wms.warehouse.entity.Warehouse;
 import com.example.wms.customer.repository.CustomerRepository;
 import com.example.wms.container.entity.Container;
 import com.example.wms.container.repository.ContainerRepository;
+import com.example.wms.billing.entity.BillingLedger;
+import com.example.wms.billing.repository.BillingLedgerRepository;
+import com.example.wms.billing.repository.PaymentHistoryRepository;
+import com.example.wms.billing.repository.BillingAdjustmentRepository;
 import com.example.wms.order.repository.StorageOrderRepository;
 import com.example.wms.warehouse.repository.WarehouseRepository;
 import com.example.wms.security.SecurityUtils;
@@ -30,6 +33,9 @@ public class StorageOrderService {
     private final CustomerRepository customerRepository;
     private final WarehouseRepository warehouseRepository;
     private final ContainerRepository containerRepository;
+    private final BillingLedgerRepository billingLedgerRepository;
+    private final PaymentHistoryRepository paymentHistoryRepository;
+    private final BillingAdjustmentRepository billingAdjustmentRepository;
 
     // 보관 계약 등록
     @Transactional
@@ -105,6 +111,7 @@ public class StorageOrderService {
         return new StorageOrderResponse(order);
     }
 
+    // ===== [출고 처리] 입고 → 출고 =====
     @Transactional
     public StorageOrderResponse releaseOrder(Long id, StorageOrderReleaseRequest request) {
         StorageOrder order = findOrderOrThrow(id);
@@ -116,6 +123,7 @@ public class StorageOrderService {
         return new StorageOrderResponse(order);
     }
 
+    // ===== [출고 취소] 출고 → 입고 =====
     @Transactional
     public StorageOrderResponse unreleaseOrder(Long id) {
         StorageOrder order = findOrderOrThrow(id);
@@ -125,39 +133,27 @@ public class StorageOrderService {
         return new StorageOrderResponse(order);
     }
 
+    // ===== [상태 토글] 입고 ↔ 출고 단일 전환 =====
     /**
-     * [슬롯 지정 시] 상태 자동 전이 (컨테이너 배치 시 호출)
+     * 현재 상태의 반대로 토글한다.
+     * - 입고 → 출고: 실제 출고일을 오늘로 기록
+     * - 출고 → 입고: 출고 정보 초기화
      */
     @Transactional
-    public void onSlotAssigned(Long orderId) {
-        StorageOrder order = findOrderOrThrow(orderId);
-        order.assignSlot();
-        // 상태 평가 후 저장됨
-    }
-
-    /**
-     * [슬롯 해제 시] 상태 자동 전이
-     */
-    @Transactional
-    public void onSlotUnassigned(Long orderId) {
-        StorageOrder order = findOrderOrThrow(orderId);
-        order.unassignSlot();
-        // 상태 평가 후 저장됨
-    }
-
-    /**
-     * [배치 작업] 모든 활성 계약의 상태를 현재 날짜 기준으로 재평가
-     * 매일 자정에 실행되어 시간 기반 상태 전이를 처리
-     * (배치 컨텍스트에서는 SecurityUtils가 없으므로 전 테넌트 대상 평가)
-     */
-    @Transactional
-    public void evaluateAllOrdersStatus() {
-        var activeOrders = storageOrderRepository.findByStatusNotIn(
-                java.util.List.of(OrderStatus.RELEASED, OrderStatus.CANCELLED)
-        );
-        for (StorageOrder order : activeOrders) {
-            order.evaluateStatus();
+    public StorageOrderResponse toggleStatus(Long id) {
+        StorageOrder order = findOrderOrThrow(id);
+        LocalDate today = LocalDate.now();
+        if (order.isInbound()) {
+            // 입고 → 출고
+            TemporalValidator.validateContractPeriod(order.getStorageStartDate(), today);
+            order.release(today);
+            syncContainerSchedule(order, order.getStorageStartDate(), today);
+        } else {
+            // 출고 → 입고
+            order.unreleased();
+            syncContainerSchedule(order, order.getStorageStartDate(), order.getExpectedEndDate());
         }
+        return new StorageOrderResponse(order);
     }
 
     /**
@@ -172,9 +168,25 @@ public class StorageOrderService {
         }
     }
 
+    // ===== [계약 삭제 - Cascade] 연결된 컨테이너 링크 해제 + 청구 원장/입금/조정 함께 삭제 =====
     @Transactional
     public void deleteOrder(Long id) {
         StorageOrder order = findOrderOrThrow(id);
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+
+        // 1. 이 계약을 점유 중인 컨테이너의 링크를 먼저 해제 (FK 제약 방지)
+        for (Container c : containerRepository.findByTenantIdAndCurrentOrderId(tenantId, order.getId())) {
+            c.release();
+        }
+
+        // 2. 연결된 청구 원장의 하위 데이터(입금·조정)부터 삭제 후 원장 삭제
+        for (BillingLedger ledger : billingLedgerRepository.findByStorageOrderId(order.getId())) {
+            paymentHistoryRepository.deleteByBillingLedgerId(ledger.getId());
+            billingAdjustmentRepository.deleteByBillingLedgerId(ledger.getId());
+            billingLedgerRepository.delete(ledger);
+        }
+
+        // 3. 계약 삭제
         storageOrderRepository.delete(order);
     }
 

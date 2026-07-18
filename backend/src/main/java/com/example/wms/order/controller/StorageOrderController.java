@@ -55,6 +55,12 @@ public class StorageOrderController {
         return ResponseEntity.ok(storageOrderService.unreleaseOrder(id));
     }
 
+    // [단일 토글] 입고 ↔ 출고 전환 — 현재 상태의 반대로 변경
+    @PatchMapping("/{id}/toggle")
+    public ResponseEntity<StorageOrderResponse> toggleStatus(@PathVariable Long id) {
+        return ResponseEntity.ok(storageOrderService.toggleStatus(id));
+    }
+
     // 계약 삭제 — ADMIN만 허용 (STAFF가 호출하면 403)
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
