@@ -34,9 +34,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BillingBatchService {
 
-    // 청구 대상 = 아직 출고/취소되지 않은 활성 계약
+    // 청구 대상 = 아직 출고/취소되지 않은 활성 계약 (입고예정, 보관중, 출고예정)
     private static final List<OrderStatus> ACTIVE_STATUSES =
-            List.of(OrderStatus.RECEIVED, OrderStatus.IN_STORAGE);
+            List.of(OrderStatus.PENDING, OrderStatus.IN_STORAGE, OrderStatus.PENDING_RELEASE);
 
     private final BillingLedgerRepository ledgerRepository;
     private final StorageOrderRepository storageOrderRepository;

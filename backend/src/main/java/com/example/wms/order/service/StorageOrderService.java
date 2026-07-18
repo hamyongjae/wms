@@ -5,6 +5,7 @@ import com.example.wms.common.validation.TemporalValidator;
 import com.example.wms.customer.entity.Customer;
 import com.example.wms.customer.exception.BlacklistedCustomerException;
 import com.example.wms.order.entity.StorageOrder;
+import com.example.wms.order.entity.OrderStatus;
 import com.example.wms.tenant.entity.Tenant;
 import com.example.wms.warehouse.entity.Warehouse;
 import com.example.wms.customer.repository.CustomerRepository;

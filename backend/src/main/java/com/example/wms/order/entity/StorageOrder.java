@@ -84,7 +84,7 @@ public class StorageOrder {
         this.monthlyFee = monthlyFee;
         this.totalVolume = totalVolume;
         this.memo = memo;
-        this.status = OrderStatus.RECEIVED;
+        this.status = OrderStatus.PENDING;
     }
 
     // ===== 정보 수정 (보관 시작일까지 편집 허용) =====
