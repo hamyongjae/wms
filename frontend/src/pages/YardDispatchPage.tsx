@@ -913,6 +913,9 @@ function GridModal({
       setFormError('층별 자리 개수를 1 이상 입력하세요.')
       return
     }
+    if (!window.confirm('이 창고의 기존 자리와 컨테이너가 모두 삭제되고 새 층별 체계로 다시 생성됩니다. 계속할까요?')) {
+      return
+    }
     setFormError(null)
     setSubmitting(true)
     try {
