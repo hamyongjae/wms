@@ -15,10 +15,11 @@ import Modal from '@/components/ui/Modal'
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
 
+/* [뮤티드 상태색] 채도를 눌러 익힌 톤 — 경고조차 품위 있게 (마스터플랜 2.1) */
 const STATUS_META: Record<CustomerStatus, { label: string; cls: string }> = {
-  ACTIVE: { label: '이용중', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  DORMANT: { label: '휴면', cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  BLACKLISTED: { label: '블랙리스트', cls: 'bg-red-100 text-red-700 ring-red-300' },
+  ACTIVE: { label: '이용중', cls: 'bg-[#E9EFEA] text-[#5C7C6B] ring-[#D3DFD6]' },
+  DORMANT: { label: '휴면', cls: 'bg-[#EFEBE4] text-[#8A8172] ring-[#E2DCD1]' },
+  BLACKLISTED: { label: '블랙리스트', cls: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]' },
 }
 
 const STATUS_OPTIONS: CustomerStatus[] = ['ACTIVE', 'DORMANT', 'BLACKLISTED']

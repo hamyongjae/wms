@@ -22,24 +22,25 @@ import { cn } from '@/lib/cn'
 
 type FilterMode = 'ALL' | CalendarEventType
 
+/* [뮤티드 상태색] 원색(파랑·주황·빨강) 대신 채도를 눌러 익힌 톤 (마스터플랜 2.1) */
 const TYPE_META: Record<CalendarEventType, { label: string; emoji: string; badge: string; dot: string }> = {
   INBOUND: {
     label: '입고',
     emoji: '📥',
-    badge: 'bg-blue-50 text-blue-700 ring-blue-100',
-    dot: 'bg-blue-500',
+    badge: 'bg-[#E9EEF3] text-[#5A748F] ring-[#D4DDE7]',
+    dot: 'bg-[#5A748F]',
   },
   OUTBOUND: {
     label: '출고',
     emoji: '📤',
-    badge: 'bg-orange-50 text-orange-700 ring-orange-100',
-    dot: 'bg-orange-500',
+    badge: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]',
+    dot: 'bg-[#A65B44]',
   },
   BILLING: {
     label: '청구',
     emoji: '💰',
-    badge: 'bg-red-50 text-red-700 ring-red-100',
-    dot: 'bg-red-500',
+    badge: 'bg-[#EFEBE4] text-[#8A8172] ring-[#E2DCD1]',
+    dot: 'bg-[#8A8172]',
   },
 }
 

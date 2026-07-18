@@ -11,9 +11,10 @@ import Modal from '@/components/ui/Modal'
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
 
+/* [뮤티드 상태색] 채도를 눌러 익힌 톤 — 경고조차 품위 있게 (마스터플랜 2.1) */
 const STATUS_META: Record<Staff['status'], { label: string; cls: string }> = {
-  ACTIVE: { label: '활성', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  PENDING: { label: '대기', cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  ACTIVE: { label: '활성', cls: 'bg-[#E9EFEA] text-[#5C7C6B] ring-[#D3DFD6]' },
+  PENDING: { label: '대기', cls: 'bg-[#EFEBE4] text-[#8A8172] ring-[#E2DCD1]' },
   INACTIVE: { label: '비활성', cls: 'bg-slate-100 text-slate-500 ring-slate-200' },
 }
 

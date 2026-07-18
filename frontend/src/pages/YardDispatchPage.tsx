@@ -20,8 +20,11 @@ import { customerApi, type Customer } from '@/api/customerApi'
 import { orderApi, type StorageOrder } from '@/api/orderApi'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
+import Fab from '@/components/ui/Fab'
+import PinchZoom from '@/components/ui/PinchZoom'
 import MoneyInput from '@/components/ui/MoneyInput'
 import CustomerListPicker from '@/components/customer/CustomerListPicker'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { calcDailyFee } from '@/lib/fee'
@@ -83,6 +86,9 @@ export default function YardDispatchPage() {
   const [dragging, setDragging] = useState<{ containerId: number; fromSlotId: number; label: string } | null>(null)
   const [gridOpen, setGridOpen] = useState(false)
   const [banner, setBanner] = useState<string | null>(null)
+  // [모바일] 층 스와이프 전환 — 한 번에 한 층만 표시
+  const isMobile = useIsMobile()
+  const [floorIdx, setFloorIdx] = useState(0)
 
   const reload = () => setRefreshKey((k) => k + 1)
 
@@ -236,16 +242,21 @@ export default function YardDispatchPage() {
           <h2 className="text-xl font-bold text-slate-800">컨테이너 관리</h2>
           <p className="mt-1 text-sm text-slate-500">격자를 클릭해 그 자리에서 입고·출고·이동을 즉시 처리합니다.</p>
         </div>
+        {/* 데스크톱: 상단 버튼 / 모바일: 하단 FAB(엄지 존)이 대신한다 */}
         {isAdmin && selectedId != null && (
           <button
             type="button"
             onClick={() => setGridOpen(true)}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+            className="hidden shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 md:flex"
           >
             <Plus size={16} /> 자리 생성
           </button>
         )}
       </div>
+
+      {isAdmin && selectedId != null && (
+        <Fab actions={[{ label: '자리 생성', icon: Grid3x3, onClick: () => setGridOpen(true) }]} />
+      )}
 
       {/* 창고 탭 + 검색 */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -257,6 +268,7 @@ export default function YardDispatchPage() {
               onClick={() => {
                 setSelectedId(w.id)
                 setDragging(null)
+                setFloorIdx(0) // 창고가 바뀌면 1번째 층부터
               }}
               className={cn(
                 'rounded-full border px-4 py-1.5 text-sm font-medium transition',
@@ -331,44 +343,94 @@ export default function YardDispatchPage() {
             <StatCard label="공실" value={fmt(kpi.empty)} icon={Square} tone="emerald" />
           </div>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="mb-4 flex items-center justify-end">
               <Legend />
             </div>
 
-            <div className="space-y-6">
-              {floors.map(({ tier, cells }) => (
-                <div key={tier}>
-                  <p className="mb-2 text-sm font-medium text-slate-700">
-                    {tier}층 <span className="text-xs font-normal text-slate-400">· {cells.length}칸</span>
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {cells.map((s) => (
-                      <SlotCell
-                        key={s.id}
-                        slot={s}
-                        container={s.containerId != null ? containersById.get(s.containerId) : undefined}
-                        highlighted={matchSlot(s)}
-                        dragActive={dragging != null}
-                        isDragSource={dragging?.fromSlotId === s.id}
-                        onClick={() => (s.occupied ? setActionSlot(s) : setInboundSlot(s))}
-                        onDragStartCell={() => {
-                          if (s.occupied && s.containerId != null) {
-                            setDragging({
-                              containerId: s.containerId,
-                              fromSlotId: s.id,
-                              label: extractOwner(s.containerId != null ? containersById.get(s.containerId)?.memo : null) ?? s.containerNo ?? '컨테이너',
-                            })
-                          }
-                        }}
-                        onDropCell={() => handleDropMove(s)}
-                        onDragEndCell={() => setDragging(null)}
-                      />
-                    ))}
-                  </div>
+            {(() => {
+              // 층 하나의 셀 묶음 렌더 (모바일·데스크톱 공용)
+              const renderCells = (cells: YardSlot[]) => (
+                <div className="flex flex-wrap gap-1.5">
+                  {cells.map((s) => (
+                    <SlotCell
+                      key={s.id}
+                      slot={s}
+                      container={s.containerId != null ? containersById.get(s.containerId) : undefined}
+                      highlighted={matchSlot(s)}
+                      dragActive={dragging != null}
+                      isDragSource={dragging?.fromSlotId === s.id}
+                      onClick={() => (s.occupied ? setActionSlot(s) : setInboundSlot(s))}
+                      onDragStartCell={() => {
+                        if (s.occupied && s.containerId != null) {
+                          setDragging({
+                            containerId: s.containerId,
+                            fromSlotId: s.id,
+                            label: extractOwner(s.containerId != null ? containersById.get(s.containerId)?.memo : null) ?? s.containerNo ?? '컨테이너',
+                          })
+                        }
+                      }}
+                      onDropCell={() => handleDropMove(s)}
+                      onDragEndCell={() => setDragging(null)}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
+              )
+
+              // ===== 모바일: 한 층씩 + 좌우 스와이프 전환 + 핀치 줌 =====
+              if (isMobile) {
+                const idx = Math.min(floorIdx, floors.length - 1)
+                const floor = floors[idx]
+                return (
+                  <div>
+                    {/* 층 세그먼트 인디케이터 */}
+                    <div className="mb-3 flex items-center gap-1.5 overflow-x-auto">
+                      {floors.map((f, i) => (
+                        <button
+                          key={f.tier}
+                          type="button"
+                          onClick={() => setFloorIdx(i)}
+                          className={cn(
+                            'card-press shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition',
+                            i === idx
+                              ? 'bg-slate-800 text-white'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
+                          )}
+                        >
+                          {f.tier}층 <span className="opacity-60">{f.cells.length}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <PinchZoom
+                      className="rounded-xl"
+                      onSwipeLeft={() => setFloorIdx((i) => Math.min(floors.length - 1, i + 1))}
+                      onSwipeRight={() => setFloorIdx((i) => Math.max(0, i - 1))}
+                    >
+                      {renderCells(floor.cells)}
+                    </PinchZoom>
+
+                    <p className="mt-3 text-center text-[11px] text-slate-400">
+                      좌우 스와이프로 층 전환 · 핀치로 확대 · 더블 탭으로 원배율
+                    </p>
+                  </div>
+                )
+              }
+
+              // ===== 데스크톱: 전 층 세로 나열 (기존 방식) =====
+              return (
+                <div className="space-y-6">
+                  {floors.map(({ tier, cells }) => (
+                    <div key={tier}>
+                      <p className="mb-2 text-sm font-medium text-slate-700">
+                        {tier}층 <span className="text-xs font-normal text-slate-400">· {cells.length}칸</span>
+                      </p>
+                      {renderCells(cells)}
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
           </section>
         </>
       )}

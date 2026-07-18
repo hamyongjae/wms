@@ -13,6 +13,7 @@ import { calcDailyFee } from '@/lib/fee'
 import { extractOwner } from '@/lib/owner'
 import { nextContainerNo } from '@/lib/containerNo'
 import Modal from '@/components/ui/Modal'
+import Fab from '@/components/ui/Fab'
 import MoneyInput from '@/components/ui/MoneyInput'
 import CustomerListPicker from '@/components/customer/CustomerListPicker'
 import LocationPickerField from '@/components/yard/LocationPickerField'
@@ -180,15 +181,18 @@ export default function OrdersPage() {
           <h2 className="text-xl font-bold text-slate-800">계약 관리</h2>
           <p className="mt-1 text-sm text-slate-500">보관 계약을 등록하고 입고·출고 일정을 관리합니다.</p>
         </div>
+        {/* 데스크톱: 상단 버튼 / 모바일: 하단 FAB(엄지 존)이 대신한다 */}
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+          className="hidden shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 md:flex"
         >
           <Plus size={16} />
           계약 등록
         </button>
       </div>
+
+      <Fab actions={[{ label: '계약 등록', icon: Plus, onClick: () => setCreateOpen(true) }]} />
 
       <div className="flex flex-wrap items-center gap-1.5">
         {FILTERS.map((f) => {

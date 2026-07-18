@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type TouchEvent } from 'react'
 import { X } from 'lucide-react'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 /**
  * [형태 승격 규칙] 같은 내용, 다른 그릇.
@@ -7,20 +8,6 @@ import { X } from 'lucide-react'
  *  - 데스크톱(≥768px): 기존 센터 다이얼로그.
  * 호출부 API는 동일하므로 모든 기존 팝업이 자동으로 승격된다.
  */
-
-/** 뷰포트가 모바일 폭인지 (md 미만) — 리사이즈에 실시간 반응 */
-function useIsMobile(): boolean {
-  const [mobile, setMobile] = useState<boolean>(
-    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
-  )
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)')
-    const onChange = (e: MediaQueryListEvent) => setMobile(e.matches)
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [])
-  return mobile
-}
 
 /** 스와이프 다운으로 닫히는 임계 이동량(px) */
 const CLOSE_THRESHOLD = 90
