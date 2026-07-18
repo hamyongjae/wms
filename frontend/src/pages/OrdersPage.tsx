@@ -330,14 +330,6 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setBillingTarget(o)}
-                        title="정산 이력(회차별 보관료)"
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
-                      >
-                        <Wallet size={15} />
-                      </button>
                       {isActive(o.status) && (
                         <button
                           type="button"
@@ -358,6 +350,14 @@ export default function OrdersPage() {
                           출고 취소
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => setBillingTarget(o)}
+                        title="정산 이력(회차별 보관료)"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
+                      >
+                        <Wallet size={15} />
+                      </button>
                       <button
                         type="button"
                         onClick={() => setEditTarget(o)}
