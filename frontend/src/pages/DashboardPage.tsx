@@ -42,12 +42,10 @@ function formatContractPrice(monthlyFee: number, startDate: string, endDate: str
   return `${won(monthlyFee)} / ${durationDays}일`
 }
 
-/** 계약에 배정된 컨테이너의 슬롯 위치 조회 (예: "3층-1") */
-function getSlotLocation(orderId: number, containers: Container[], slots: YardSlot[]): string {
+/** 계약에 배정된 컨테이너 번호 조회 */
+function getContainerNumber(orderId: number, containers: Container[]): string {
   const container = containers.find((c) => c.currentOrderId === orderId)
-  if (!container) return ''
-  const slot = slots.find((s) => s.containerId === container.id)
-  return slot?.locationLabel ?? ''
+  return container?.containerNo ?? ''
 }
 
 
@@ -65,7 +63,6 @@ export default function DashboardPage() {
   const [ledgers, setLedgers] = useState<BillingLedger[]>([])
   const [occupancy, setOccupancy] = useState<WarehouseOccupancy[]>([])
   const [containers, setContainers] = useState<Container[]>([])
-  const [slots, setSlots] = useState<YardSlot[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -81,13 +78,9 @@ export default function DashboardPage() {
       })
       .finally(() => setLoading(false))
 
-    // 컨테이너·슬롯은 별도 비동기 로드 (에러 무시)
-    Promise.allSettled([
-      containerApi.list({}),
-      yardApi.slots(),
-    ]).then((results) => {
-      if (results[0].status === 'fulfilled') setContainers(results[0].value)
-      if (results[1].status === 'fulfilled') setSlots(results[1].value)
+    // 컨테이너는 별도 비동기 로드 (에러 무시)
+    containerApi.list({}).then(setContainers).catch(() => {
+      // 에러 무시
     })
   }, [])
 
@@ -245,13 +238,13 @@ export default function DashboardPage() {
               ) : (
                 <ul className="mt-3 divide-y divide-slate-100">
                   {recentOrders.map((o) => {
-                    const location = getSlotLocation(o.id, containers, slots)
+                    const containerNo = getContainerNumber(o.id, containers)
                     return (
                       <li key={o.id} className="flex items-center justify-between py-2.5 text-sm">
                         <div className="min-w-0">
                           <p className="truncate font-medium text-slate-800">{o.customerName}</p>
                           <p className="text-xs text-slate-400">
-                            {o.warehouseName} {location && `· ${location}`} · {o.storageStartDate}~{o.actualEndDate ?? o.expectedEndDate ?? '미정'}
+                            {o.warehouseName} {containerNo && `· ${containerNo}`} · {o.storageStartDate}~{o.actualEndDate ?? o.expectedEndDate ?? '미정'}
                           </p>
                         </div>
                         <span className="shrink-0 whitespace-nowrap text-slate-600">{formatContractPrice(o.monthlyFee, o.storageStartDate, o.actualEndDate ?? o.expectedEndDate)}</span>
