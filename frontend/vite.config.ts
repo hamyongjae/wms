@@ -13,6 +13,7 @@ export default defineConfig({
     },
   },
   server: {
+    host: true,   // 0.0.0.0 바인딩 → 같은 Wi-Fi의 모바일 기기에서 접속 가능
     port: 5173,
   },
 })

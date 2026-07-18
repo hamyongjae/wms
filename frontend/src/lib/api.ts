@@ -1,9 +1,27 @@
 import axios from 'axios'
 import { authStorage } from './auth'
 
+/**
+ * 백엔드 API 주소 결정.
+ * 우선순위:
+ *  1. VITE_API_BASE_URL 환경변수 (운영 배포·터널링 시 명시)
+ *  2. 현재 접속한 호스트로 자동 유추 (모바일 LAN 테스트 — 폰에서 192.168.x.x:5173으로 열면
+ *     자동으로 192.168.x.x:8080 을 호출. .env 수정 불필요)
+ *  3. 최종 폴백 localhost:8080
+ */
+function resolveBaseURL(): string {
+  const fromEnv = import.meta.env.VITE_API_BASE_URL
+  if (fromEnv) return fromEnv
+  if (typeof window !== 'undefined' && window.location.hostname) {
+    const { protocol, hostname } = window.location
+    return `${protocol}//${hostname}:8080`
+  }
+  return 'http://localhost:8080'
+}
+
 // 백엔드와 통신하는 공용 axios 인스턴스.
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080',
+  baseURL: resolveBaseURL(),
   headers: { 'Content-Type': 'application/json' },
 })
 
