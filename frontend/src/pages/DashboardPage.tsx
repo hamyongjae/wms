@@ -72,17 +72,22 @@ export default function DashboardPage() {
       orderApi.list().catch(() => [] as StorageOrder[]),
       billingApi.list().catch(() => [] as BillingLedger[]),
       yardApi.tenantOccupancy().catch(() => [] as WarehouseOccupancy[]),
-      containerApi.list({}).catch(() => [] as Container[]),
-      yardApi.slots().catch(() => [] as YardSlot[]),
     ])
-      .then(([o, l, occ, c, s]) => {
+      .then(([o, l, occ]) => {
         setOrders(o)
         setLedgers(l)
         setOccupancy(occ)
-        setContainers(c)
-        setSlots(s)
       })
       .finally(() => setLoading(false))
+
+    // 컨테이너·슬롯은 대시보드 로드 후 비동기로 로드 (대용량 데이터)
+    Promise.all([
+      containerApi.list({}).catch(() => [] as Container[]),
+      yardApi.slots().catch(() => [] as YardSlot[]),
+    ]).then(([c, s]) => {
+      setContainers(c)
+      setSlots(s)
+    })
   }, [])
 
   const stats = useMemo(() => {
