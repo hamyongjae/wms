@@ -72,22 +72,16 @@ public class WarehouseService {
     }
 
     // 창고 삭제
-    // [규칙] 컨테이너가 등록돼 있으면 삭제 불가(개수 안내). 보관창고 슬롯(격자)은
-    //   창고에 종속된 구조물이므로 창고와 함께 자동 정리한다.
+    // [규칙] 창고에 종속된 자리(슬롯)와 컨테이너는 창고와 함께 정리한다.
+    //   슬롯이 컨테이너를 참조하므로 슬롯 → 컨테이너 → 창고 순서로 삭제한다.
+    //   (컨테이너 레코드가 화면(격자)에 보이지 않아도 함께 정리되므로 삭제가 막히지 않는다)
     @Transactional
     public void deleteWarehouse(Long id) {
         Warehouse warehouse = findWarehouseOrThrow(id);
         Long tenantId = SecurityUtils.getCurrentTenantId();
 
-        long containerCount = containerRepository.countByTenantIdAndWarehouseId(tenantId, id);
-        if (containerCount > 0) {
-            throw new IllegalStateException(
-                    "이 창고에 등록된 컨테이너 " + containerCount + "개가 있어 삭제할 수 없습니다. "
-                            + "컨테이너를 먼저 이동하거나 삭제한 뒤 다시 시도하세요.");
-        }
-
-        // 컨테이너가 없으므로 남은 슬롯은 모두 공실 — 창고와 함께 정리
         yardSlotRepository.deleteByTenantIdAndWarehouseId(tenantId, id);
+        containerRepository.deleteByTenantIdAndWarehouseId(tenantId, id);
         warehouseRepository.delete(warehouse);
     }
 

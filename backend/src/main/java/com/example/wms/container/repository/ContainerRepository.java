@@ -40,6 +40,9 @@ public interface ContainerRepository extends JpaRepository<Container, Long> {
 
     // 점유 현황 집계용 카운트
     long countByTenantIdAndWarehouseId(Long tenantId, Long warehouseId);
+
+    // [창고 삭제] 창고에 속한 컨테이너 일괄 삭제 — 삭제된 행 수 반환
+    long deleteByTenantIdAndWarehouseId(Long tenantId, Long warehouseId);
     long countByTenantIdAndWarehouseIdAndStatus(Long tenantId, Long warehouseId, ContainerStatus status);
 
     /**
