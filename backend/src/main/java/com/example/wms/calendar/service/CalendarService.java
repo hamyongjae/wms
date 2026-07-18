@@ -49,6 +49,10 @@ public class CalendarService {
         Long tenantId = SecurityUtils.getCurrentTenantId();
         LocalDate today = LocalDate.now();
         List<CalendarEventResponse> events = new ArrayList<>();
+        // [중복 방지] 계약이 존재하는 화주(고객)명 집합. 컨테이너 루프에서 이 화주는 계약이
+        //   이미 권위 있는 일정을 만들었으므로 컨테이너 자체 일정 이벤트를 만들지 않는다.
+        //   (계약에 직접 연결되지 않은 옛 컨테이너까지 화주명 기준으로 방어)
+        java.util.Set<String> orderOwners = new java.util.HashSet<>();
 
         // ===== 계약 → 입고/출고 =====
         for (StorageOrder order : orderRepository.findAllByTenantId(tenantId)) {
@@ -56,6 +60,9 @@ public class CalendarService {
                 continue;
             }
             String customer = order.getCustomer().getName();
+            if (customer != null) {
+                orderOwners.add(customer.trim().toLowerCase());
+            }
 
             java.math.BigDecimal fee = order.getMonthlyFee() != null
                     ? java.math.BigDecimal.valueOf(order.getMonthlyFee()) : null;
@@ -130,6 +137,10 @@ public class CalendarService {
                 continue;
             }
             String owner = ownerFromMemo(container.getMemo(), container.getContainerNo());
+            // 계약이 있는 화주면 계약 이벤트로 이미 표현됨 → 컨테이너 이벤트는 만들지 않는다(중복 방지).
+            if (owner != null && orderOwners.contains(owner.trim().toLowerCase())) {
+                continue;
+            }
 
             LocalDate cIn = container.getInboundDate();
             LocalDate cOut = container.getExpectedOutboundDate();
