@@ -56,15 +56,7 @@ export const orderApi = {
     const { data } = await api.put<StorageOrder>(`/api/orders/${id}`, body)
     return data
   },
-  async release(id: number, actualEndDate: string): Promise<StorageOrder> {
-    const { data } = await api.patch<StorageOrder>(`/api/orders/${id}/release`, { actualEndDate })
-    return data
-  },
-  async unreleased(id: number): Promise<StorageOrder> {
-    const { data } = await api.patch<StorageOrder>(`/api/orders/${id}/unreleased`, {})
-    return data
-  },
-  // [단일 토글] 입고 ↔ 출고 전환
+  // [단일 토글] 입고 ↔ 출고 전환 — 유일한 상태 변경 진입점
   async toggle(id: number): Promise<StorageOrder> {
     const { data } = await api.patch<StorageOrder>(`/api/orders/${id}/toggle`, {})
     return data

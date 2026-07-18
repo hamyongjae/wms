@@ -98,15 +98,6 @@ export interface LedgerCreateRequest {
   dueDate?: string
 }
 
-/** 중도 출고 일할 정산 결과 (preview/apply 공용) */
-export interface MidReleaseSettlement {
-  actualUsageAmount: number // 실제 사용 기간 청구액
-  refundAmount: number // 환급액 (선납 후 중도출고)
-  additionalChargeAmount: number // 추가 청구액 (후납형)
-  effectiveEndDate: string
-  ledger: BillingLedger
-}
-
 export const billingApi = {
   async list(): Promise<BillingLedger[]> {
     const { data } = await api.get<Page<BillingLedger>>('/api/billing/ledgers', {
@@ -143,22 +134,6 @@ export const billingApi = {
   },
   async carryOver(id: number, body: CarryOverRequest): Promise<BillingLedger> {
     const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/${id}/carry-over`, body)
-    return data
-  },
-  // [중도출고 정산] 실제 출고일 기준 일할 정산 미리보기 (원장 변경 없음)
-  async previewMidRelease(id: number, actualEndDate: string): Promise<MidReleaseSettlement> {
-    const { data } = await api.post<MidReleaseSettlement>(
-      `/api/billing/ledgers/${id}/mid-release/preview`,
-      { actualEndDate },
-    )
-    return data
-  },
-  // [중도출고 정산] 정산 확정 — 원장에 조정 반영
-  async applyMidRelease(id: number, actualEndDate: string): Promise<MidReleaseSettlement> {
-    const { data } = await api.post<MidReleaseSettlement>(
-      `/api/billing/ledgers/${id}/mid-release/apply`,
-      { actualEndDate },
-    )
     return data
   },
   // 미납(연체) 촉구 일괄 발송 → 결과 메시지 문자열

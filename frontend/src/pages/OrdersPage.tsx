@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, Trash2, LogOut, FileText, ShieldAlert, AlertTriangle, Pencil, X, Wallet } from 'lucide-react'
+import { Plus, Loader2, Trash2, FileText, ShieldAlert, AlertTriangle, Pencil, X, Wallet } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType } from '@/api/orderApi'
-import { billingApi, type BillingLedger, type MidReleaseSettlement, type PaymentMethod } from '@/api/billingApi'
+import { billingApi, type BillingLedger, type PaymentMethod } from '@/api/billingApi'
 import { displayStatus, isOpenLedger } from '@/lib/billing'
 import { customerApi, type Customer, type CustomerType } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
@@ -15,6 +15,7 @@ import { calcDailyFee } from '@/lib/fee'
 import { extractOwner } from '@/lib/owner'
 import { nextContainerNo } from '@/lib/containerNo'
 import { orderSync } from '@/lib/orderEvents'
+import { today, addDays, addMonths } from '@/lib/dates'
 import Modal from '@/components/ui/Modal'
 import Fab from '@/components/ui/Fab'
 import MoneyInput from '@/components/ui/MoneyInput'
@@ -51,22 +52,7 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'OUTBOUND', label: '출고' },
 ]
 
-const today = () => new Date().toISOString().slice(0, 10)
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
-
-/** yyyy-MM-dd 에 일수 더하기 (UTC 기준) */
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(`${dateStr}T00:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-/** yyyy-MM-dd 에 개월 더하기 (하루 빼서 '한 달 구간'으로: 1/15~2/14) */
-function addMonths(dateStr: string, months: number): string {
-  const d = new Date(`${dateStr}T00:00:00Z`)
-  d.setUTCMonth(d.getUTCMonth() + months)
-  d.setUTCDate(d.getUTCDate() - 1)
-  return d.toISOString().slice(0, 10)
-}
 
 /**
  * 특정 계약(주문)에 컨테이너를 만들어 지정 슬롯에 적재·배정하는 파이프라인.

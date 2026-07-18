@@ -22,18 +22,10 @@ import WarehouseArt from '@/components/brand/WarehouseArt'
 import { authStorage } from '@/lib/auth'
 
 import { isOverdue, isOpenLedger, daysFromDue } from '@/lib/billing'
-import { calcDailyFee } from '@/lib/fee'
+import { today, getDurationDays } from '@/lib/dates'
 
-const today = () => new Date().toISOString().slice(0, 10)
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const isActive = (s: StorageOrder['status']) => s === 'INBOUND'
-
-/** 계약의 기간을 일 단위로 계산 */
-function getDurationDays(startDate: string, endDate: string | null | undefined): number {
-  const start = new Date(`${startDate}T00:00:00Z`).getTime()
-  const end = new Date(`${endDate ?? startDate}T00:00:00Z`).getTime()
-  return Math.round((end - start) / 86_400_000) + 1 // 당일 포함
-}
 
 /** 계약 가격 표시: "보관료 / 보관일수" 형식 */
 function formatContractPrice(monthlyFee: number, startDate: string, endDate: string | null | undefined): string {
@@ -42,12 +34,19 @@ function formatContractPrice(monthlyFee: number, startDate: string, endDate: str
   return `${won(monthlyFee)} / ${durationDays}일`
 }
 
-/** 계약에 배정된 컨테이너의 슬롯 위치 조회 */
-function getSlotLocation(orderId: number, containers: Container[], slots: YardSlot[]): string {
-  const container = containers.find((c) => c.currentOrderId === orderId)
-  if (!container) return ''
-  const slot = slots.find((s) => s.containerId === container.id)
-  return slot?.locationLabel ?? ''
+/** 계약 id → 슬롯 위치 라벨 맵 파생 (Map 조인 — 렌더 중 반복 탐색 제거) */
+function buildLocationMap(containers: Container[], slots: YardSlot[]): Map<number, string> {
+  const locByContainer = new Map<number, string>()
+  for (const s of slots) {
+    if (s.containerId != null) locByContainer.set(s.containerId, s.locationLabel)
+  }
+  const m = new Map<number, string>()
+  for (const c of containers) {
+    if (c.currentOrderId == null) continue
+    const loc = locByContainer.get(c.id)
+    if (loc) m.set(c.currentOrderId, loc)
+  }
+  return m
 }
 
 
@@ -69,40 +68,50 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let alive = true // 언마운트 후 setState 방지 (메모리 릭 차단)
+
+    // [1차] 핵심 지표 — 병렬 로드 후 즉시 렌더
     Promise.all([
       orderApi.list().catch(() => [] as StorageOrder[]),
       billingApi.list().catch(() => [] as BillingLedger[]),
       yardApi.tenantOccupancy().catch(() => [] as WarehouseOccupancy[]),
     ])
       .then(([o, l, occ]) => {
+        if (!alive) return
         setOrders(o)
         setLedgers(l)
         setOccupancy(occ)
 
-        // 최근 계약의 warehouse ID만 추출
-        const recentWarehouseIds = Array.from(new Set(o.slice(0, 5).map((order) => order.warehouseId)))
-
-        // 그 warehouse들의 슬롯만 조회 (필요한 것만)
-        if (recentWarehouseIds.length > 0) {
-          Promise.all(
-            recentWarehouseIds.map((warehouseId) =>
-              yardApi.slots(warehouseId).catch(() => [] as YardSlot[]),
-            ),
-          )
-            .then((results) => {
-              setSlots(results.flat())
+        // [2차] 슬롯 위치는 부가 정보 — 컨테이너를 먼저 받아
+        //   "최근 5건 계약에 실제 배정된 컨테이너가 있는 창고"만 슬롯을 조회한다.
+        //   (배정이 없으면 슬롯 API를 아예 호출하지 않음 → 네트워크 오버헤드 최소화)
+        const recentIds = new Set(o.slice(0, 5).map((ord) => ord.id))
+        containerApi
+          .list({})
+          .then((cts) => {
+            if (!alive) return
+            setContainers(cts)
+            const neededWarehouseIds = [
+              ...new Set(
+                cts
+                  .filter((c) => c.currentOrderId != null && recentIds.has(c.currentOrderId))
+                  .map((c) => c.warehouseId),
+              ),
+            ]
+            if (neededWarehouseIds.length === 0) return
+            return Promise.all(
+              neededWarehouseIds.map((wid) => yardApi.slots(wid).catch(() => [] as YardSlot[])),
+            ).then((results) => {
+              if (alive) setSlots(results.flat())
             })
-            .catch(() => {
-              // 슬롯 조회 실패해도 무시
-            })
-        }
+          })
+          .catch(() => {}) // 부가 정보 실패는 조용히 무시
       })
-      .finally(() => setLoading(false))
+      .finally(() => alive && setLoading(false))
 
-    // 컨테이너는 별도 비동기 로드 (에러 무시)
-    containerApi.list({}).then(setContainers).catch(() => {
-      // 에러 무시
-    })
+    return () => {
+      alive = false
+    }
   }, [])
 
   const stats = useMemo(() => {
@@ -128,6 +137,7 @@ export default function DashboardPage() {
   }, [orders, ledgers, occupancy])
 
   const recentOrders = useMemo(() => orders.slice(0, 5), [orders])
+  const locationByOrder = useMemo(() => buildLocationMap(containers, slots), [containers, slots])
 
   // 최근 6개월 청구/수금 집계 (원장 청구기간 시작월 기준)
   const revenueSeries = useMemo<RevenuePoint[]>(() => {
@@ -259,7 +269,7 @@ export default function DashboardPage() {
               ) : (
                 <ul className="mt-3 divide-y divide-slate-100">
                   {recentOrders.map((o) => {
-                    const location = getSlotLocation(o.id, containers, slots)
+                    const location = locationByOrder.get(o.id) ?? ''
                     return (
                       <li key={o.id} className="flex items-center justify-between py-2.5 text-sm">
                         <div className="min-w-0">

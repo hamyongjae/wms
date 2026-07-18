@@ -18,6 +18,8 @@ import { yardApi, type YardSlot } from '@/api/yardApi'
 import { containerApi, type Container } from '@/api/containerApi'
 import { customerApi, type Customer } from '@/api/customerApi'
 import { orderApi, type StorageOrder, type PaymentType } from '@/api/orderApi'
+import { addDays } from '@/lib/dates'
+import { orderSync } from '@/lib/orderEvents'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
 import Fab from '@/components/ui/Fab'
@@ -56,13 +58,6 @@ const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
 
 const fmt = (n: number) => n.toLocaleString('ko-KR')
-
-/** yyyy-MM-dd 에 일수 더하기 (UTC 기준) */
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(`${dateStr}T00:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + days)
-  return d.toISOString().slice(0, 10)
-}
 
 const CONTAINER_STATUS_KO: Record<string, string> = {
   AVAILABLE: '가용',
@@ -133,6 +128,9 @@ export default function YardDispatchPage() {
       .catch(() => setError('보관창고 현황을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [selectedId, refreshKey])
+
+  // [실시간 동기화] 계약관리에서 상태 전환·삭제 시 슬롯/컨테이너를 다시 불러온다.
+  useEffect(() => orderSync.subscribe(() => setRefreshKey((k) => k + 1)), [])
 
   const floors = useMemo(() => groupByFloor(slots), [slots])
   const kpi = useMemo(() => {

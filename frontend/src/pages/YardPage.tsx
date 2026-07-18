@@ -15,6 +15,7 @@ import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
+import { orderSync } from '@/lib/orderEvents'
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
@@ -55,6 +56,9 @@ export default function YardPage() {
       .catch(() => setError('보관창고 현황을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [selectedId, refreshKey])
+
+  // [실시간 동기화] 계약관리에서 상태 전환·삭제 시 점유 현황을 다시 불러온다.
+  useEffect(() => orderSync.subscribe(() => setRefreshKey((k) => k + 1)), [])
 
   const blocks = useMemo(() => groupByBlock(slots), [slots])
 

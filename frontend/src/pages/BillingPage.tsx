@@ -27,6 +27,7 @@ import StatCard from '@/components/ui/StatCard'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { isOverdue, daysFromDue, displayStatus } from '@/lib/billing'
+import { today } from '@/lib/dates'
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
@@ -67,7 +68,6 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'CARRIED_OVER', label: '이월' },
 ]
 
-const today = () => new Date().toISOString().slice(0, 10)
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const totalDue = (l: BillingLedger) => l.baseAmount + l.carriedOverIn + l.adjustmentTotal
 
