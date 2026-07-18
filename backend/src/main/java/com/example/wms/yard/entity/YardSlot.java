@@ -90,9 +90,12 @@ public class YardSlot {
         this.occupied = false;
     }
 
-    /** 사람이 읽는 위치 라벨 (예: A-1-1-2) */
+    /**
+     * 사람이 읽는 위치 라벨.
+     * [층별 번호 체계] tier=층, columnNo=자리 번호 → "1층-15" 형태로 표기.
+     */
     public String getLocationLabel() {
-        return block + "-" + rowNo + "-" + columnNo + "-" + tier;
+        return tier + "층-" + columnNo;
     }
 
     /** 컨테이너 적재 (이미 차 있으면 예외) */

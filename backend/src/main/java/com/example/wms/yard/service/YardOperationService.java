@@ -72,6 +72,39 @@ public class YardOperationService {
         return created;
     }
 
+    /**
+     * [층별 재생성] 층(tier)마다 지정한 개수만큼 자리를 생성한다. (예: 1층 37, 2층 22, 3층 55)
+     * 자리 번호는 columnNo(1..count), 단일 구역("메인"), rowNo=1 로 저장하고 라벨은 "N층-번호".
+     * 기존 '빈 자리'는 먼저 정리하고 새로 만든다. (적재된 자리는 그대로 보존)
+     */
+    @Transactional
+    public int generateFloors(FloorGridRequest req) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        Warehouse warehouse = warehouseRepository.findByIdAndTenantId(req.getWarehouseId(), tenantId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "존재하지 않는 창고입니다. id=" + req.getWarehouseId()));
+
+        final String block = "메인";
+        // 재생성: 비어있는 자리 정리(적재된 자리는 유지)
+        yardSlotRepository.deleteByTenantIdAndWarehouseIdAndOccupiedFalse(tenantId, warehouse.getId());
+
+        int created = 0;
+        for (FloorGridRequest.Floor floor : req.getFloors()) {
+            int tier = floor.getTier();
+            int count = floor.getCount();
+            for (int no = 1; no <= count; no++) {
+                // 적재돼 남아있는 자리와 좌표 충돌 시 건너뜀 (columnNo=자리번호, rowNo=1)
+                if (yardSlotRepository.existsByTenantIdAndWarehouseIdAndBlockAndRowNoAndColumnNoAndTier(
+                        tenantId, warehouse.getId(), block, 1, no, tier)) {
+                    continue;
+                }
+                yardSlotRepository.save(new YardSlot(warehouse.getTenant(), warehouse, block, 1, no, tier));
+                created++;
+            }
+        }
+        return created;
+    }
+
     // ===================== 입고 / 이동 / 반출 =====================
 
     /** 반입: 보관창고 밖의 컨테이너를 대상 슬롯에 적재 */

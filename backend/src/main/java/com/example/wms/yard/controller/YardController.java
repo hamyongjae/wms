@@ -43,6 +43,14 @@ public class YardController {
         return ResponseEntity.status(HttpStatus.CREATED).body("생성된 슬롯: " + created + "개");
     }
 
+    // [층별 생성] 층마다 자리 개수를 지정해 재생성 (빈 자리 정리 후 N층-번호로 생성)
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/slots/generate-floors")
+    public ResponseEntity<String> generateFloors(@Valid @RequestBody FloorGridRequest request) {
+        int created = yardOperationService.generateFloors(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body("생성된 자리: " + created + "개");
+    }
+
     @GetMapping("/slots")
     public ResponseEntity<Page<YardSlotResponse>> listSlots(
             @RequestParam Long warehouseId, Pageable pageable) {
