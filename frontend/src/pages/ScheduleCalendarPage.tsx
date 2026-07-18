@@ -501,15 +501,23 @@ function EventCard({
             중도 출고 정산
           </QuickBtn>
         )}
-        {event.type === 'BILLING' && event.status !== 'COMPLETED' && (
+        {event.type === 'BILLING' && (
           <>
-            <QuickBtn onClick={settlePayment} disabled={busy} icon={<CheckCircle2 size={13} />} tone="emerald">
-              수금 완료 처리
+            {/* [딥링크] 청구 이벤트의 id = 원장 id — 청구·정산 화면의 해당 원장 상세를 바로 연다 */}
+            <QuickBtn onClick={() => navigate(`/billing?ledger=${event.id}`)} icon={<ArrowRightLeft size={13} />}>
+              원장 상세
             </QuickBtn>
-            {isAdmin && (
-              <QuickBtn onClick={resendNotify} disabled={busy} icon={<Bell size={13} />}>
-                알림톡 재발송
-              </QuickBtn>
+            {event.status !== 'COMPLETED' && (
+              <>
+                <QuickBtn onClick={settlePayment} disabled={busy} icon={<CheckCircle2 size={13} />} tone="emerald">
+                  수금 완료 처리
+                </QuickBtn>
+                {isAdmin && (
+                  <QuickBtn onClick={resendNotify} disabled={busy} icon={<Bell size={13} />}>
+                    알림톡 재발송
+                  </QuickBtn>
+                )}
+              </>
             )}
           </>
         )}

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, Trash2, LogOut, FileText, ShieldAlert, AlertTriangle, Pencil, X } from 'lucide-react'
+import { Plus, Loader2, Trash2, LogOut, FileText, ShieldAlert, AlertTriangle, Pencil, X, Wallet } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus } from '@/api/orderApi'
+import { billingApi, type BillingLedger, type MidReleaseSettlement, type PaymentMethod } from '@/api/billingApi'
+import { displayStatus, isOpenLedger } from '@/lib/billing'
 import { customerApi, type Customer, type CustomerType } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { containerApi } from '@/api/containerApi'
@@ -80,6 +82,7 @@ export default function OrdersPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<StorageOrder | null>(null)
   const [releaseTarget, setReleaseTarget] = useState<StorageOrder | null>(null)
+  const [billingTarget, setBillingTarget] = useState<StorageOrder | null>(null) // 정산 타임라인
   // 계약 id → 배치된 슬롯 위치 라벨 목록 (창고+화주 기준으로 조인)
   const [locationsByOrder, setLocationsByOrder] = useState<Map<number, string[]>>(new Map())
 
@@ -298,6 +301,14 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setBillingTarget(o)}
+                        title="정산 이력(회차별 보관료)"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
+                      >
+                        <Wallet size={15} />
+                      </button>
                       {isActive(o.status) && (
                         <>
                           <button
@@ -366,7 +377,176 @@ export default function OrdersPage() {
           reload()
         }}
       />
+
+      <OrderBillingModal target={billingTarget} onClose={() => setBillingTarget(null)} />
     </div>
+  )
+}
+
+/* ===== 정산 타임라인 (계약 상세 — 회차별 보관료) =====
+ * "이 고객 정산 어떻게 돼가?"에 화면 한 장으로 답한다.
+ * 회차(원장)별 기간·상태·수금/잔액을 시간순으로 보여주고, 그 자리에서 바로 입금을 기록한다.
+ */
+function OrderBillingModal({ target, onClose }: { target: StorageOrder | null; onClose: () => void }) {
+  const [ledgers, setLedgers] = useState<BillingLedger[]>([])
+  const [loading, setLoading] = useState(true)
+  const [payTarget, setPayTarget] = useState<BillingLedger | null>(null) // 입금 기록 중인 회차
+  const [amount, setAmount] = useState<number | null>(null)
+  const [method, setMethod] = useState<PaymentMethod>('BANK_TRANSFER')
+  const [paidOn, setPaidOn] = useState(today())
+  const [saving, setSaving] = useState(false)
+  const [payError, setPayError] = useState<string | null>(null)
+
+  function load(orderId: number) {
+    setLoading(true)
+    billingApi
+      .list()
+      .then((all) =>
+        setLedgers(
+          all
+            .filter((l) => l.storageOrderId === orderId && l.status !== 'CANCELED')
+            .sort((a, b) => (a.periodStart < b.periodStart ? -1 : 1)),
+        ),
+      )
+      .catch(() => setLedgers([]))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    if (target) {
+      setPayTarget(null)
+      setPayError(null)
+      load(target.id)
+    }
+  }, [target])
+
+  if (!target) return null
+
+  function openPay(l: BillingLedger) {
+    setPayTarget(l)
+    setAmount(l.balance) // 기본값 = 잔액 전액 (부분입금이면 수정)
+    setMethod('BANK_TRANSFER')
+    setPaidOn(today())
+    setPayError(null)
+  }
+
+  async function submitPay(e: FormEvent) {
+    e.preventDefault()
+    if (!payTarget || amount == null || amount <= 0) {
+      setPayError('입금액을 입력하세요.')
+      return
+    }
+    setSaving(true)
+    try {
+      await billingApi.recordPayment(payTarget.id, { amount, method, paidOn })
+      setPayTarget(null)
+      load(target!.id)
+    } catch (err) {
+      setPayError(errMsg(err, '입금 기록에 실패했습니다.'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const totalBalance = ledgers.reduce((s, l) => s + (isOpenLedger(l) ? l.balance : 0), 0)
+
+  return (
+    <Modal open onClose={onClose} title={`${target.customerName} · 정산 이력`} widthClass="max-w-2xl">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+          <span className="text-slate-500">
+            계약 기간 <span className="font-medium text-slate-700">{target.storageStartDate} ~ {target.actualEndDate ?? target.expectedEndDate ?? '미정'}</span>
+          </span>
+          <span className={cn('font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-[#5C7C6B]')}>
+            {totalBalance > 0 ? `미수 잔액 ${won(totalBalance)}` : '미수 없음'}
+          </span>
+        </div>
+
+        {loading && (
+          <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
+            <Loader2 className="animate-spin" size={16} />
+            <span className="text-sm">정산 이력을 불러오는 중…</span>
+          </div>
+        )}
+
+        {!loading && ledgers.length === 0 && (
+          <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
+            아직 생성된 청구 회차가 없습니다. 원장은 매월 1일 자동 생성됩니다.
+          </p>
+        )}
+
+        {!loading && ledgers.length > 0 && (
+          <ol className="space-y-2">
+            {ledgers.map((l, i) => {
+              const ds = displayStatus(l)
+              const paying = payTarget?.id === l.id
+              return (
+                <li key={l.id} className="rounded-xl bg-white p-3.5 ring-1 ring-slate-200/70">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-400">{i + 1}회차</span>
+                    <span className="text-sm font-medium text-slate-700">
+                      {l.periodStart} ~ {l.periodEnd}
+                    </span>
+                    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>
+                      {ds.label}
+                    </span>
+                    <span className="ml-auto text-sm text-slate-500">
+                      <span className="font-semibold text-slate-800">{won(l.paidTotal)}</span>
+                      <span className="text-slate-300"> / </span>
+                      {won(l.baseAmount + l.carriedOverIn + l.adjustmentTotal)}
+                    </span>
+                    {isOpenLedger(l) && l.balance > 0 && !paying && (
+                      <button
+                        type="button"
+                        onClick={() => openPay(l)}
+                        className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-indigo-700"
+                      >
+                        입금 기록
+                      </button>
+                    )}
+                  </div>
+                  {l.carriedOverIn > 0 && (
+                    <p className="mt-1 text-[11px] text-slate-400">전 회차 이월 미수 {won(l.carriedOverIn)} 포함</p>
+                  )}
+
+                  {/* 인라인 입금 기록 폼 */}
+                  {paying && (
+                    <form onSubmit={submitPay} className="mt-2.5 flex flex-wrap items-end gap-2 rounded-lg bg-slate-50 p-2.5">
+                      <div className="min-w-[8rem] flex-1">
+                        <label className="mb-0.5 block text-[11px] text-slate-500">입금액 (잔액 {won(l.balance)})</label>
+                        <MoneyInput value={amount} onChange={setAmount} required className={cn(inputCls, 'pr-8')} />
+                      </div>
+                      <div>
+                        <label className="mb-0.5 block text-[11px] text-slate-500">방법</label>
+                        <select value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)} className={inputCls}>
+                          <option value="BANK_TRANSFER">계좌이체</option>
+                          <option value="CASH">현금</option>
+                          <option value="CARD">카드</option>
+                          <option value="OTHER">기타</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-0.5 block text-[11px] text-slate-500">입금일</label>
+                        <input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} className={inputCls} />
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button type="submit" disabled={saving} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
+                          {saving ? '기록 중…' : '기록'}
+                        </button>
+                        <button type="button" onClick={() => setPayTarget(null)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-600 transition hover:bg-white">
+                          취소
+                        </button>
+                      </div>
+                      {payError && <p className="w-full text-xs text-red-600">{payError}</p>}
+                    </form>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+        )}
+      </div>
+    </Modal>
   )
 }
 
@@ -1009,7 +1189,11 @@ function QuickCustomerModal({
   )
 }
 
-/* ===== 출고 처리 ===== */
+/* ===== 출고 처리 (+중도출고 일할 정산) =====
+ * 실제 출고일 입력 → 이 계약의 미결 원장을 찾아 일할 정산 미리보기(preview)를 띄우고,
+ * '정산 반영' 체크 시 출고와 함께 applyMidRelease 로 원장에 확정한다.
+ * 정산 실패가 출고를 막지 않도록(짐은 나가야 하므로) 출고 성공 후 정산은 별도 경고로 처리.
+ */
 function ReleaseModal({
   target,
   onClose,
@@ -1022,13 +1206,46 @@ function ReleaseModal({
   const [actualEndDate, setDate] = useState(today())
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  // 정산 대상 원장 + 미리보기
+  const [ledger, setLedger] = useState<BillingLedger | null>(null)
+  const [preview, setPreview] = useState<MidReleaseSettlement | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [settle, setSettle] = useState(true)
 
   useEffect(() => {
     if (target) {
       setDate(today())
       setFormError(null)
+      setPreview(null)
+      setPreviewError(null)
+      setSettle(true)
+      // 이 계약의 미결(발행/부분수금) 원장 중 최신 회차를 정산 대상으로
+      billingApi
+        .list()
+        .then((all) => {
+          const open = all
+            .filter((l) => l.storageOrderId === target.id && isOpenLedger(l))
+            .sort((a, b) => (a.periodStart < b.periodStart ? 1 : -1))
+          setLedger(open[0] ?? null)
+        })
+        .catch(() => setLedger(null))
     }
   }, [target])
+
+  // 출고일·원장이 정해지면 일할 정산 미리보기 (원장 변경 없음)
+  useEffect(() => {
+    if (!target || !ledger || !actualEndDate) return
+    let alive = true
+    setPreview(null)
+    setPreviewError(null)
+    billingApi
+      .previewMidRelease(ledger.id, actualEndDate)
+      .then((p) => alive && setPreview(p))
+      .catch((e) => alive && setPreviewError(errMsg(e, '정산 미리보기를 계산하지 못했습니다.')))
+    return () => {
+      alive = false
+    }
+  }, [target, ledger, actualEndDate])
 
   if (!target) return null
 
@@ -1038,12 +1255,21 @@ function ReleaseModal({
     setSubmitting(true)
     try {
       await orderApi.release(target!.id, actualEndDate)
-      onDone()
     } catch (err) {
       setFormError(errMsg(err, '출고 처리에 실패했습니다.'))
-    } finally {
       setSubmitting(false)
+      return
     }
+    // 출고 성공 후 정산 확정 (실패해도 출고는 유지 — 청구 화면에서 재시도 가능)
+    if (settle && ledger && preview && !previewError) {
+      try {
+        await billingApi.applyMidRelease(ledger.id, actualEndDate)
+      } catch (err) {
+        window.alert(`출고는 완료됐지만 정산 반영에 실패했습니다.\n청구·정산 화면에서 다시 처리해 주세요.\n(${errMsg(err, '원인 미상')})`)
+      }
+    }
+    setSubmitting(false)
+    onDone()
   }
 
   return (
@@ -1057,6 +1283,54 @@ function ReleaseModal({
           <input type="date" value={actualEndDate} onChange={(e) => setDate(e.target.value)} required className={inputCls} />
         </div>
 
+        {/* ===== 중도출고 정산 미리보기 ===== */}
+        {ledger && (
+          <div className="space-y-2 rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200/70">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-slate-500">
+                보관료 정산 <span className="font-normal text-slate-400">· {ledger.periodStart} ~ {ledger.periodEnd}</span>
+              </p>
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-600">
+                <input type="checkbox" checked={settle} onChange={(e) => setSettle(e.target.checked)} className="accent-indigo-600" />
+                출고와 함께 정산 반영
+              </label>
+            </div>
+
+            {previewError && <p className="text-xs text-[#A65B44]">{previewError}</p>}
+
+            {preview && (
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between text-slate-600">
+                  <span>실사용 보관료 ({ledger.periodStart} ~ {preview.effectiveEndDate})</span>
+                  <span className="font-medium text-slate-800">{won(preview.actualUsageAmount)}</span>
+                </div>
+                {preview.refundAmount > 0 && (
+                  <div className="flex justify-between text-[#5C7C6B]">
+                    <span>환급(잔여 기간 차감)</span>
+                    <span className="font-semibold">-{won(preview.refundAmount)}</span>
+                  </div>
+                )}
+                {preview.additionalChargeAmount > 0 && (
+                  <div className="flex justify-between text-[#A65B44]">
+                    <span>추가 청구</span>
+                    <span className="font-semibold">+{won(preview.additionalChargeAmount)}</span>
+                  </div>
+                )}
+                {ledger.balance > 0 && (
+                  <p className="mt-1.5 rounded-lg bg-[#F2E8E3] px-2.5 py-1.5 text-xs font-medium text-[#A65B44]">
+                    이 계약에 미수 잔액 {won(ledger.balance)}이 남아 있습니다. 출고 후에도 원장에 유지됩니다.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {!ledger && (
+          <p className="rounded-lg border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-400">
+            정산할 미결 청구 원장이 없습니다. (원장은 매월 자동 생성되며, 청구·정산 화면에서 확인할 수 있습니다)
+          </p>
+        )}
+
         {formError && <p className="text-sm text-red-600">{formError}</p>}
 
         <div className="flex justify-end gap-2 pt-2">
@@ -1064,7 +1338,7 @@ function ReleaseModal({
             취소
           </button>
           <button type="submit" disabled={submitting} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700 disabled:opacity-60">
-            {submitting ? '처리 중…' : '출고 완료'}
+            {submitting ? '처리 중…' : settle && ledger ? '정산 확정 + 출고 완료' : '출고 완료'}
           </button>
         </div>
       </form>

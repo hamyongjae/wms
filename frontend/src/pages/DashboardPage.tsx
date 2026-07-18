@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   PackageOpen,
   Truck,
+  CalendarClock,
   Loader2,
   type LucideIcon,
 } from 'lucide-react'
@@ -19,14 +20,18 @@ import RevenueBarChart, { type RevenuePoint } from '@/components/charts/RevenueB
 import WarehouseArt from '@/components/brand/WarehouseArt'
 import { authStorage } from '@/lib/auth'
 
+import { isOverdue, isOpenLedger, daysFromDue } from '@/lib/billing'
+
 const today = () => new Date().toISOString().slice(0, 10)
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const isActive = (s: StorageOrder['status']) => s === 'RECEIVED' || s === 'IN_STORAGE'
-const isOverdue = (l: BillingLedger) =>
-  l.balance > 0 &&
-  (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID') &&
-  l.dueDate != null &&
-  l.dueDate < today()
+
+/** [연체 예방 지표] 납기 7일 이내로 다가온 입금예정 원장 (오늘 포함, 연체 제외) */
+const isDueSoon = (l: BillingLedger) => {
+  if (!isOpenLedger(l) || l.balance <= 0 || l.dueDate == null) return false
+  const d = daysFromDue(l.dueDate) // 음수 = 납기 전
+  return d >= -7 && d <= 0
+}
 
 export default function DashboardPage() {
   const user = authStorage.getUser()
@@ -55,6 +60,10 @@ export default function DashboardPage() {
     const activeContracts = orders.filter((o) => isActive(o.status)).length
     const outstanding = ledgers.filter((l) => l.status !== 'CANCELED').reduce((s, l) => s + l.balance, 0)
     const overdue = ledgers.filter(isOverdue).length
+    // 이번 주 납기 도래 — 연체가 되기 전에 잡는 선행 지표
+    const dueSoonList = ledgers.filter(isDueSoon)
+    const dueSoon = dueSoonList.length
+    const dueSoonAmount = dueSoonList.reduce((s, l) => s + l.balance, 0)
 
     const totalSlots = occupancy.reduce((s, w) => s + w.totalSlots, 0)
     const occupiedSlots = occupancy.reduce((s, w) => s + w.occupiedSlots, 0)
@@ -65,7 +74,7 @@ export default function DashboardPage() {
       (o) => o.actualEndDate === t || (o.expectedEndDate === t && isActive(o.status)),
     )
 
-    return { activeContracts, outstanding, overdue, totalSlots, occupiedSlots, usage, todayInbound, todayOutbound }
+    return { activeContracts, outstanding, overdue, dueSoon, dueSoonAmount, totalSlots, occupiedSlots, usage, todayInbound, todayOutbound }
   }, [orders, ledgers, occupancy])
 
   const recentOrders = useMemo(() => orders.slice(0, 5), [orders])
@@ -124,7 +133,7 @@ export default function DashboardPage() {
       ) : (
         <>
           {/* KPI */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <StatCard label="진행중 계약" value={`${stats.activeContracts}건`} icon={FileText} tone="indigo" />
             <StatCard label="미수금 총액" value={won(stats.outstanding)} icon={Wallet} tone="amber" />
             <StatCard
@@ -133,6 +142,14 @@ export default function DashboardPage() {
               sub={`${stats.occupiedSlots.toLocaleString('ko-KR')}/${stats.totalSlots.toLocaleString('ko-KR')} 슬롯`}
               icon={Grid3x3}
               tone="emerald"
+            />
+            {/* 납기 도래(7일) — 연체를 만들기 전에 잡는 선행 지표 */}
+            <StatCard
+              label="이번 주 납기 도래"
+              value={`${stats.dueSoon}건`}
+              sub={stats.dueSoon > 0 ? `${won(stats.dueSoonAmount)} 입금 예정` : '납기 임박 건 없음'}
+              icon={CalendarClock}
+              tone="indigo"
             />
             <StatCard label="연체 청구" value={`${stats.overdue}건`} icon={AlertTriangle} tone="slate" />
           </div>

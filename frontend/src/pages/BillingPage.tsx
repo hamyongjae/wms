@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { isAxiosError } from 'axios'
 import {
   Loader2,
@@ -25,6 +26,7 @@ import {
 import StatCard from '@/components/ui/StatCard'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
+import { isOverdue, daysFromDue, displayStatus } from '@/lib/billing'
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
@@ -68,38 +70,6 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 const today = () => new Date().toISOString().slice(0, 10)
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const totalDue = (l: BillingLedger) => l.baseAmount + l.carriedOverIn + l.adjustmentTotal
-const isOverdue = (l: BillingLedger) =>
-  l.balance > 0 &&
-  (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID') &&
-  l.dueDate != null &&
-  l.dueDate < today()
-
-/** 납기일 기준 경과/잔여 일수 (오늘 - 납기일, UTC 일 단위) */
-function daysFromDue(dueDate: string): number {
-  const due = new Date(`${dueDate}T00:00:00Z`).getTime()
-  const now = new Date(`${today()}T00:00:00Z`).getTime()
-  return Math.round((now - due) / 86_400_000)
-}
-
-/**
- * [파생 표시 상태] 저장 상태 × 납기일 → 화면 표기 (운영 가이드 2.2)
- *  - 발행/부분수금 + 납기 전  → '입금예정' (더스티블루)
- *  - 발행/부분수금 + 납기 경과·잔액>0 → '연체 N일' (클레이)
- *  - 그 외는 저장 상태 그대로
- */
-function displayStatus(l: BillingLedger): { label: string; cls: string } {
-  if (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID') {
-    if (isOverdue(l)) {
-      const d = daysFromDue(l.dueDate!)
-      return { label: `연체 ${d}일`, cls: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]' }
-    }
-    return {
-      label: l.status === 'PARTIALLY_PAID' ? '부분수금 · 입금예정' : '입금예정',
-      cls: 'bg-[#E9EEF3] text-[#5A748F] ring-[#D4DDE7]',
-    }
-  }
-  return STATUS_META[l.status]
-}
 
 export default function BillingPage() {
   const isAdmin = authStorage.getUser()?.role === 'ADMIN'
@@ -111,6 +81,17 @@ export default function BillingPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  // [딥링크] 캘린더 등에서 /billing?ledger=ID 로 진입하면 해당 원장 상세를 바로 연다
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  useEffect(() => {
+    const raw = searchParams.get('ledger')
+    if (raw != null) {
+      const id = Number(raw)
+      if (Number.isFinite(id)) setSelectedId(id)
+      setSearchParams({}, { replace: true }) // 한 번 소비 후 URL 정리
+    }
+  }, [searchParams, setSearchParams])
 
   const reload = () => setRefreshKey((k) => k + 1)
 
