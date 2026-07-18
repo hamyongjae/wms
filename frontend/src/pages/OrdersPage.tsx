@@ -947,13 +947,20 @@ function CreateOrderModal({
       setWarehouseId(warehouses[0] ? String(warehouses[0].id) : '')
       setSlotId(null)
       setStartDate(today())
-      setEndDate('')
+      setEndDate(addDays(today(), 7))
       setMonthlyFee(null)
       setMemo('')
       setFormError(null)
       setDormantConfirm(false)
     }
   }, [open, warehouses])
+
+  // [자동 계산] 보관 시작일이 변경되면 출고 예정일을 자동으로 +7일로 설정
+  useEffect(() => {
+    if (storageStartDate && !expectedEndDate) {
+      setEndDate(addDays(storageStartDate, 7))
+    }
+  }, [storageStartDate])
 
   const periodError = validateContractPeriod(storageStartDate, expectedEndDate)
 
