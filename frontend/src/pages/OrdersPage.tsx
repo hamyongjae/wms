@@ -14,6 +14,7 @@ import { validateContractPeriod } from '@/lib/dateValidation'
 import { calcDailyFee } from '@/lib/fee'
 import { extractOwner } from '@/lib/owner'
 import { nextContainerNo } from '@/lib/containerNo'
+import { orderSync } from '@/lib/orderEvents'
 import Modal from '@/components/ui/Modal'
 import Fab from '@/components/ui/Fab'
 import MoneyInput from '@/components/ui/MoneyInput'
@@ -203,6 +204,8 @@ export default function OrdersPage() {
       const updated = await orderApi.toggle(o.id)
       // 전체 재조회 없이 해당 계약만 교체 (비동기 부분 갱신)
       setOrders((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+      // [동기화] 입출고 일정(캘린더) 화면에 상태 변경 전파
+      orderSync.emit()
     } catch (err) {
       alert(errMsg(err, '상태 전환에 실패했습니다.'))
     } finally {
@@ -216,6 +219,8 @@ export default function OrdersPage() {
       await orderApi.remove(o.id)
       // 화면에서 즉시 제거 (비동기 부분 갱신)
       setOrders((prev) => prev.filter((x) => x.id !== o.id))
+      // [동기화] 삭제도 일정에서 사라져야 하므로 전파
+      orderSync.emit()
     } catch (err) {
       alert(errMsg(err, '계약 삭제에 실패했습니다.'))
     }

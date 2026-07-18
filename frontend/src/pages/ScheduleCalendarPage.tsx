@@ -19,6 +19,7 @@ import {
 import { billingApi } from '@/api/billingApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
+import { orderSync } from '@/lib/orderEvents'
 
 type FilterMode = 'ALL' | CalendarEventType
 
@@ -118,6 +119,9 @@ export default function ScheduleCalendarPage() {
       .catch(() => setError('일정을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [cursor, refreshKey])
+
+  // [실시간 동기화] 계약관리에서 입고/출고 전환·삭제가 일어나면 일정을 다시 불러온다.
+  useEffect(() => orderSync.subscribe(() => setRefreshKey((k) => k + 1)), [])
 
   const filtered = useMemo(
     () => (filter === 'ALL' ? events : events.filter((e) => e.type === filter)),
