@@ -64,9 +64,12 @@ public class CalendarService {
                         CalendarEventType.INBOUND, status, customer, null, periodStart, periodEnd, fee));
             }
 
-            // 출고 이벤트 (완료면 실제일, 아니면 예정일)
-            boolean released = order.getActualEndDate() != null;
-            LocalDate outDate = released ? order.getActualEndDate() : order.getExpectedEndDate();
+            // 출고 이벤트 — [단일 이진 상태] 계약의 status(OUTBOUND) 를 유일 기준으로 삼는다.
+            //   actualEndDate 유무가 아니라 status 로 판정 → 계약관리 토글과 100% 일치.
+            boolean released = order.isOutbound();
+            LocalDate outDate = released
+                    ? (order.getActualEndDate() != null ? order.getActualEndDate() : order.getExpectedEndDate())
+                    : order.getExpectedEndDate();
             if (outDate != null && inRange(outDate, from, to)) {
                 CalendarEventStatus status;
                 if (released) {
