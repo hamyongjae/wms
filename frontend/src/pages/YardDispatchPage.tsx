@@ -56,6 +56,13 @@ const inputCls =
 
 const fmt = (n: number) => n.toLocaleString('ko-KR')
 
+/** yyyy-MM-dd 에 일수 더하기 (UTC 기준) */
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 const CONTAINER_STATUS_KO: Record<string, string> = {
   AVAILABLE: '가용',
   OCCUPIED: '사용중',
@@ -607,14 +614,22 @@ function InboundModal({
   const [customerId, setCustomerId] = useState('')
   const [orderId, setOrderId] = useState('') // 선택 계약(빈 값이면 배정 안 함)
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
-  const [inboundDate, setInboundDate] = useState(new Date().toISOString().slice(0, 10))
-  const [outboundDate, setOutboundDate] = useState('')
+  const today = new Date().toISOString().slice(0, 10)
+  const [inboundDate, setInboundDate] = useState(today)
+  const [outboundDate, setOutboundDate] = useState(addDays(today, 7))
   const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
   // 컨테이너 번호 자동 배정 (접두사 없이 순번) — 기존 번호 중 최대 정수 +1
   const autoNo = useMemo(() => nextContainerNo(existingNos), [existingNos])
+
+  // [자동 계산] 입고일이 변경되면 출고 예정일을 자동으로 +7일로 설정
+  useEffect(() => {
+    if (inboundDate && !outboundDate) {
+      setOutboundDate(addDays(inboundDate, 7))
+    }
+  }, [inboundDate])
 
   const selectedCustomer = useMemo(
     () => customers.find((c) => String(c.id) === customerId) ?? null,
