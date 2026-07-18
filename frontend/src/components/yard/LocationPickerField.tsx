@@ -108,7 +108,7 @@ export default function LocationPickerField({
       </div>
 
       {/* (c) 격자 맵 */}
-      <div className={cn('max-h-64 overflow-y-auto p-3', isUnassigned && !disabled && 'opacity-70')}>
+      <div className={cn('max-h-52 overflow-y-auto p-3', isUnassigned && !disabled && 'opacity-70')}>
         {warehouseId == null ? (
           <p className="py-6 text-center text-xs text-slate-400">먼저 창고를 선택하세요.</p>
         ) : loading ? (

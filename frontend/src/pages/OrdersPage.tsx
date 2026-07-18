@@ -830,21 +830,23 @@ function CreateOrderModal({
                 <textarea
                   value={memo}
                   onChange={(e) => setMemo(e.target.value)}
-                  rows={4}
+                  rows={2}
                   placeholder="계약 특이사항이나 부대 정보를 자유롭게 입력하세요."
-                  className={cn(inputCls, 'min-h-[100px] w-full resize-y leading-relaxed')}
+                  className={cn(inputCls, 'min-h-[64px] w-full resize-y leading-relaxed')}
                 />
               </div>
             </div>
 
-            {/* ===== 우측 고객 검색 리스트 ===== */}
-            <div>
+            {/* ===== 우측 고객 검색 리스트 (좌측 폼 높이에 맞춰 확장, 모바일 최소 높이 보장) ===== */}
+            <div className="flex flex-col">
               <label className="mb-1 block text-sm font-medium text-slate-700">고객 검색</label>
               <CustomerListPicker
                 customers={customers}
                 selectedId={selectedCustomer?.id ?? null}
                 onSelect={setSelectedCustomer}
                 onQuickAdd={() => setCustOpen(true)}
+                heightClass=""
+                className="min-h-[18rem] flex-1"
               />
             </div>
           </div>
