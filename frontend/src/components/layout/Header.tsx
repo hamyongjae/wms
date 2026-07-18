@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   PanelLeftClose,
@@ -12,7 +11,6 @@ import {
   Palette,
   Check,
 } from 'lucide-react'
-import { PanelLeftClose, PanelLeftOpen, ChevronDown, Bell, LogOut, Loader2 } from 'lucide-react'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { loadNotifications, type AppNotification } from '@/lib/notifications'
@@ -33,7 +31,6 @@ export default function Header({ collapsed, onToggle }: HeaderProps) {
         onClick={onToggle}
         title="사이드바 접기/펼치기"
         className="hidden h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 md:flex"
-        className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
       >
         {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
       </button>
