@@ -468,92 +468,107 @@ function EditOrderModal({
   }
 
   const locationChanged = slotId !== currentSlotId
+  const dailyFee = calcDailyFee(monthlyFee, storageStartDate, expectedEndDate)
 
   return (
-    <Modal open onClose={onClose} title={`계약 수정`}>
+    <Modal open onClose={onClose} title="계약 수정" widthClass="max-w-5xl">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
-          <div>
-            <span className="block text-xs text-slate-400">고객</span>
-            <span className="font-medium text-slate-700">{target.customerName}</span>
-          </div>
-          <div>
-            <span className="block text-xs text-slate-400">창고</span>
-            <span className="font-medium text-slate-700">{target.warehouseName}</span>
-          </div>
-        </div>
+        {/* 좌: 계약 정보 / 우: 컨테이너 위치 지정 (등록 팝업과 동일 템플릿) */}
+        <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_26rem]">
+          {/* ===== 좌측 폼 ===== */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
+              <div>
+                <span className="block text-xs text-slate-400">고객</span>
+                <span className="font-medium text-slate-700">{target.customerName}</span>
+              </div>
+              <div>
+                <span className="block text-xs text-slate-400">창고</span>
+                <span className="font-medium text-slate-700">{target.warehouseName}</span>
+              </div>
+            </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">보관 시작일 *</label>
-            <input
-              type="date"
-              value={storageStartDate}
-              max={expectedEndDate || undefined}
-              onChange={(e) => setStartDate(e.target.value)}
-              required
-              className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
-            <input
-              type="date"
-              value={expectedEndDate}
-              min={storageStartDate || undefined}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
-            />
-          </div>
-          <div className="col-span-2">
-            <label className="mb-1 block text-sm font-medium text-slate-700">보관료 *</label>
-            <MoneyInput
-              value={monthlyFee}
-              onChange={setMonthlyFee}
-              required
-              placeholder="예: 300,000"
-              className={cn(inputCls, 'pr-9')}
-            />
-          </div>
-        </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">보관 시작일 *</label>
+                <input
+                  type="date"
+                  value={storageStartDate}
+                  max={expectedEndDate || undefined}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  required
+                  className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
+                <input
+                  type="date"
+                  value={expectedEndDate}
+                  min={storageStartDate || undefined}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">보관료 *</label>
+                <MoneyInput
+                  value={monthlyFee}
+                  onChange={setMonthlyFee}
+                  required
+                  placeholder="예: 300,000"
+                  className={cn(inputCls, 'pr-9')}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">하루 보관료</label>
+                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                  {dailyFee != null ? won(dailyFee) : ''}
+                </div>
+                <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
+              </div>
+            </div>
 
-        {periodError && (
-          <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-            {periodError}
-          </p>
-        )}
-
-        <div>
-          <div className="mb-1 flex items-center justify-between">
-            <label className="text-sm font-medium text-slate-700">컨테이너 위치</label>
-            {locationChanged && (
-              <button
-                type="button"
-                onClick={() => setSlotId(currentSlotId)}
-                className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
-              >
-                되돌리기
-              </button>
+            {periodError && (
+              <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                {periodError}
+              </p>
             )}
-          </div>
-          <LocationPickerField
-            warehouseId={target.warehouseId}
-            value={slotId}
-            onChange={setSlotId}
-            currentSlotId={currentSlotId}
-          />
-        </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">메모 (특이사항)</label>
-          <textarea
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            rows={4}
-            placeholder="계약 특이사항이나 부대 정보를 자유롭게 입력하세요."
-            className={cn(inputCls, 'min-h-[100px] w-full resize-y leading-relaxed')}
-          />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">메모 (특이사항)</label>
+              <textarea
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                rows={2}
+                placeholder="계약 특이사항이나 부대 정보를 자유롭게 입력하세요."
+                className={cn(inputCls, 'min-h-[64px] w-full resize-y leading-relaxed')}
+              />
+            </div>
+          </div>
+
+          {/* ===== 우측 컨테이너 위치 지정 ===== */}
+          <div className="flex flex-col">
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-sm font-medium text-slate-700">컨테이너 위치</label>
+              {locationChanged && (
+                <button
+                  type="button"
+                  onClick={() => setSlotId(currentSlotId)}
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                >
+                  되돌리기
+                </button>
+              )}
+            </div>
+            <LocationPickerField
+              warehouseId={target.warehouseId}
+              value={slotId}
+              onChange={setSlotId}
+              currentSlotId={currentSlotId}
+            />
+          </div>
         </div>
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
