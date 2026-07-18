@@ -29,3 +29,9 @@ jwt:
   # 개발 편의를 위해 기본 12시간. 운영에서는 JWT_ACCESS_TOKEN_VALIDITY_MS 환경변수로
   # 짧게(예: 3600000=1시간) 주고 리프레시 토큰을 도입하는 것을 권장.
   access-token-validity-ms: ${JWT_ACCESS_TOKEN_VALIDITY_MS:43200000}
+
+# ===== 데이터 정합화(마이그레이션) =====
+wms:
+  migration:
+    # 기동 시 계약↔컨테이너 입출고 일정 재동기화(멱등). 한 번 정합화한 뒤엔 false로 꺼도 된다.
+    sync-container-schedules: ${WMS_SYNC_CONTAINER_SCHEDULES:true}
