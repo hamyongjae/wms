@@ -14,33 +14,52 @@ const TOKEN_KEY = 'wms.token'
 const USER_KEY = 'wms.user'
 const TENANT_NAME_KEY = 'wms.tenantName'
 
+/*
+ * 자동 로그인(리멤버 미) 저장 전략
+ * - remember = true  → localStorage 에 저장. 브라우저를 닫았다 열어도 세션 유지(자동 로그인).
+ * - remember = false → sessionStorage 에 저장. 탭/브라우저를 닫으면 소멸(다음엔 재로그인).
+ * 조회는 두 저장소를 모두 확인하고, 저장 시엔 선택한 쪽에 쓰고 반대쪽은 정리한다.
+ */
+function readBoth(key: string): string | null {
+  return localStorage.getItem(key) ?? sessionStorage.getItem(key)
+}
+function writeOne(key: string, value: string, remember: boolean) {
+  const store = remember ? localStorage : sessionStorage
+  const other = remember ? sessionStorage : localStorage
+  store.setItem(key, value)
+  other.removeItem(key)
+}
+
 export const authStorage = {
   getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY)
+    return readBoth(TOKEN_KEY)
   },
-  setToken(token: string) {
-    localStorage.setItem(TOKEN_KEY, token)
+  setToken(token: string, remember = true) {
+    writeOne(TOKEN_KEY, token, remember)
   },
   getUser(): AuthUser | null {
-    const raw = localStorage.getItem(USER_KEY)
+    const raw = readBoth(USER_KEY)
     return raw ? (JSON.parse(raw) as AuthUser) : null
   },
-  setUser(user: AuthUser) {
-    localStorage.setItem(USER_KEY, JSON.stringify(user))
+  setUser(user: AuthUser, remember = true) {
+    writeOne(USER_KEY, JSON.stringify(user), remember)
   },
-  // 가입 업체명 캐시 (헤더/사이드바 동적 타이틀용)
+  // 가입 업체명 캐시 (헤더/사이드바 동적 타이틀용) — 토큰과 같은 저장소 정책을 따른다
   getTenantName(): string | null {
-    return localStorage.getItem(TENANT_NAME_KEY)
+    return readBoth(TENANT_NAME_KEY)
   },
   setTenantName(name: string) {
-    localStorage.setItem(TENANT_NAME_KEY, name)
+    // 토큰이 어디에 있는지에 맞춰 동일 저장소에 캐시(없으면 세션)
+    const remember = localStorage.getItem(TOKEN_KEY) != null
+    writeOne(TENANT_NAME_KEY, name, remember)
   },
   isAuthenticated(): boolean {
-    return !!localStorage.getItem(TOKEN_KEY)
+    return !!readBoth(TOKEN_KEY)
   },
   clear() {
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(USER_KEY)
-    localStorage.removeItem(TENANT_NAME_KEY)
+    for (const key of [TOKEN_KEY, USER_KEY, TENANT_NAME_KEY]) {
+      localStorage.removeItem(key)
+      sessionStorage.removeItem(key)
+    }
   },
 }

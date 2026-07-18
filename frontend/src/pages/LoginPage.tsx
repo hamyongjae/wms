@@ -12,6 +12,7 @@ export default function LoginPage() {
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [recovery, setRecovery] = useState<null | 'username' | 'password'>(null)
@@ -22,14 +23,18 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const res = await authApi.login({ username, password })
-      authStorage.setToken(res.accessToken)
-      authStorage.setUser({
-        userId: res.userId,
-        username: res.username,
-        name: res.name,
-        role: res.role,
-        tenantId: res.tenantId,
-      })
+      // [자동 로그인] 체크 시 localStorage(영속), 미체크 시 sessionStorage(브라우저 종료 시 만료)
+      authStorage.setToken(res.accessToken, rememberMe)
+      authStorage.setUser(
+        {
+          userId: res.userId,
+          username: res.username,
+          name: res.name,
+          role: res.role,
+          tenantId: res.tenantId,
+        },
+        rememberMe,
+      )
       navigate('/dashboard', { replace: true })
     } catch (err) {
       const message = isAxiosError(err)
@@ -117,6 +122,17 @@ export default function LoginPage() {
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
             />
           </div>
+
+          {/* 자동 로그인: 체크 시에만 브라우저를 닫아도 세션 유지 */}
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600 select-none">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+            />
+            자동 로그인
+          </label>
 
           {error && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
