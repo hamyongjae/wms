@@ -3,6 +3,7 @@ package com.example.wms.order.batch;
 import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.order.entity.OrderStatus;
 import com.example.wms.order.repository.StorageOrderRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,6 +32,16 @@ import java.util.List;
 public class OrderStatusEvaluationBatch {
 
     private final StorageOrderRepository storageOrderRepository;
+
+    /**
+     * [서버 기동 시] 애플리케이션 초기화 시점에 배치 한 번 실행
+     * 서버 시작 직후 계약 상태를 현재 기준으로 재평가
+     */
+    @PostConstruct
+    public void initOnStartup() {
+        log.info("[초기화] 서버 기동 시 계약 상태 평가 실행");
+        evaluateAllOrdersStatus();
+    }
 
     /**
      * 매일 자정에 계약 상태 일괄 평가
