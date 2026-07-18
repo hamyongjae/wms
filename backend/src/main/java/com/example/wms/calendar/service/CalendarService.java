@@ -6,9 +6,6 @@ import com.example.wms.billing.repository.BillingLedgerRepository;
 import com.example.wms.calendar.dto.CalendarEventResponse;
 import com.example.wms.calendar.dto.CalendarEventStatus;
 import com.example.wms.calendar.dto.CalendarEventType;
-import com.example.wms.container.entity.Container;
-import com.example.wms.container.entity.ContainerStatus;
-import com.example.wms.container.repository.ContainerRepository;
 import com.example.wms.order.entity.OrderStatus;
 import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.order.repository.StorageOrderRepository;
@@ -21,12 +18,13 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 입고/출고/청구를 하나의 캘린더 이벤트 시계열로 정규화하는 서비스.
  *
+ * [단일 소스] 입고/출고 일정은 오직 '계약(StorageOrder)'에서만 파생한다.
+ *   컨테이너는 계약에 종속된 물리 단위일 뿐, 컨테이너 자체 날짜로 별도 이벤트를 만들지 않는다.
+ *   → 캘린더가 '계약 관리' 화면의 보관기간과 항상 1:1로 일치한다(어긋남·중복 원천 차단).
  * [격리] 모든 조회는 현재 tenantId 범위로 강제된다.
  * [파생 규칙]
  *  - INBOUND  : 계약 입고일(storageStartDate). 오늘 지났으면 완료, 아니면 예정.
@@ -38,31 +36,22 @@ import java.util.regex.Pattern;
 public class CalendarService {
 
     private static final LocalTime EVENT_TIME = LocalTime.of(9, 0);
-    private static final Pattern OWNER_TAG = Pattern.compile("^\\[([^\\]]+)\\]");
 
     private final StorageOrderRepository orderRepository;
     private final BillingLedgerRepository ledgerRepository;
-    private final ContainerRepository containerRepository;
 
     @Transactional(readOnly = true)
     public List<CalendarEventResponse> getEvents(LocalDate from, LocalDate to) {
         Long tenantId = SecurityUtils.getCurrentTenantId();
         LocalDate today = LocalDate.now();
         List<CalendarEventResponse> events = new ArrayList<>();
-        // [중복 방지] 계약이 존재하는 화주(고객)명 집합. 컨테이너 루프에서 이 화주는 계약이
-        //   이미 권위 있는 일정을 만들었으므로 컨테이너 자체 일정 이벤트를 만들지 않는다.
-        //   (계약에 직접 연결되지 않은 옛 컨테이너까지 화주명 기준으로 방어)
-        java.util.Set<String> orderOwners = new java.util.HashSet<>();
 
-        // ===== 계약 → 입고/출고 =====
+        // ===== 계약 → 입고/출고 (일정의 단일 소스) =====
         for (StorageOrder order : orderRepository.findAllByTenantId(tenantId)) {
             if (order.getStatus() == OrderStatus.CANCELLED) {
                 continue;
             }
             String customer = order.getCustomer().getName();
-            if (customer != null) {
-                orderOwners.add(customer.trim().toLowerCase());
-            }
 
             java.math.BigDecimal fee = order.getMonthlyFee() != null
                     ? java.math.BigDecimal.valueOf(order.getMonthlyFee()) : null;
@@ -128,62 +117,7 @@ public class CalendarService {
                     ledger.getBillingPeriodStart(), ledger.getBillingPeriodEnd(), ledger.getBaseAmount()));
         }
 
-        // ===== 컨테이너 → 입고/출고(예정) =====
-        for (Container container : containerRepository.findAllByTenantId(tenantId)) {
-            // [중복 제거] 계약에 배정된 컨테이너는 위 '계약 루프'가 이미(권위 있는 계약 날짜로) 이벤트를 만든다.
-            //   컨테이너 자체 일정으로 또 만들면 같은 화주가 두 번, 게다가 날짜가 어긋나 보이므로 스킵한다.
-            //   (계약과 무관하게 컨테이너 관리에서 직접 등록한 컨테이너만 여기서 파생)
-            if (container.getCurrentOrder() != null) {
-                continue;
-            }
-            String owner = ownerFromMemo(container.getMemo(), container.getContainerNo());
-            // 계약이 있는 화주면 계약 이벤트로 이미 표현됨 → 컨테이너 이벤트는 만들지 않는다(중복 방지).
-            if (owner != null && orderOwners.contains(owner.trim().toLowerCase())) {
-                continue;
-            }
-
-            LocalDate cIn = container.getInboundDate();
-            LocalDate cOut = container.getExpectedOutboundDate();
-
-            if (cIn != null && inRange(cIn, from, to)) {
-                CalendarEventStatus status =
-                        cIn.isAfter(today) ? CalendarEventStatus.PENDING : CalendarEventStatus.COMPLETED;
-                events.add(event(container.getId(), "[" + owner + "] 입고", cIn,
-                        CalendarEventType.INBOUND, status, owner, null, cIn, cOut, null));
-            }
-
-            if (cOut != null && inRange(cOut, from, to)) {
-                // 아직 적재 중인데 출고 예정일이 지났으면 지연
-                boolean overdue = cOut.isBefore(today) && container.getStatus() == ContainerStatus.OCCUPIED;
-                CalendarEventStatus status =
-                        overdue ? CalendarEventStatus.OVERDUE : CalendarEventStatus.PENDING;
-                events.add(event(container.getId(), "[" + owner + "] 출고", cOut,
-                        CalendarEventType.OUTBOUND, status, owner, null, cIn, cOut, null));
-            }
-        }
-
         return events;
-    }
-
-    /** 컨테이너 memo 앞 [화주] 태그에서 화주명을 뽑되, 규격/소유구분 토큰은 제외. 없으면 fallback(번호). */
-    private String ownerFromMemo(String memo, String fallback) {
-        if (memo != null) {
-            Matcher m = OWNER_TAG.matcher(memo);
-            if (m.find()) {
-                List<String> keep = new ArrayList<>();
-                for (String token : m.group(1).split("·")) {
-                    String t = token.trim();
-                    if (t.isEmpty() || t.matches("(?i)\\d+ft") || t.equals("자가") || t.equals("임차")) {
-                        continue;
-                    }
-                    keep.add(t);
-                }
-                if (!keep.isEmpty()) {
-                    return String.join(" · ", keep);
-                }
-            }
-        }
-        return fallback;
     }
 
     private CalendarEventResponse event(Long id, String title, LocalDate date,
