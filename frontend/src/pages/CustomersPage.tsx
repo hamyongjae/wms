@@ -65,8 +65,7 @@ export default function CustomersPage() {
       const okQuery =
         q === '' ||
         c.name.toLowerCase().includes(q) ||
-        (c.phoneNumber ?? '').includes(q) ||
-        (c.businessNumber ?? '').includes(q)
+        (c.phoneNumber ?? '').includes(q)
       return okStatus && okQuery
     })
   }, [items, query, filter])
@@ -119,7 +118,7 @@ export default function CustomersPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="이름·연락처·사업자번호 검색"
+            placeholder="이름·연락처 검색"
             className={cn(inputCls, 'pl-9')}
           />
         </div>

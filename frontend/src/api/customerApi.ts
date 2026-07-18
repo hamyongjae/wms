@@ -4,12 +4,11 @@ import type { Page } from '@/api/yardApi'
 export type CustomerType = 'INDIVIDUAL' | 'CORPORATE'
 export type CustomerStatus = 'ACTIVE' | 'DORMANT' | 'BLACKLISTED'
 
-// [슬림화] 주소/우편번호/비상연락/동의 필드 제거 — 화주 관리 핵심만
+// [슬림화] 주소/우편번호/비상연락/동의/사업자번호 필드 제거 — 화주 관리 핵심만
 export interface Customer {
   id: number
   name: string
   customerType: CustomerType | null
-  businessNumber: string | null
   phoneNumber: string | null
   email: string | null
   status: CustomerStatus
@@ -27,7 +26,6 @@ export interface UpdateCustomerStatusRequestDto {
 export interface CustomerUpsert {
   name: string
   customerType?: CustomerType
-  businessNumber?: string
   phoneNumber?: string
   email?: string
   memo?: string
