@@ -25,7 +25,7 @@ const inputCls =
 
 /* [뮤티드 상태색] 채도를 눌러 익힌 톤 — 경고조차 품위 있게 (마스터플랜 2.1) */
 const STATUS_META: Record<OrderStatus, { label: string; cls: string }> = {
-  RECEIVED: { label: '입고완료', cls: 'bg-indigo-50 text-indigo-700 ring-indigo-200' },
+  RECEIVED: { label: '입고예정', cls: 'bg-blue-50 text-blue-700 ring-blue-200' },
   IN_STORAGE: { label: '보관중', cls: 'bg-[#E9EFEA] text-[#5C7C6B] ring-[#D3DFD6]' },
   RELEASED: { label: '출고완료', cls: 'bg-slate-100 text-slate-500 ring-slate-200' },
   CANCELLED: { label: '취소', cls: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]' },
@@ -34,7 +34,7 @@ const STATUS_META: Record<OrderStatus, { label: string; cls: string }> = {
 type FilterKey = 'ALL' | 'ACTIVE' | 'RELEASED' | 'CANCELLED'
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'ALL', label: '전체' },
-  { key: 'ACTIVE', label: '보관중' },
+  { key: 'ACTIVE', label: '입고예정/보관중' },
   { key: 'RELEASED', label: '출고완료' },
   { key: 'CANCELLED', label: '취소' },
 ]
