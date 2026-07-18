@@ -236,9 +236,7 @@ function UserMenu() {
           <div className="absolute right-0 z-40 mt-1.5 w-52 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
             <div className="px-3 py-2">
               <p className="text-sm font-medium text-slate-800">{user?.name ?? '사용자'}</p>
-              <p className="text-xs text-slate-400">
-                {user?.role === 'ADMIN' ? '관리자' : '직원'} · 업체 {user?.tenantId ?? '-'}
-              </p>
+              <p className="text-xs text-slate-400">{user?.role === 'ADMIN' ? '관리자' : '직원'}</p>
             </div>
             <div className="my-1 h-px bg-slate-100" />
             <button
