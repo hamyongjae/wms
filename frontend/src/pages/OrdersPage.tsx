@@ -24,24 +24,28 @@ const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
 
 /* [뮤티드 상태색] 채도를 눌러 익힌 톤 — 경고조차 품위 있게 (마스터플랜 2.1) */
-const STATUS_META: Record<OrderStatus, { label: string; cls: string }> = {
-  RECEIVED: { label: '입고예정', cls: 'bg-blue-50 text-blue-700 ring-blue-200' },
+const STATUS_META: Record<OrderStatus, { label: string; cls: string; icon?: string }> = {
+  PENDING: { label: '입고예정', cls: 'bg-blue-50 text-blue-700 ring-blue-200' },
   IN_STORAGE: { label: '보관중', cls: 'bg-[#E9EFEA] text-[#5C7C6B] ring-[#D3DFD6]' },
+  PENDING_RELEASE: { label: '출고예정', cls: 'bg-amber-50 text-amber-700 ring-amber-200', icon: '⚠️' },
   RELEASED: { label: '출고완료', cls: 'bg-slate-100 text-slate-500 ring-slate-200' },
   CANCELLED: { label: '취소', cls: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]' },
 }
 
-type FilterKey = 'ALL' | 'ACTIVE' | 'RELEASED' | 'CANCELLED'
+type FilterKey = 'ALL' | 'PENDING' | 'IN_STORAGE' | 'PENDING_RELEASE' | 'RELEASED' | 'CANCELLED'
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'ALL', label: '전체' },
-  { key: 'ACTIVE', label: '입고예정/보관중' },
+  { key: 'PENDING', label: '입고예정' },
+  { key: 'IN_STORAGE', label: '보관중' },
+  { key: 'PENDING_RELEASE', label: '출고예정' },
   { key: 'RELEASED', label: '출고완료' },
   { key: 'CANCELLED', label: '취소' },
 ]
 
 const today = () => new Date().toISOString().slice(0, 10)
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
-const isActive = (s: OrderStatus) => s === 'RECEIVED' || s === 'IN_STORAGE'
+const isActive = (s: OrderStatus) => s === 'PENDING' || s === 'IN_STORAGE'
+const canRelease = (s: OrderStatus) => s === 'IN_STORAGE' || s === 'PENDING_RELEASE'
 
 /** yyyy-MM-dd 에 일수 더하기 (UTC 기준) */
 function addDays(dateStr: string, days: number): string {
@@ -177,7 +181,6 @@ export default function OrdersPage() {
 
   const visible = useMemo(() => {
     if (filter === 'ALL') return orders
-    if (filter === 'ACTIVE') return orders.filter((o) => isActive(o.status))
     return orders.filter((o) => o.status === filter)
   }, [orders, filter])
 
@@ -231,9 +234,7 @@ export default function OrdersPage() {
           const count =
             f.key === 'ALL'
               ? orders.length
-              : f.key === 'ACTIVE'
-                ? orders.filter((o) => isActive(o.status)).length
-                : orders.filter((o) => o.status === f.key).length
+              : orders.filter((o) => o.status === f.key).length
           return (
             <button
               key={f.key}
@@ -330,11 +331,16 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-1">
-                      {isActive(o.status) && (
+                      {canRelease(o.status) && (
                         <button
                           type="button"
                           onClick={() => setReleaseTarget(o)}
-                          className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-amber-600 transition hover:bg-amber-50"
+                          className={cn(
+                            'flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition',
+                            o.status === 'PENDING_RELEASE'
+                              ? 'text-red-600 hover:bg-red-50'
+                              : 'text-amber-600 hover:bg-amber-50'
+                          )}
                         >
                           <LogOut size={14} />
                           출고 처리

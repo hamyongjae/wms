@@ -1,7 +1,7 @@
 import { api } from '@/lib/api'
 import type { Page } from '@/api/yardApi'
 
-export type OrderStatus = 'RECEIVED' | 'IN_STORAGE' | 'RELEASED' | 'CANCELLED'
+export type OrderStatus = 'PENDING' | 'IN_STORAGE' | 'PENDING_RELEASE' | 'RELEASED' | 'CANCELLED'
 export type PaymentType = 'PREPAID' | 'POSTPAID'
 
 export interface StorageOrder {
