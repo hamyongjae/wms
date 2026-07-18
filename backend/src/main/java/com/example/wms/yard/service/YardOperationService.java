@@ -85,19 +85,17 @@ public class YardOperationService {
                         "존재하지 않는 창고입니다. id=" + req.getWarehouseId()));
 
         final String block = "메인";
-        // 재생성: 비어있는 자리 정리(적재된 자리는 유지)
-        yardSlotRepository.deleteByTenantIdAndWarehouseIdAndOccupiedFalse(tenantId, warehouse.getId());
+        // [전체 초기화] 이 창고의 기존 자리·컨테이너를 모두 비운 뒤 새 층별 체계로 생성한다.
+        //   (구 격자 자리가 남아 번호가 섞이는 문제 방지 — 슬롯이 컨테이너를 참조하므로 슬롯 → 컨테이너 순 삭제)
+        yardSlotRepository.deleteByTenantIdAndWarehouseId(tenantId, warehouse.getId());
+        containerRepository.deleteByTenantIdAndWarehouseId(tenantId, warehouse.getId());
 
         int created = 0;
         for (FloorGridRequest.Floor floor : req.getFloors()) {
             int tier = floor.getTier();
             int count = floor.getCount();
             for (int no = 1; no <= count; no++) {
-                // 적재돼 남아있는 자리와 좌표 충돌 시 건너뜀 (columnNo=자리번호, rowNo=1)
-                if (yardSlotRepository.existsByTenantIdAndWarehouseIdAndBlockAndRowNoAndColumnNoAndTier(
-                        tenantId, warehouse.getId(), block, 1, no, tier)) {
-                    continue;
-                }
+                // columnNo = 자리 번호(1..count), rowNo=1 → 라벨 "N층-번호"
                 yardSlotRepository.save(new YardSlot(warehouse.getTenant(), warehouse, block, 1, no, tier));
                 created++;
             }
