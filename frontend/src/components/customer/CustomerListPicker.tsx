@@ -16,12 +16,15 @@ export default function CustomerListPicker({
   onSelect,
   onQuickAdd,
   className,
+  heightClass = 'max-h-[24rem]',
 }: {
   customers: Customer[]
   selectedId: number | null
   onSelect: (c: Customer) => void
   onQuickAdd?: () => void
   className?: string
+  /** 리스트 최대 높이 유틸 (기본 max-h-[24rem]). 화면에 따라 더 크게 줄 수 있다. */
+  heightClass?: string
 }) {
   const [query, setQuery] = useState('')
 
@@ -37,7 +40,7 @@ export default function CustomerListPicker({
   }, [customers, query])
 
   return (
-    <div className={cn('flex max-h-[24rem] flex-col overflow-hidden rounded-xl border border-slate-200', className)}>
+    <div className={cn('flex flex-col overflow-hidden rounded-xl border border-slate-200', heightClass, className)}>
       <div className="flex items-center gap-2 border-b border-slate-200 p-2">
         <div className="relative flex-1">
           <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />

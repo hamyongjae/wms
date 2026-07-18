@@ -7,6 +7,7 @@ import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { validateContractPeriod } from '@/lib/dateValidation'
+import { calcDailyFee } from '@/lib/fee'
 import Modal from '@/components/ui/Modal'
 import MoneyInput from '@/components/ui/MoneyInput'
 import CustomerListPicker from '@/components/customer/CustomerListPicker'
@@ -32,32 +33,6 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 const today = () => new Date().toISOString().slice(0, 10)
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const isActive = (s: OrderStatus) => s === 'RECEIVED' || s === 'IN_STORAGE'
-
-/**
- * 두 날짜(YYYY-MM-DD) 사이의 보관 일수 — 당일 포함(inclusive).
- * - 빈 값/형식오류/역전(시작>종료) → null (계산 불가)
- * - 시작==종료(당일 계약) → 1일. (0으로 나눔 방지)
- * UTC 기준으로 계산해 타임존/DST 영향 없이 정확한 일수를 낸다.
- */
-function storageDays(startStr: string, endStr: string): number | null {
-  if (!startStr || !endStr) return null
-  const s = Date.parse(`${startStr}T00:00:00Z`)
-  const e = Date.parse(`${endStr}T00:00:00Z`)
-  if (Number.isNaN(s) || Number.isNaN(e)) return null
-  const days = Math.floor((e - s) / 86_400_000) + 1 // 당일 포함
-  return days >= 1 ? days : null // 역전/0 이하 → 계산 불가
-}
-
-/**
- * 하루 보관료 = 보관료 ÷ 보관일수. 세 값이 모두 유효할 때만 숫자, 아니면 null(빈 값).
- * 반올림 정수로 반환. (0으로 나눔은 storageDays 가 null 을 반환하므로 원천 차단)
- */
-function calcDailyFee(fee: number | null, startStr: string, endStr: string): number | null {
-  if (fee == null || fee <= 0) return null
-  const days = storageDays(startStr, endStr)
-  if (days == null) return null
-  return Math.round(fee / days)
-}
 
 export default function OrdersPage() {
   const isAdmin = authStorage.getUser()?.role === 'ADMIN'
@@ -628,7 +603,7 @@ function CreateOrderModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">하루 보관료</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">일 보관료</label>
                   {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
                   <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
                     {dailyFee != null ? won(dailyFee) : ''}

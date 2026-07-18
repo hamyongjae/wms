@@ -23,6 +23,7 @@ import MoneyInput from '@/components/ui/MoneyInput'
 import CustomerListPicker from '@/components/customer/CustomerListPicker'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
+import { calcDailyFee } from '@/lib/fee'
 import { validateInOut, todayStr } from '@/lib/dateValidation'
 
 /* ===== 타입 명세 ===== */
@@ -519,6 +520,13 @@ function InboundModal({
     [customers, customerId],
   )
 
+  // [실시간] 하루 보관료 = 보관료 ÷ (입고일~출고예정일 일수, 당일 포함).
+  // 보관료·입고일·출고예정일이 모두 유효할 때만 값, 아니면 null(빈 값).
+  const dailyFee = useMemo(
+    () => calcDailyFee(monthlyFee, inboundDate, outboundDate),
+    [monthlyFee, inboundDate, outboundDate],
+  )
+
   // 실제 입고 확정이므로 입고일 미래 불가 + 출고예정일 >= 입고일
   const dateError = validateInOut(inboundDate, outboundDate)
 
@@ -586,14 +594,24 @@ function InboundModal({
               )}
             </div>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">보관료</label>
-              <MoneyInput
-                value={monthlyFee}
-                onChange={setMonthlyFee}
-                placeholder="예: 300,000"
-                className={cn(inputCls, 'pr-9')}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">보관료</label>
+                <MoneyInput
+                  value={monthlyFee}
+                  onChange={setMonthlyFee}
+                  placeholder="예: 300,000"
+                  className={cn(inputCls, 'pr-9')}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">하루 보관료</label>
+                {/* 보관료·입고일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
+                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                  {dailyFee != null ? `${fmt(dailyFee)}원` : ''}
+                </div>
+                <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -624,6 +642,7 @@ function InboundModal({
               customers={customers}
               selectedId={customerId ? Number(customerId) : null}
               onSelect={(c) => setCustomerId(String(c.id))}
+              heightClass="max-h-[30rem]"
             />
           </div>
         </div>
