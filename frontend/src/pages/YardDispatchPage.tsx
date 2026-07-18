@@ -39,8 +39,10 @@ export interface QuickInboundDto {
   targetSlotId: number
   containerNo: string
   capacityTon: number
+  customerId?: number // 새 계약 자동 생성용
   customerName?: string
-  orderId?: number // 선택 시 해당 계약에 컨테이너를 정식 배정
+  orderId?: number // 선택 시 해당 계약에 배정 / 없으면 새 계약 생성
+  monthlyFee?: number // 새 계약 생성 시 보관료
   inboundDate?: string
   outboundDate?: string
   memo?: string
@@ -163,8 +165,22 @@ export default function YardDispatchPage() {
 
   /* ===== 액션 ===== */
   async function doQuickInbound(body: QuickInboundDto) {
-    // 파이프라인: 컨테이너 생성 → (선택) 계약 배정 → 해당 슬롯에 입고 배치
+    // 파이프라인: (계약 미연결 시) 새 계약 생성 → 컨테이너 생성 → 계약 배정 → 슬롯 적재
     // 화주는 memo 앞 태그로, 입고/출고예정일은 정식 필드로 저장.
+    let orderId = body.orderId
+    // 기존 계약을 연결하지 않았으면, 이 입고 정보로 새 계약을 만들어 계약 관리에도 뜨게 한다.
+    if (orderId == null && body.customerId != null) {
+      const order = await orderApi.create({
+        customerId: body.customerId,
+        warehouseId: body.warehouseId,
+        storageStartDate: body.inboundDate ?? todayStr(),
+        expectedEndDate: body.outboundDate,
+        monthlyFee: body.monthlyFee ?? 0,
+        memo: body.memo,
+      })
+      orderId = order.id
+    }
+
     const tag = body.customerName ? `[${body.customerName}]` : ''
     const composedMemo = [tag, body.memo].filter(Boolean).join(' ').trim() || undefined
     // 컨테이너 번호는 업체 전체에서 유일해야 하므로 전 창고 기준으로 채번(충돌 방지)
@@ -178,9 +194,9 @@ export default function YardDispatchPage() {
       inboundDate: body.inboundDate,
       expectedOutboundDate: body.outboundDate,
     })
-    // 계약 연결 선택 시: 적재(OCCUPIED) 전에 배정해야 함(assignTo 는 AVAILABLE 상태만 허용)
-    if (body.orderId != null) {
-      await containerApi.assign(created.id, body.orderId)
+    // 적재(OCCUPIED) 전에 배정해야 함(assignTo 는 AVAILABLE 상태만 허용)
+    if (orderId != null) {
+      await containerApi.assign(created.id, orderId)
     }
     await containerApi.inbound({ containerId: created.id, targetSlotId: body.targetSlotId })
   }
@@ -570,22 +586,25 @@ function InboundModal({
     e.preventDefault()
     if (!customerId) return setFormError('화주(고객)를 선택하세요.')
     if (dateError) return setFormError(dateError)
+    // 기존 계약을 연결하지 않으면 이 입고로 새 계약이 생성되므로 보관료가 필요하다.
+    if (!orderId && (monthlyFee == null || monthlyFee <= 0)) {
+      return setFormError('보관료를 입력하세요. (입고 시 새 계약이 생성됩니다)')
+    }
     setFormError(null)
     setSubmitting(true)
     try {
-      // 컨테이너 전용 금액 필드가 없어, 입력한 보관료는 특이사항 메모에 함께 기록한다.
-      const feeNote = monthlyFee != null && monthlyFee > 0 ? `보관료 ${fmt(monthlyFee)}원` : ''
-      const noteBody = [feeNote, memo.trim()].filter(Boolean).join(' · ') || undefined
       await onSubmit({
         warehouseId,
         targetSlotId: slot.id,
         containerNo: autoNo,
         capacityTon: 5, // 기본 5톤 임대 단위(용량 입력칸 제거)
-        customerName: customers.find((c) => String(c.id) === customerId)?.name,
+        customerId: Number(customerId),
+        customerName: selectedCustomer?.name,
         orderId: orderId ? Number(orderId) : undefined,
+        monthlyFee: monthlyFee ?? undefined,
         inboundDate: inboundDate || undefined,
         outboundDate: outboundDate || undefined,
-        memo: noteBody,
+        memo: memo.trim() || undefined,
       })
       onDone()
     } catch (err) {
