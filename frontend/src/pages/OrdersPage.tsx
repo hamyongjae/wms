@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, Trash2, LogOut, FileText, ShieldAlert, AlertTriangle, Pencil } from 'lucide-react'
+import { Plus, Loader2, Trash2, LogOut, FileText, ShieldAlert, AlertTriangle, Pencil, X } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus } from '@/api/orderApi'
 import { customerApi, type Customer, type CustomerType } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn'
 import { validateContractPeriod } from '@/lib/dateValidation'
 import Modal from '@/components/ui/Modal'
 import MoneyInput from '@/components/ui/MoneyInput'
-import CustomerSearchField from '@/components/customer/CustomerSearchField'
+import CustomerListPicker from '@/components/customer/CustomerListPicker'
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
@@ -547,94 +547,125 @@ function CreateOrderModal({
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title="계약 등록">
+      <Modal open={open} onClose={onClose} title="계약 등록" widthClass="max-w-3xl">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">고객 *</label>
-            <CustomerSearchField
-              customers={customers}
-              value={selectedCustomer}
-              onChange={setSelectedCustomer}
-              onQuickAdd={() => setCustOpen(true)}
-            />
-            {isBlacklisted && (
-              <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-                <ShieldAlert size={14} className="mt-0.5 shrink-0" />
-                블랙리스트 고객입니다{selectedCustomer?.blacklistReason ? ` (사유: ${selectedCustomer.blacklistReason})` : ''}. 계약
-                등록이 불가합니다.
-              </p>
-            )}
-            {isDormant && (
-              <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                휴면 상태 고객입니다. 등록 시 정상 거래 고객으로 전환됩니다.
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">창고 *</label>
-            <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={inputCls}>
-              <option value="">창고 선택…</option>
-              {warehouses.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">보관 시작일 *</label>
-              <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={inputCls} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
-              <input
-                type="date"
-                value={expectedEndDate}
-                min={storageStartDate || undefined}
-                onChange={(e) => setEndDate(e.target.value)}
-                className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">보관료 *</label>
-              <MoneyInput
-                value={monthlyFee}
-                onChange={setMonthlyFee}
-                required
-                placeholder="예: 300,000"
-                className={cn(inputCls, 'pr-9')}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">하루 보관료</label>
-              {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
-              <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
-                {dailyFee != null ? won(dailyFee) : ''}
+          {/* 좌: 계약 정보 폼 / 우: 고객(화주) 검색 리스트 */}
+          <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_19rem]">
+            {/* ===== 좌측 폼 ===== */}
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">고객 *</label>
+                {selectedCustomer ? (
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-800">{selectedCustomer.name}</p>
+                      <p className="truncate text-xs text-slate-500">{selectedCustomer.phoneNumber || '연락처 없음'}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCustomer(null)}
+                      className="shrink-0 rounded-md p-1 text-slate-400 transition hover:bg-white hover:text-slate-600"
+                      title="선택 해제"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                ) : (
+                  <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-400">
+                    오른쪽 목록에서 고객을 선택하세요.
+                  </p>
+                )}
+                {isBlacklisted && (
+                  <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                    <ShieldAlert size={14} className="mt-0.5 shrink-0" />
+                    블랙리스트 고객입니다{selectedCustomer?.blacklistReason ? ` (사유: ${selectedCustomer.blacklistReason})` : ''}. 계약
+                    등록이 불가합니다.
+                  </p>
+                )}
+                {isDormant && (
+                  <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    휴면 상태 고객입니다. 등록 시 정상 거래 고객으로 전환됩니다.
+                  </p>
+                )}
               </div>
-              <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">창고 *</label>
+                <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={inputCls}>
+                  <option value="">창고 선택…</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">보관 시작일 *</label>
+                  <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={inputCls} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
+                  <input
+                    type="date"
+                    value={expectedEndDate}
+                    min={storageStartDate || undefined}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">보관료 *</label>
+                  <MoneyInput
+                    value={monthlyFee}
+                    onChange={setMonthlyFee}
+                    required
+                    placeholder="예: 300,000"
+                    className={cn(inputCls, 'pr-9')}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">하루 보관료</label>
+                  {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
+                  <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                    {dailyFee != null ? won(dailyFee) : ''}
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
+                </div>
+              </div>
+
+              {periodError && (
+                <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                  {periodError}
+                </p>
+              )}
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">메모</label>
+                <textarea
+                  value={memo}
+                  onChange={(e) => setMemo(e.target.value)}
+                  rows={4}
+                  placeholder="계약 특이사항이나 부대 정보를 자유롭게 입력하세요."
+                  className={cn(inputCls, 'min-h-[100px] w-full resize-y leading-relaxed')}
+                />
+              </div>
             </div>
-          </div>
 
-          {periodError && (
-            <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-              {periodError}
-            </p>
-          )}
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">메모</label>
-            <textarea
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-              rows={5}
-              placeholder="계약 특이사항이나 부대 정보를 자유롭게 입력하세요."
-              className={cn(inputCls, 'min-h-[120px] w-full resize-y leading-relaxed')}
-            />
+            {/* ===== 우측 고객 검색 리스트 ===== */}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">고객 검색</label>
+              <CustomerListPicker
+                customers={customers}
+                selectedId={selectedCustomer?.id ?? null}
+                onSelect={setSelectedCustomer}
+                onQuickAdd={() => setCustOpen(true)}
+              />
+            </div>
           </div>
 
           {formError && <p className="text-sm text-red-600">{formError}</p>}

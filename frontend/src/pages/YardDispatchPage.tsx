@@ -12,9 +12,6 @@ import {
   Boxes,
   Grid3x3,
   Square,
-  Check,
-  UserRound,
-  Building2,
 } from 'lucide-react'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { yardApi, type YardSlot } from '@/api/yardApi'
@@ -22,9 +19,10 @@ import { containerApi, type Container } from '@/api/containerApi'
 import { customerApi, type Customer } from '@/api/customerApi'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
+import MoneyInput from '@/components/ui/MoneyInput'
+import CustomerListPicker from '@/components/customer/CustomerListPicker'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
-import { digitsOnly } from '@/lib/format'
 import { validateInOut, todayStr } from '@/lib/dateValidation'
 
 /* ===== 타입 명세 ===== */
@@ -506,8 +504,7 @@ function InboundModal({
   onDone: () => void
 }) {
   const [customerId, setCustomerId] = useState('')
-  const [custQuery, setCustQuery] = useState('')
-  const [capacityTon, setCapacityTon] = useState(5)
+  const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
   const [inboundDate, setInboundDate] = useState(new Date().toISOString().slice(0, 10))
   const [outboundDate, setOutboundDate] = useState('')
   const [memo, setMemo] = useState('')
@@ -522,18 +519,6 @@ function InboundModal({
     [customers, customerId],
   )
 
-  // 이름/연락처로 즉시 필터 (검색어 없으면 전체 = 최근 등록순)
-  const filteredCustomers = useMemo(() => {
-    const q = custQuery.trim().toLowerCase()
-    const qd = digitsOnly(custQuery)
-    if (!q) return customers
-    return customers.filter((c) => {
-      const byName = c.name.toLowerCase().includes(q)
-      const byPhone = qd.length > 0 && (c.phoneNumber ?? '').replace(/\D/g, '').includes(qd)
-      return byName || byPhone
-    })
-  }, [customers, custQuery])
-
   // 실제 입고 확정이므로 입고일 미래 불가 + 출고예정일 >= 입고일
   const dateError = validateInOut(inboundDate, outboundDate)
 
@@ -544,15 +529,18 @@ function InboundModal({
     setFormError(null)
     setSubmitting(true)
     try {
+      // 컨테이너 전용 금액 필드가 없어, 입력한 보관료는 특이사항 메모에 함께 기록한다.
+      const feeNote = monthlyFee != null && monthlyFee > 0 ? `보관료 ${fmt(monthlyFee)}원` : ''
+      const noteBody = [feeNote, memo.trim()].filter(Boolean).join(' · ') || undefined
       await onSubmit({
         warehouseId,
         targetSlotId: slot.id,
         containerNo: autoNo,
-        capacityTon,
+        capacityTon: 5, // 기본 5톤 임대 단위(용량 입력칸 제거)
         customerName: customers.find((c) => String(c.id) === customerId)?.name,
         inboundDate: inboundDate || undefined,
         outboundDate: outboundDate || undefined,
-        memo: memo.trim() || undefined,
+        memo: noteBody,
       })
       onDone()
     } catch (err) {
@@ -599,8 +587,13 @@ function InboundModal({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">용량(톤)</label>
-              <input type="number" min={1} value={capacityTon} onChange={(e) => setCapacityTon(Number(e.target.value))} className={inputCls} />
+              <label className="mb-1 block text-sm font-medium text-slate-700">보관료</label>
+              <MoneyInput
+                value={monthlyFee}
+                onChange={setMonthlyFee}
+                placeholder="예: 300,000"
+                className={cn(inputCls, 'pr-9')}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -624,56 +617,14 @@ function InboundModal({
             </div>
           </div>
 
-          {/* ===== 우측 화주 선택 리스트 ===== */}
-          <div className="flex max-h-[24rem] flex-col overflow-hidden rounded-xl border border-slate-200">
-            <div className="relative border-b border-slate-200 p-2">
-              <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                autoFocus
-                value={custQuery}
-                onChange={(e) => setCustQuery(e.target.value)}
-                placeholder="이름·연락처로 검색"
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-8 pr-3 text-sm outline-none focus:border-indigo-400 focus:bg-white"
-              />
-            </div>
-            <div className="flex items-center justify-between px-3 py-1.5 text-[11px] text-slate-400">
-              <span>{custQuery.trim() ? `검색 결과 ${filteredCustomers.length}건` : `전체 ${customers.length}명`}</span>
-            </div>
-            <ul className="flex-1 overflow-y-auto">
-              {filteredCustomers.length === 0 ? (
-                <li className="px-3 py-8 text-center text-sm text-slate-400">일치하는 고객이 없습니다.</li>
-              ) : (
-                filteredCustomers.map((c) => {
-                  const active = String(c.id) === customerId
-                  return (
-                    <li key={c.id}>
-                      <button
-                        type="button"
-                        onClick={() => setCustomerId(String(c.id))}
-                        className={cn(
-                          'flex w-full items-center gap-2.5 px-3 py-2 text-left transition',
-                          active ? 'bg-indigo-50' : 'hover:bg-slate-50',
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg',
-                            c.customerType === 'CORPORATE' ? 'bg-violet-50 text-violet-600' : 'bg-slate-100 text-slate-500',
-                          )}
-                        >
-                          {c.customerType === 'CORPORATE' ? <Building2 size={14} /> : <UserRound size={14} />}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-slate-800">{c.name}</span>
-                          <span className="block truncate text-xs text-slate-400">{c.phoneNumber || '연락처 없음'}</span>
-                        </span>
-                        {active && <Check size={16} className="shrink-0 text-indigo-600" />}
-                      </button>
-                    </li>
-                  )
-                })
-              )}
-            </ul>
+          {/* ===== 우측 화주 선택 리스트 (공용 컴포넌트) ===== */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">화주 검색</label>
+            <CustomerListPicker
+              customers={customers}
+              selectedId={customerId ? Number(customerId) : null}
+              onSelect={(c) => setCustomerId(String(c.id))}
+            />
           </div>
         </div>
 
