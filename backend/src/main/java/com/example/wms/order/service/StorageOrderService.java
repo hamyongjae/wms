@@ -8,6 +8,8 @@ import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.tenant.entity.Tenant;
 import com.example.wms.warehouse.entity.Warehouse;
 import com.example.wms.customer.repository.CustomerRepository;
+import com.example.wms.container.entity.Container;
+import com.example.wms.container.repository.ContainerRepository;
 import com.example.wms.order.repository.StorageOrderRepository;
 import com.example.wms.warehouse.repository.WarehouseRepository;
 import com.example.wms.security.SecurityUtils;
@@ -26,6 +28,7 @@ public class StorageOrderService {
     private final StorageOrderRepository storageOrderRepository;
     private final CustomerRepository customerRepository;
     private final WarehouseRepository warehouseRepository;
+    private final ContainerRepository containerRepository;
 
     // 보관 계약 등록
     @Transactional
@@ -95,6 +98,9 @@ public class StorageOrderService {
                 request.getTotalVolume(),
                 request.getMemo()
         );
+        // [일정 동기화] 이 계약에 배정된 컨테이너의 입고/출고예정일을 계약 기간과 일치시킨다.
+        //   (계약이 단일 소스 — 컨테이너 관리·캘린더에서 계약과 어긋나지 않도록)
+        syncContainerSchedule(order, order.getStorageStartDate(), order.getExpectedEndDate());
         return new StorageOrderResponse(order);
     }
 
@@ -104,7 +110,21 @@ public class StorageOrderService {
         // [날짜 정합성] 실제 출고일은 보관 시작일보다 빠를 수 없다
         TemporalValidator.validateContractPeriod(order.getStorageStartDate(), request.getActualEndDate());
         order.release(request.getActualEndDate());
+        // [일정 동기화] 출고 완료 시 배정 컨테이너의 출고예정일을 실제 출고일로 확정한다.
+        syncContainerSchedule(order, order.getStorageStartDate(), request.getActualEndDate());
         return new StorageOrderResponse(order);
+    }
+
+    /**
+     * [일정 동기화] 계약에 배정된 컨테이너들의 입고일/출고예정일을 계약 기간과 맞춘다.
+     * 계약↔컨테이너는 currentOrder 로 직접 연결되므로 계약을 단일 소스로 삼아 파생 필드를 갱신한다.
+     * (배정된 컨테이너가 없으면 no-op)
+     */
+    private void syncContainerSchedule(StorageOrder order, LocalDate start, LocalDate end) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        for (Container c : containerRepository.findByTenantIdAndCurrentOrderId(tenantId, order.getId())) {
+            c.setStorageDates(start, end);
+        }
     }
 
     @Transactional

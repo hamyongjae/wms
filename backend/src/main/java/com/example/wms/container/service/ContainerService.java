@@ -157,6 +157,9 @@ public class ContainerService {
                         "존재하지 않는 계약입니다. id=" + req.getOrderId()));
 
         container.assignTo(order);   // 빈 컨테이너 아니면 IllegalState → 409
+        // [일정 동기화] 배정과 동시에 컨테이너 입고/출고예정일을 계약 기간으로 상속한다.
+        //   (계약이 단일 소스 — 이후 계약 수정 시엔 StorageOrderService가 전파)
+        container.setStorageDates(order.getStorageStartDate(), order.getExpectedEndDate());
         return new ContainerResponse(container);
     }
 

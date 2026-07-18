@@ -123,6 +123,12 @@ public class CalendarService {
 
         // ===== 컨테이너 → 입고/출고(예정) =====
         for (Container container : containerRepository.findAllByTenantId(tenantId)) {
+            // [중복 제거] 계약에 배정된 컨테이너는 위 '계약 루프'가 이미(권위 있는 계약 날짜로) 이벤트를 만든다.
+            //   컨테이너 자체 일정으로 또 만들면 같은 화주가 두 번, 게다가 날짜가 어긋나 보이므로 스킵한다.
+            //   (계약과 무관하게 컨테이너 관리에서 직접 등록한 컨테이너만 여기서 파생)
+            if (container.getCurrentOrder() != null) {
+                continue;
+            }
             String owner = ownerFromMemo(container.getMemo(), container.getContainerNo());
 
             LocalDate cIn = container.getInboundDate();
