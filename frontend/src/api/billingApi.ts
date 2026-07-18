@@ -170,4 +170,8 @@ export const billingApi = {
   async sendPaymentRequest(id: number): Promise<void> {
     await api.post(`/api/billing/ledgers/${id}/notify/payment-request`, {})
   },
+  // 원장 삭제 (DRAFT 상태만 가능)
+  async deleteLedger(id: number): Promise<void> {
+    await api.delete(`/api/billing/ledgers/${id}`)
+  },
 }

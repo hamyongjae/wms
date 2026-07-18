@@ -182,12 +182,24 @@ export default function OrdersPage() {
   }, [orders, filter])
 
   async function handleDelete(o: StorageOrder) {
-    if (!window.confirm(`'${o.customerName}' 계약을 삭제할까요?`)) return
+    if (!window.confirm(`'${o.customerName}' 계약을 삭제할까요?\n(연결된 청구 원장도 함께 삭제됩니다)`)) return
     try {
+      // 계약 삭제 전에 관련된 청구 원장 삭제
+      const ledgers = await billingApi.list()
+      const relatedLedgers = ledgers.filter((l) => l.storageOrderId === o.id)
+      for (const ledger of relatedLedgers) {
+        try {
+          await billingApi.deleteLedger(ledger.id)
+        } catch (e) {
+          // DRAFT가 아닌 원장은 삭제 불가능하므로 무시하고 계속 진행
+          console.warn(`원장 ${ledger.id} 삭제 실패: ${errMsg(e, '원인 미상')}`)
+        }
+      }
+      // 청구 원장 삭제 후 계약 삭제
       await orderApi.remove(o.id)
       reload()
     } catch (err) {
-      alert(errMsg(err, '삭제에 실패했습니다.'))
+      alert(errMsg(err, '삭제에 실패했습니다. 청구 원장을 먼저 정리해주세요.'))
     }
   }
 
