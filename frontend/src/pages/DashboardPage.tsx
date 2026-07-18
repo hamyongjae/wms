@@ -42,6 +42,12 @@ function formatContractPrice(monthlyFee: number, startDate: string, endDate: str
   return `${won(monthlyFee)} / ${durationDays}일`
 }
 
+/** 계약에 배정된 컨테이너 번호 조회 */
+function getContainerNumber(orderId: number, containers: Container[]): string {
+  const container = containers.find((c) => c.currentOrderId === orderId)
+  return container?.containerNo ?? ''
+}
+
 
 /** [연체 예방 지표] 납기 7일 이내로 다가온 입금예정 원장 (오늘 포함, 연체 제외) */
 const isDueSoon = (l: BillingLedger) => {
@@ -56,6 +62,7 @@ export default function DashboardPage() {
   const [orders, setOrders] = useState<StorageOrder[]>([])
   const [ledgers, setLedgers] = useState<BillingLedger[]>([])
   const [occupancy, setOccupancy] = useState<WarehouseOccupancy[]>([])
+  const [containers, setContainers] = useState<Container[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -63,11 +70,13 @@ export default function DashboardPage() {
       orderApi.list().catch(() => [] as StorageOrder[]),
       billingApi.list().catch(() => [] as BillingLedger[]),
       yardApi.tenantOccupancy().catch(() => [] as WarehouseOccupancy[]),
+      containerApi.list({}).catch(() => [] as Container[]),
     ])
-      .then(([o, l, occ]) => {
+      .then(([o, l, occ, c]) => {
         setOrders(o)
         setLedgers(l)
         setOccupancy(occ)
+        setContainers(c)
       })
       .finally(() => setLoading(false))
   }, [])
@@ -225,17 +234,20 @@ export default function DashboardPage() {
                 <p className="mt-6 text-center text-sm text-slate-400">등록된 계약이 없습니다.</p>
               ) : (
                 <ul className="mt-3 divide-y divide-slate-100">
-                  {recentOrders.map((o) => (
-                    <li key={o.id} className="flex items-center justify-between py-2.5 text-sm">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-slate-800">{o.customerName}</p>
-                        <p className="text-xs text-slate-400">
-                          {o.warehouseName} · {o.storageStartDate}~{o.actualEndDate ?? o.expectedEndDate ?? '미정'}
-                        </p>
-                      </div>
-                      <span className="shrink-0 whitespace-nowrap text-slate-600">{formatContractPrice(o.monthlyFee, o.storageStartDate, o.actualEndDate ?? o.expectedEndDate)}</span>
-                    </li>
-                  ))}
+                  {recentOrders.map((o) => {
+                    const containerNo = getContainerNumber(o.id, containers)
+                    return (
+                      <li key={o.id} className="flex items-center justify-between py-2.5 text-sm">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-800">{o.customerName}</p>
+                          <p className="text-xs text-slate-400">
+                            {o.warehouseName} {containerNo && `· ${containerNo}`} · {o.storageStartDate}~{o.actualEndDate ?? o.expectedEndDate ?? '미정'}
+                          </p>
+                        </div>
+                        <span className="shrink-0 whitespace-nowrap text-slate-600">{formatContractPrice(o.monthlyFee, o.storageStartDate, o.actualEndDate ?? o.expectedEndDate)}</span>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </section>
