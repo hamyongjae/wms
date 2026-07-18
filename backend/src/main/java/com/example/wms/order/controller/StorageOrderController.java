@@ -50,6 +50,11 @@ public class StorageOrderController {
         return ResponseEntity.ok(storageOrderService.releaseOrder(id, request));
     }
 
+    @PatchMapping("/{id}/unreleased")
+    public ResponseEntity<StorageOrderResponse> unreleaseOrder(@PathVariable Long id) {
+        return ResponseEntity.ok(storageOrderService.unreleaseOrder(id));
+    }
+
     // 계약 삭제 — ADMIN만 허용 (STAFF가 호출하면 403)
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")

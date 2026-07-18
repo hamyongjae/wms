@@ -115,6 +115,51 @@ public class StorageOrderService {
         return new StorageOrderResponse(order);
     }
 
+    @Transactional
+    public StorageOrderResponse unreleaseOrder(Long id) {
+        StorageOrder order = findOrderOrThrow(id);
+        order.unreleased();
+        // [일정 동기화] 출고 취소 시 배정 컨테이너의 출고예정일을 원래 예정일로 복구한다.
+        syncContainerSchedule(order, order.getStorageStartDate(), order.getExpectedEndDate());
+        return new StorageOrderResponse(order);
+    }
+
+    /**
+     * [슬롯 지정 시] 상태 자동 전이 (컨테이너 배치 시 호출)
+     */
+    @Transactional
+    public void onSlotAssigned(Long orderId) {
+        StorageOrder order = findOrderOrThrow(orderId);
+        order.assignSlot();
+        // 상태 평가 후 저장됨
+    }
+
+    /**
+     * [슬롯 해제 시] 상태 자동 전이
+     */
+    @Transactional
+    public void onSlotUnassigned(Long orderId) {
+        StorageOrder order = findOrderOrThrow(orderId);
+        order.unassignSlot();
+        // 상태 평가 후 저장됨
+    }
+
+    /**
+     * [배치 작업] 모든 활성 계약의 상태를 현재 날짜 기준으로 재평가
+     * 매일 자정에 실행되어 시간 기반 상태 전이를 처리
+     */
+    @Transactional
+    public void evaluateAllOrdersStatus() {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        var activeOrders = storageOrderRepository.findByTenantIdAndStatusNotIn(
+                tenantId,
+                java.util.List.of(OrderStatus.RELEASED, OrderStatus.CANCELLED)
+        );
+        for (StorageOrder order : activeOrders) {
+            order.evaluateStatus();
+        }
+    }
+
     /**
      * [일정 동기화] 계약에 배정된 컨테이너들의 입고일/출고예정일을 계약 기간과 맞춘다.
      * 계약↔컨테이너는 currentOrder 로 직접 연결되므로 계약을 단일 소스로 삼아 파생 필드를 갱신한다.

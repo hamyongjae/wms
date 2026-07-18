@@ -22,4 +22,7 @@ public interface StorageOrderRepository extends JpaRepository<StorageOrder, Long
 
     // [배치] 전 테넌트 대상 활성 계약 조회 (스케줄러 월 청구 생성용)
     List<StorageOrder> findByStatusIn(Collection<OrderStatus> statuses);
+
+    // [배치] 특정 상태를 제외한 계약 조회 (상태 자동 평가용)
+    List<StorageOrder> findByStatusNotIn(Collection<OrderStatus> statuses);
 }
