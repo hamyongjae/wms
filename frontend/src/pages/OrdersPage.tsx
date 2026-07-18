@@ -23,13 +23,44 @@ import LocationPickerField from '@/components/yard/LocationPickerField'
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
 
-/* [뮤티드 상태색] 채도를 눌러 익힌 톤 — 경고조차 품위 있게 (마스터플랜 2.1) */
-const STATUS_META: Record<OrderStatus, { label: string; cls: string; icon?: string }> = {
-  PENDING: { label: '입고예정', cls: 'bg-blue-50 text-blue-700 ring-blue-200' },
-  IN_STORAGE: { label: '보관중', cls: 'bg-[#E9EFEA] text-[#5C7C6B] ring-[#D3DFD6]' },
-  PENDING_RELEASE: { label: '출고예정', cls: 'bg-amber-50 text-amber-700 ring-amber-200', icon: '⚠️' },
-  RELEASED: { label: '출고완료', cls: 'bg-slate-100 text-slate-500 ring-slate-200' },
-  CANCELLED: { label: '취소', cls: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]' },
+/**
+ * [실시간 상태 시각화]
+ *
+ * 4가지 상태별 색상 및 UI:
+ * 1. 입고예정 (PENDING): 파란색 - 준비 상태
+ * 2. 보관중 (IN_STORAGE): 초록색 - 정상 청구 상태
+ * 3. 출고예정 (PENDING_RELEASE): 주황색 + ⚠️ - 미납/연체 경고
+ * 4. 출고완료 (RELEASED): 회색 - 최종 마감 상태
+ *
+ * @PostLoad로 조회 시마다 자동 계산되므로 항상 최신 상태
+ */
+const STATUS_META: Record<OrderStatus, { label: string; cls: string; icon?: string; animation?: string }> = {
+  PENDING: {
+    label: '입고예정',
+    cls: 'bg-blue-50 text-blue-700 ring-blue-200',
+    icon: '📦',
+  },
+  IN_STORAGE: {
+    label: '보관중',
+    cls: 'bg-[#E9EFEA] text-[#5C7C6B] ring-[#D3DFD6]',
+    icon: '📍',
+  },
+  PENDING_RELEASE: {
+    label: '출고예정',
+    cls: 'bg-amber-50 text-amber-700 ring-amber-200 border-2 border-amber-300',
+    icon: '⚠️',
+    animation: 'animate-pulse',  // 연체 상태 강조
+  },
+  RELEASED: {
+    label: '출고완료',
+    cls: 'bg-slate-100 text-slate-500 ring-slate-200',
+    icon: '✅',
+  },
+  CANCELLED: {
+    label: '취소',
+    cls: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]',
+    icon: '❌',
+  },
 }
 
 type FilterKey = 'ALL' | 'PENDING' | 'IN_STORAGE' | 'PENDING_RELEASE' | 'RELEASED' | 'CANCELLED'
@@ -320,15 +351,28 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-5 py-3 text-right text-slate-700">{won(o.monthlyFee)}</td>
                   <td className="px-5 py-3">
-                    <span
-                      className={cn(
-                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1',
-                        STATUS_META[o.status].cls,
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1',
+                          STATUS_META[o.status].cls,
+                          STATUS_META[o.status].animation,
+                        )}
+                      >
+                        {STATUS_META[o.status].icon && <span>{STATUS_META[o.status].icon}</span>}
+                        {STATUS_META[o.status].label}
+                      </span>
+
+                      {/* [실시간 상태 변화 감지] 계산된 상태가 저장 상태와 다르면 강조 */}
+                      {o.computedStatus && o.computedStatus !== o.status && (
+                        <span
+                          className="text-[11px] font-semibold text-amber-600 px-1.5 py-0.5 bg-amber-50 rounded"
+                          title={`상태가 ${STATUS_META[o.status].label}에서 ${STATUS_META[o.computedStatus].label}로 변경됨`}
+                        >
+                          ↻ 업데이트됨
+                        </span>
                       )}
-                    >
-                      {STATUS_META[o.status].icon && <span>{STATUS_META[o.status].icon}</span>}
-                      {STATUS_META[o.status].label}
-                    </span>
+                    </div>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-1">

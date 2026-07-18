@@ -13,6 +13,8 @@ export interface StorageOrder {
   warehouseId: number
   warehouseName: string
   status: OrderStatus
+  computedStatus?: OrderStatus  // 실시간 계산된 상태 (변경 감지용)
+  slotAssigned: boolean  // 슬롯 지정 여부
   storageStartDate: string
   expectedEndDate: string | null
   actualEndDate: string | null
