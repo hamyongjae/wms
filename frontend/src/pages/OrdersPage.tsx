@@ -93,7 +93,7 @@ export default function OrdersPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<StorageOrder | null>(null)
   const [billingTarget, setBillingTarget] = useState<StorageOrder | null>(null) // 정산 타임라인
-  const [togglingId, setTogglingId] = useState<number | null>(null) // 상태 토글 진행 중인 계약 id
+  const [statusTarget, setStatusTarget] = useState<StorageOrder | null>(null) // 입/출고 처리 모달 대상
   // 계약 id → 배치된 슬롯 위치 라벨 목록 (창고+화주 기준으로 조인)
   const [locationsByOrder, setLocationsByOrder] = useState<Map<number, string[]>>(new Map())
 
@@ -180,26 +180,10 @@ export default function OrdersPage() {
     return orders.filter((o) => o.status === filter)
   }, [orders, filter])
 
-  // [단일 토글] 입고 ↔ 출고 전환 — 화면 새로고침 없이 해당 행만 즉시 갱신
-  async function handleToggle(o: StorageOrder) {
-    const toOutbound = o.status === 'INBOUND'
-    const msg = toOutbound
-      ? `'${o.customerName}' 계약을 출고 처리할까요?`
-      : `'${o.customerName}' 계약을 입고 상태로 되돌릴까요?`
-    if (!window.confirm(msg)) return
-
-    setTogglingId(o.id)
-    try {
-      const updated = await orderApi.toggle(o.id)
-      // 전체 재조회 없이 해당 계약만 교체 (비동기 부분 갱신)
-      setOrders((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
-      // [동기화] 입출고 일정(캘린더) 화면에 상태 변경 전파
-      orderSync.emit()
-    } catch (err) {
-      alert(errMsg(err, '상태 전환에 실패했습니다.'))
-    } finally {
-      setTogglingId(null)
-    }
+  // [상태 처리 완료] 모달에서 처리된 결과를 해당 행만 즉시 반영 (새로고침 없음)
+  function handleStatusChanged(updated: StorageOrder) {
+    setOrders((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+    orderSync.emit() // 일정·매출 화면에 전파
   }
 
   async function handleDelete(o: StorageOrder) {
@@ -326,22 +310,17 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-5 py-3 text-right text-slate-700">{won(o.monthlyFee)}</td>
                   <td className="px-5 py-3">
-                    {/* [단일 토글] 배지를 클릭하면 입고 ↔ 출고 즉시 전환 (화면 새로고침 없음) */}
+                    {/* [유형별 처리] 배지 클릭 → 입/출고 처리 모달 (정상/중도출고·정상/지연입고) */}
                     <button
                       type="button"
-                      onClick={() => handleToggle(o)}
-                      disabled={togglingId === o.id}
+                      onClick={() => setStatusTarget(o)}
                       title={o.status === 'INBOUND' ? '클릭하여 출고 처리' : '클릭하여 입고로 되돌리기'}
                       className={cn(
-                        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition hover:brightness-95 disabled:opacity-50',
+                        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition hover:brightness-95',
                         STATUS_META[o.status].cls,
                       )}
                     >
-                      {togglingId === o.id ? (
-                        <Loader2 size={12} className="animate-spin" />
-                      ) : (
-                        STATUS_META[o.status].icon && <span>{STATUS_META[o.status].icon}</span>
-                      )}
+                      {STATUS_META[o.status].icon && <span>{STATUS_META[o.status].icon}</span>}
                       {STATUS_META[o.status].label}
                     </button>
                   </td>
@@ -399,6 +378,15 @@ export default function OrdersPage() {
         onDone={() => {
           setEditTarget(null)
           reload()
+        }}
+      />
+
+      <StatusChangeModal
+        target={statusTarget}
+        onClose={() => setStatusTarget(null)}
+        onDone={(updated) => {
+          setStatusTarget(null)
+          handleStatusChanged(updated)
         }}
       />
 
@@ -1164,7 +1152,7 @@ function CreateOrderModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">일 보관료</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">하루 보관료</label>
                   {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
                   <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
                     {dailyFee != null ? won(dailyFee) : ''}
@@ -1344,6 +1332,185 @@ function QuickCustomerModal({
   )
 }
 
+
+/* ===== 입/출고 유형별 처리 모달 =====
+ * 배지 클릭 시 즉시 팝업. '정상' 유형이 기본 선택이라 대개 [확인]만 누르면 끝난다.
+ * '중도 출고'/'지연 입고' 같은 특수 유형을 고를 때만 하단 옵션(소급/실제일)이 동적으로 노출된다.
+ */
+type ReleaseKind = 'NORMAL' | 'EARLY'
+type ReturnKind = 'NORMAL' | 'LATE'
+
+function StatusChangeModal({
+  target,
+  onClose,
+  onDone,
+}: {
+  target: StorageOrder | null
+  onClose: () => void
+  onDone: (updated: StorageOrder) => void
+}) {
+  const isRelease = target?.status === 'INBOUND' // 입고 → 출고 처리
+  const [releaseKind, setReleaseKind] = useState<ReleaseKind>('NORMAL')
+  const [returnKind, setReturnKind] = useState<ReturnKind>('NORMAL')
+  const [actualEndDate, setActualEndDate] = useState('')
+  const [actualStartDate, setActualStartDate] = useState('')
+  const [applySettlement, setApplySettlement] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!target) return
+    setReleaseKind('NORMAL')
+    setReturnKind('NORMAL')
+    setActualEndDate(target.expectedEndDate ?? today())
+    setActualStartDate(target.storageStartDate ?? today())
+    setApplySettlement(true)
+    setFormError(null)
+  }, [target])
+
+  if (!target) return null
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    setFormError(null)
+    try {
+      const body = isRelease
+        ? {
+            targetStatus: 'OUTBOUND' as const,
+            // 정상 출고: 예정일 그대로 / 중도 출고: 입력한 실제 출고일 + 소급 여부
+            actualEndDate: releaseKind === 'EARLY' ? actualEndDate : (target!.expectedEndDate ?? today()),
+            applySettlement: releaseKind === 'EARLY' && applySettlement,
+          }
+        : {
+            targetStatus: 'INBOUND' as const,
+            // 지연 입고일 때만 실제 입고일로 시작일 조정
+            actualStartDate: returnKind === 'LATE' ? actualStartDate : undefined,
+          }
+      const updated = await orderApi.changeStatus(target!.id, body)
+      onDone(updated)
+    } catch (err) {
+      setFormError(errMsg(err, '처리에 실패했습니다.'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={isRelease ? `${target.customerName} · 출고 처리` : `${target.customerName} · 입고 처리`}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          계약 기간 {target.storageStartDate} ~ {target.expectedEndDate ?? '미정'}
+        </p>
+
+        {isRelease ? (
+          <>
+            <RadioRow
+              checked={releaseKind === 'NORMAL'}
+              onSelect={() => setReleaseKind('NORMAL')}
+              title="정상 출고"
+              desc="예정일 기준으로 출고 완료 처리합니다."
+            />
+            <RadioRow
+              checked={releaseKind === 'EARLY'}
+              onSelect={() => setReleaseKind('EARLY')}
+              title="중도 출고"
+              desc="예정일보다 일찍 출고 — 실제 점유 기간으로 보관료를 정산합니다."
+            />
+            {releaseKind === 'EARLY' && (
+              <div className="space-y-3 rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200/70">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">실제 출고일</label>
+                  <input
+                    type="date"
+                    value={actualEndDate}
+                    min={target.storageStartDate}
+                    max={target.expectedEndDate ?? undefined}
+                    onChange={(e) => setActualEndDate(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+                  <input type="checkbox" checked={applySettlement} onChange={(e) => setApplySettlement(e.target.checked)} className="h-4 w-4 accent-indigo-600" />
+                  보관료 소급 정산 (실제 사용 기간만큼 차감·환급)
+                </label>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <RadioRow
+              checked={returnKind === 'NORMAL'}
+              onSelect={() => setReturnKind('NORMAL')}
+              title="정상 입고"
+              desc="출고를 취소하고 보관중 상태로 되돌립니다."
+            />
+            <RadioRow
+              checked={returnKind === 'LATE'}
+              onSelect={() => setReturnKind('LATE')}
+              title="지연 입고"
+              desc="실제 입고일을 조정해 보관 시작일을 다시 맞춥니다."
+            />
+            {returnKind === 'LATE' && (
+              <div className="rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200/70">
+                <label className="mb-1 block text-sm font-medium text-slate-700">실제 입고일</label>
+                <input
+                  type="date"
+                  value={actualStartDate}
+                  max={target.expectedEndDate ?? undefined}
+                  onChange={(e) => setActualStartDate(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {formError && <p className="text-sm text-red-600">{formError}</p>}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
+            취소
+          </button>
+          <button type="submit" disabled={submitting} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
+            {submitting ? '처리 중…' : '확인'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function RadioRow({
+  checked,
+  onSelect,
+  title,
+  desc,
+}: {
+  checked: boolean
+  onSelect: () => void
+  title: string
+  desc: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        'flex w-full items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition',
+        checked ? 'border-indigo-400 bg-indigo-50/50 ring-1 ring-indigo-200' : 'border-slate-200 hover:bg-slate-50',
+      )}
+    >
+      <span className={cn('mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', checked ? 'border-indigo-500' : 'border-slate-300')}>
+        {checked && <span className="h-2 w-2 rounded-full bg-indigo-600" />}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-slate-800">{title}</span>
+        <span className="mt-0.5 block text-xs text-slate-500">{desc}</span>
+      </span>
+    </button>
+  )
+}
 
 function errMsg(err: unknown, fallback: string): string {
   return isAxiosError(err) ? (err.response?.data?.message ?? fallback) : fallback
