@@ -74,7 +74,23 @@ public class BillingService {
                 baseAmount, carriedOverIn, req.getDueDate());
 
         BillingLedger saved = ledgerRepository.save(ledger);
+        // [보관기간 동기화] 회차 청구가 계약 종료일을 넘기면 계약을 그 종료일까지 자동 연장
+        extendOrderPeriod(order, saved.getBillingPeriodEnd());
         return new BillingLedgerResponse(saved);
+    }
+
+    /**
+     * [보관기간 동기화] 연속 계약(회차 청구·이월)으로 청구 기간이 계약 종료일을 넘어서면,
+     * 계약의 출고예정일을 가장 늦은 회차 종료일로 확장한다. (계약·달력이 실제 보관기간과 일치)
+     */
+    private void extendOrderPeriod(StorageOrder order, LocalDate periodEnd) {
+        if (periodEnd == null) return;
+        // 이미 출고 완료된 계약은 실제 출고일이 확정이므로 건드리지 않는다.
+        if (order.isOutbound()) return;
+        LocalDate current = order.getExpectedEndDate();
+        if (current == null || periodEnd.isAfter(current)) {
+            order.setExpectedEndDate(periodEnd);
+        }
     }
 
     /**
@@ -191,6 +207,8 @@ public class BillingService {
         BillingLedger savedNext = ledgerRepository.save(next);
 
         current.carryOverTo(savedNext);
+        // [보관기간 동기화] 이월(연장) 회차 종료일까지 계약 보관기간 확장
+        extendOrderPeriod(order, req.getNextPeriodEnd());
         return new BillingLedgerResponse(savedNext);
     }
 
