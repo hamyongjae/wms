@@ -456,19 +456,18 @@ export default function YardDispatchPage() {
               return (
                 <div className="space-y-6">
                   {floors.map(({ tier, cells }) => (
-                    <div key={tier}>
-                      <div className="mb-2 flex items-center gap-2">
-                        <p className="text-sm font-medium text-slate-700">
-                          {tier}층 <span className="text-xs font-normal text-slate-400">· {cells.length}칸</span>
-                        </p>
-                        <div className="ml-auto">
-                          <FloorPriceInline
-                            tier={tier}
-                            price={floorPrices.get(tier) ?? null}
-                            editable={isAdmin}
-                            onSave={(u, m) => handleSaveFloorPrice(tier, u, m)}
-                          />
-                        </div>
+                    <div key={tier} className="relative">
+                      <p className="mb-2 text-sm font-medium text-slate-700">
+                        {tier}층 <span className="text-xs font-normal text-slate-400">· {cells.length}칸</span>
+                      </p>
+                      {/* 층 컨테이너 우측에 절대 고정 → 모든 층 배지의 우측 끝이 정확히 일치 */}
+                      <div className="absolute right-0 top-0">
+                        <FloorPriceInline
+                          tier={tier}
+                          price={floorPrices.get(tier) ?? null}
+                          editable={isAdmin}
+                          onSave={(u, m) => handleSaveFloorPrice(tier, u, m)}
+                        />
                       </div>
                       {renderCells(cells)}
                     </div>
