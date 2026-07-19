@@ -1161,7 +1161,12 @@ function groupByFloor(slots: YardSlot[]): Array<{ tier: number; cells: YardSlot[
 }
 
 function errMsg(err: unknown, fallback: string): string {
-  return isAxiosError(err) ? (err.response?.data?.message ?? fallback) : fallback
+  if (!isAxiosError(err)) return fallback
+  const status = err.response?.status
+  const data = err.response?.data as { message?: string; error?: string } | undefined
+  // 서버가 message를 주면 그대로, 없으면 상태코드·error·URL로 원인을 최대한 드러낸다.
+  const detail = data?.message ?? data?.error ?? err.message
+  return status ? `[HTTP ${status}] ${detail ?? fallback}` : (detail ?? fallback)
 }
 
 /** memo 앞머리의 [ ... ] 화주 태그 원문(대괄호 포함). 없으면 빈 문자열. */
