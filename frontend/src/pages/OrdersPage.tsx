@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, Trash2, FileText, ShieldAlert, AlertTriangle, Pencil, X, Wallet, LogOut, LogIn } from 'lucide-react'
+import { Plus, Loader2, Trash2, FileText, ShieldAlert, AlertTriangle, Pencil, X, Wallet, LogOut, Undo2 } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger, type PaymentMethod } from '@/api/billingApi'
@@ -187,7 +187,18 @@ export default function OrdersPage() {
   // [상태 처리 완료] 모달에서 처리된 결과를 해당 행만 즉시 반영 (새로고침 없음)
   function handleStatusChanged(updated: StorageOrder) {
     setOrders((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
-    orderSync.emit() // 일정·매출 화면에 전파
+    orderSync.emit() // 일정·매출·야적장 화면에 전파
+  }
+
+  // [출고 취소] 소급 복구 — 종료일·보관료 롤백 + 정산 취소 + 컨테이너 원자리 복구
+  async function handleCancelRelease(o: StorageOrder) {
+    if (!window.confirm(`'${o.customerName}' 계약의 출고를 취소할까요?\n보관 종료일·정산이 원래대로 복구되고 컨테이너 자리가 다시 사용중이 됩니다.`)) return
+    try {
+      const updated = await orderApi.changeStatus(o.id, { targetStatus: 'INBOUND' })
+      handleStatusChanged(updated)
+    } catch (err) {
+      alert(errMsg(err, '출고 취소에 실패했습니다.'))
+    }
   }
 
   async function handleDelete(o: StorageOrder) {
@@ -331,7 +342,7 @@ export default function OrdersPage() {
                       {o.status === 'INBOUND' ? (
                         <RowAction icon={<LogOut size={13} />} label="출고" tooltip="출고 처리" tone="amber" onClick={() => setStatusTarget(o)} />
                       ) : (
-                        <RowAction icon={<LogIn size={13} />} label="입고" tooltip="입고 처리 (출고 취소)" tone="emerald" onClick={() => setStatusTarget(o)} />
+                        <RowAction icon={<Undo2 size={13} />} label="출고취소" tooltip="출고 취소 (소급 복구)" tone="slate" onClick={() => handleCancelRelease(o)} />
                       )}
                       <RowAction icon={<Wallet size={15} />} tooltip="정산원장 조회" tone="indigo" onClick={() => setBillingTarget(o)} />
                       <RowAction icon={<Pencil size={14} />} tooltip="계약 수정" tone="slate" onClick={() => setEditTarget(o)} />
