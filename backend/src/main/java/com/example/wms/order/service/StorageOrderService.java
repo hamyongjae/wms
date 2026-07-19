@@ -151,9 +151,14 @@ public class StorageOrderService {
             TemporalValidator.validateContractPeriod(order.getStorageStartDate(), actualEnd);
             order.release(actualEnd);
             syncContainerSchedule(order, order.getStorageStartDate(), actualEnd);
-            // [매출 소급] 중도출고 + 소급 선택 시 실제 점유 기간으로 원장 정산
+            // [매출 소급] 중도출고 + 소급 선택 시 원장 정산.
+            //   실사용 보관료를 직접 입력했으면 그 값으로, 아니면 실제 점유 기간 일할로.
             if (req.isApplySettlement()) {
-                billingService.settleMidReleaseForOrder(order.getId(), actualEnd);
+                if (req.getSettledAmount() != null) {
+                    billingService.settleManualForOrder(order.getId(), req.getSettledAmount());
+                } else {
+                    billingService.settleMidReleaseForOrder(order.getId(), actualEnd);
+                }
             }
         } else {
             // 출고 → 입고(되돌리기). 지연 입고면 실제 입고일로 시작일 조정

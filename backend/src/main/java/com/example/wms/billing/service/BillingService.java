@@ -253,6 +253,29 @@ public class BillingService {
         applyMidReleaseTo(locked, actualEndDate);
     }
 
+    /**
+     * [수동 정산] 사용자가 입력한 실사용 보관료로 원장을 정산한다.
+     * 대상 원장의 기본 보관료(baseAmount)를 settledAmount가 되도록 CORRECTION 조정을 반영.
+     */
+    @Transactional
+    public void settleManualForOrder(Long storageOrderId, BigDecimal settledAmount) {
+        if (settledAmount == null) return;
+        BillingLedger target = ledgerRepository.findByStorageOrderId(storageOrderId).stream()
+                .filter(l -> l.getStatus() != BillingStatus.CANCELED)
+                .max(java.util.Comparator.comparing(BillingLedger::getBillingPeriodStart))
+                .orElse(null);
+        if (target == null) return;
+        BillingLedger locked = lockLedger(target.getId());
+        BigDecimal settled = MoneyPolicy.normalize(settledAmount);
+        BigDecimal diff = settled.subtract(locked.getBaseAmount());
+        if (diff.signum() == 0) return;
+        Long userId = SecurityUtils.getCurrentUser().getUserId();
+        String reason = "중도출고 실사용 보관료 정산 (" + settled.toBigInteger() + "원)";
+        adjustmentRepository.save(new BillingAdjustment(
+                locked.getTenant(), locked, AdjustmentType.CORRECTION, diff, reason, userId));
+        locked.applyAdjustment(diff);
+    }
+
     /** 중도출고 정산 코어 — 이미 잠근 원장에 환급(차감)/추가청구(가산)를 반영 */
     private MidReleaseSettlementResponse applyMidReleaseTo(BillingLedger ledger, LocalDate actualEndDate) {
         Long userId = SecurityUtils.getCurrentUser().getUserId();

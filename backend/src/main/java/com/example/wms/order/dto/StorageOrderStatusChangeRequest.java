@@ -4,6 +4,7 @@ import com.example.wms.order.entity.OrderStatus;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
@@ -21,4 +22,6 @@ public class StorageOrderStatusChangeRequest {
     private LocalDate actualEndDate;
     private LocalDate actualStartDate;
     private boolean applySettlement;
+    // 사용자가 직접 입력한 실사용 보관료(있으면 이 값으로 정산, 없으면 일할 자동계산)
+    private BigDecimal settledAmount;
 }
