@@ -1,8 +1,5 @@
 package com.example.wms.calendar.service;
 
-import com.example.wms.billing.entity.BillingLedger;
-import com.example.wms.billing.entity.BillingStatus;
-import com.example.wms.billing.repository.BillingLedgerRepository;
 import com.example.wms.calendar.dto.CalendarEventResponse;
 import com.example.wms.calendar.dto.CalendarEventStatus;
 import com.example.wms.calendar.dto.CalendarEventType;
@@ -37,7 +34,6 @@ public class CalendarService {
     private static final LocalTime EVENT_TIME = LocalTime.of(9, 0);
 
     private final StorageOrderRepository orderRepository;
-    private final BillingLedgerRepository ledgerRepository;
 
     @Transactional(readOnly = true)
     public List<CalendarEventResponse> getEvents(LocalDate from, LocalDate to) {
@@ -84,38 +80,7 @@ public class CalendarService {
             }
         }
 
-        // ===== 청구 원장 → 청구/납기 =====
-        for (BillingLedger ledger : ledgerRepository.findAllByTenantId(tenantId)) {
-            if (ledger.getStatus() == BillingStatus.CANCELED) {
-                continue;
-            }
-            LocalDate due = ledger.getDueDate();
-            if (due == null || !inRange(due, from, to)) {
-                continue;
-            }
-            String customer = ledger.getCustomer().getName();
-
-            boolean overdue = ledger.getBalance().signum() > 0
-                    && (ledger.getStatus() == BillingStatus.ISSUED
-                        || ledger.getStatus() == BillingStatus.PARTIALLY_PAID)
-                    && due.isBefore(today);
-
-            CalendarEventStatus status;
-            if (ledger.getStatus() == BillingStatus.PAID) {
-                status = CalendarEventStatus.COMPLETED;
-            } else if (overdue) {
-                status = CalendarEventStatus.OVERDUE;
-            } else {
-                status = CalendarEventStatus.PENDING;
-            }
-
-            events.add(new CalendarEventResponse(
-                    ledger.getId(), "[" + customer + "] 청구",
-                    due.atTime(EVENT_TIME), due.atTime(EVENT_TIME),
-                    CalendarEventType.BILLING, status, customer, ledger.getBalance(),
-                    ledger.getBillingPeriodStart(), ledger.getBillingPeriodEnd(), ledger.getBaseAmount()));
-        }
-
+        // [정책] 입출고 일정은 입고/출고만 노출한다. (청구/납기 이벤트는 청구·정산 화면에서 관리)
         return events;
     }
 

@@ -2,6 +2,7 @@ package com.example.wms.yard.service;
 
 import com.example.wms.container.entity.Container;
 import com.example.wms.container.repository.ContainerRepository;
+import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.warehouse.entity.Warehouse;
 import com.example.wms.warehouse.repository.WarehouseRepository;
 import com.example.wms.security.SecurityUtils;
@@ -176,6 +177,13 @@ public class YardOperationService {
         YardSlot from = lockSlot(current.getId(), tenantId);
         from.vacate();
         container.markRemovedFromYard();   // 사용중 → 가용
+
+        // [단일 소스 동기화] 물리적으로 야적장을 벗어났으므로, 연결된 계약도 출고 완료로 전이한다.
+        //   (계약 status 가 유일 소스 — 계약관리·캘린더가 즉시 '출고'로 일치)
+        StorageOrder order = container.getCurrentOrder();
+        if (order != null && order.isInbound()) {
+            order.release(java.time.LocalDate.now());
+        }
         return new YardSlotResponse(from);
     }
 
