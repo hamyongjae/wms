@@ -111,7 +111,8 @@ export default function ScheduleCalendarPage() {
     setLoading(true)
     setError(null)
     getMonthEvents(cursor.year, cursor.month0 + 1)
-      .then(setEvents)
+      // [정책] 입출고 일정은 입고/출고만 — 청구(BILLING) 이벤트는 표시하지 않는다.
+      .then((list) => setEvents(list.filter((e) => e.type === 'INBOUND' || e.type === 'OUTBOUND')))
       .catch(() => setError('일정을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [cursor, refreshKey])
@@ -284,7 +285,7 @@ export default function ScheduleCalendarPage() {
                             )}
                             title={eventLabel(e)}
                           >
-                            {TYPE_META[e.type].emoji} {eventLabel(e)}
+                            {eventLabel(e)}
                           </span>
                         ))}
                         {dayEvents.length > 3 && (
@@ -452,7 +453,7 @@ function EventCard({
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1', meta.badge)}>
-              {meta.emoji} {meta.label}
+              {meta.label}
             </span>
             {event.status === 'OVERDUE' && (
               <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">연체</span>

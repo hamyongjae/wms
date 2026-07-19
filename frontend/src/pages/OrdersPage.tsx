@@ -512,6 +512,8 @@ function OrderBillingModal({ target, isAdmin, onClose }: { target: StorageOrder 
       await billingApi.issue(created.id, genDue || undefined) // 발행해야 수금 가능
       setGenOpen(false)
       load(target!.id)
+      // [보관기간 동기화] 회차 청구로 계약 종료일이 확장됐을 수 있으니 계약·달력 갱신
+      orderSync.emit()
     } catch (err) {
       setGenError(errMsg(err, '청구서 생성에 실패했습니다.'))
     } finally {

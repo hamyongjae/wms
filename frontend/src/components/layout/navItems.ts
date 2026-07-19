@@ -27,7 +27,7 @@ export const navItems: NavItem[] = [
   { to: '/customers', label: '고객 관리', description: '개인·기업 고객 및 상태', icon: Users },
   { to: '/warehouses', label: '창고 관리', description: '구역 및 보관 시설 설정', icon: Warehouse },
   { to: '/yard', label: '컨테이너 관리', description: '격자 맵에서 입출고·이동 처리', icon: Grid3x3 },
-  { to: '/billing', label: '청구 및 정산', description: '청구 원장·미수금·세금계산서', icon: CreditCard },
+  { to: '/billing', label: '정산 관리', description: '청구 원장·미수금·세금계산서', icon: CreditCard },
   { to: '/staff', label: '직원 관리', description: '계정 추가·권한 관리', icon: UserCog, adminOnly: true },
   { to: '/settings', label: '회사 정보', description: '업체 기본 정보 설정', icon: Building2, adminOnly: true },
 ]
