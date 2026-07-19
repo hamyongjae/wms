@@ -55,4 +55,7 @@ public interface ContainerRepository extends JpaRepository<Container, Long> {
 
     // 특정 계약이 점유 중인 컨테이너 목록
     List<Container> findByTenantIdAndCurrentOrderId(Long tenantId, Long currentOrderId);
+
+    // [정합화] 계약 연결이 끊긴 유령 컨테이너 (전 테넌트 — 기동 시 self-heal용)
+    List<Container> findByCurrentOrderIsNull();
 }

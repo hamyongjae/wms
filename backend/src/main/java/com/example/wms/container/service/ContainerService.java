@@ -34,7 +34,6 @@ public class ContainerService {
     private final ContainerRepository containerRepository;
     private final WarehouseRepository warehouseRepository;
     private final StorageOrderRepository storageOrderRepository;
-    private final com.example.wms.yard.repository.YardSlotRepository yardSlotRepository;
 
     // memo 앞머리의 [화주·규격·소유] 태그를 파싱하기 위한 패턴
     private static final Pattern OWNER_TAG = Pattern.compile("^\\[([^\\]]+)\\]");
@@ -188,29 +187,6 @@ public class ContainerService {
             throw new IllegalStateException("사용 중인 컨테이너는 삭제할 수 없습니다. 먼저 회수하세요.");
         }
         containerRepository.delete(container);
-    }
-
-    // ===== [정합성 정리] 계약과 연결이 끊긴 유령 컨테이너 일괄 정리 =====
-    /**
-     * 계약이 삭제됐지만 남아 있는 컨테이너(currentOrder == null)를 찾아,
-     * 점유 중인 슬롯을 공석 처리한 뒤 컨테이너 행을 삭제한다.
-     * (컨테이너는 항상 계약에 배정되어 생성되므로 currentOrder 가 없으면 유령 데이터다)
-     * @return 정리된 컨테이너 수
-     */
-    @Transactional
-    public int cleanupOrphans() {
-        Long tenantId = SecurityUtils.getCurrentTenantId();
-        int cleaned = 0;
-        for (Container c : containerRepository.findAllByTenantId(tenantId)) {
-            if (c.getCurrentOrder() != null) {
-                continue; // 계약에 연결돼 있으면 정상
-            }
-            yardSlotRepository.findByTenantIdAndContainerId(tenantId, c.getId())
-                    .ifPresent(slot -> slot.vacate());
-            containerRepository.delete(c);
-            cleaned++;
-        }
-        return cleaned;
     }
 
     // ===== 내부 헬퍼 =====

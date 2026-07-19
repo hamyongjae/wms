@@ -31,6 +31,9 @@ public interface YardSlotRepository extends JpaRepository<YardSlot, Long> {
     // 특정 컨테이너가 현재 놓인 슬롯
     Optional<YardSlot> findByTenantIdAndContainerId(Long tenantId, Long containerId);
 
+    // [정합화] 컨테이너 id로 슬롯 조회 (전 테넌트 — 기동 시 self-heal용)
+    Optional<YardSlot> findByContainerId(Long containerId);
+
     /**
      * [동시성] 적재/이동 임계 구간용 비관적 쓰기 락.
      * 같은 슬롯을 두 트랜잭션이 동시에 점유하려 하면 한쪽은 대기 → 이중 적재 방지.
