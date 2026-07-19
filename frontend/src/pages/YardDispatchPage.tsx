@@ -456,12 +456,14 @@ export default function YardDispatchPage() {
                         <p className="text-sm font-medium text-slate-700">
                           {tier}층 <span className="text-xs font-normal text-slate-400">· {cells.length}칸</span>
                         </p>
-                        <FloorPriceInline
-                          tier={tier}
-                          price={floorPrices.get(tier) ?? null}
-                          editable={isAdmin}
-                          onSave={(p) => handleSaveFloorPrice(tier, p)}
-                        />
+                        <div className="ml-auto">
+                          <FloorPriceInline
+                            tier={tier}
+                            price={floorPrices.get(tier) ?? null}
+                            editable={isAdmin}
+                            onSave={(p) => handleSaveFloorPrice(tier, p)}
+                          />
+                        </div>
                       </div>
                       {renderCells(cells)}
                     </div>
@@ -1202,7 +1204,7 @@ function FloorPriceInline({
           editable && 'hover:brightness-95',
         )}
       >
-        {price != null ? `개당 ${fmt(price)}원` : '단가 미설정'}
+        {price != null ? `기본 단가 : ${fmt(price)}원 / 일` : '단가 미설정'}
         {editable && <Pencil size={11} />}
       </button>
     )
