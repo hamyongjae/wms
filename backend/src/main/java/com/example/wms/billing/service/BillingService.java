@@ -77,6 +77,29 @@ public class BillingService {
         return new BillingLedgerResponse(saved);
     }
 
+    /**
+     * [선불 계약 자동 정산] 원장 생성 → 발행 → 전액 수금을 한 트랜잭션으로 처리한다.
+     * 계약 등록(StorageOrderService.createOrder)에서 호출되어, 부분 실패 없이 원자적으로 완결된다.
+     * (호출자의 트랜잭션에 참여 — 계약과 청구가 함께 커밋되거나 함께 롤백된다)
+     */
+    @Transactional
+    public void settlePrepaid(StorageOrder order, LocalDate periodStart, LocalDate periodEnd, BigDecimal amount) {
+        BigDecimal base = MoneyPolicy.normalize(amount);
+        BillingLedger ledger = new BillingLedger(
+                order.getTenant(), order, order.getCustomer(), generateLedgerNo(),
+                BillingType.MONTHLY, SettlementType.PREPAID,
+                periodStart, periodEnd, base, BigDecimal.ZERO, periodStart);
+
+        ledger.issue(periodStart);              // DRAFT → ISSUED (납기 = 입고일)
+        ledgerRepository.save(ledger);
+
+        Long userId = SecurityUtils.getCurrentUser().getUserId();
+        paymentHistoryRepository.save(new PaymentHistory(
+                order.getTenant(), ledger, base, PaymentMethod.BANK_TRANSFER,
+                periodStart, "선불 계약 - 자동 처리", userId));
+        ledger.applyPayment(base);              // 전액 수금 → PAID
+    }
+
     /** 원장 발행 (DRAFT → ISSUED) */
     @Transactional
     public BillingLedgerResponse issueLedger(Long ledgerId, IssueRequest req) {

@@ -1,5 +1,6 @@
 package com.example.wms.order.dto;
 
+import com.example.wms.billing.entity.SettlementType;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,4 +27,7 @@ public class StorageOrderCreateRequest {
 
     private Double totalVolume;
     private String memo;
+
+    // 결제 방식 — PREPAID(선불)면 계약 등록과 동시에 청구·수금까지 자동 처리. 미지정 시 후불.
+    private SettlementType paymentType;
 }

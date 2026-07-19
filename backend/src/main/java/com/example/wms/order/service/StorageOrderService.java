@@ -11,9 +11,11 @@ import com.example.wms.customer.repository.CustomerRepository;
 import com.example.wms.container.entity.Container;
 import com.example.wms.container.repository.ContainerRepository;
 import com.example.wms.billing.entity.BillingLedger;
+import com.example.wms.billing.entity.SettlementType;
 import com.example.wms.billing.repository.BillingLedgerRepository;
 import com.example.wms.billing.repository.PaymentHistoryRepository;
 import com.example.wms.billing.repository.BillingAdjustmentRepository;
+import com.example.wms.billing.service.BillingService;
 import com.example.wms.yard.repository.YardSlotRepository;
 import com.example.wms.order.repository.StorageOrderRepository;
 import com.example.wms.warehouse.repository.WarehouseRepository;
@@ -38,6 +40,7 @@ public class StorageOrderService {
     private final PaymentHistoryRepository paymentHistoryRepository;
     private final BillingAdjustmentRepository billingAdjustmentRepository;
     private final YardSlotRepository yardSlotRepository;
+    private final BillingService billingService;
 
     // 보관 계약 등록
     @Transactional
@@ -77,6 +80,19 @@ public class StorageOrderService {
         );
 
         StorageOrder saved = storageOrderRepository.save(order);
+
+        // [선불 자동 정산] 결제 방식이 PREPAID이고 요금이 있으면, 같은 트랜잭션에서
+        //   청구 원장 생성 → 발행 → 전액 수금까지 원자적으로 완결한다.
+        //   (실패 시 계약까지 함께 롤백 → "계약은 됐는데 청구 실패" 같은 부분 상태가 사라진다)
+        if (request.getPaymentType() == SettlementType.PREPAID
+                && request.getMonthlyFee() != null && request.getMonthlyFee() > 0) {
+            LocalDate periodStart = saved.getStorageStartDate();
+            LocalDate periodEnd = saved.getExpectedEndDate() != null
+                    ? saved.getExpectedEndDate() : periodStart.plusDays(7);
+            billingService.settlePrepaid(saved, periodStart, periodEnd,
+                    java.math.BigDecimal.valueOf(request.getMonthlyFee()));
+        }
+
         return new StorageOrderResponse(saved);
     }
 
