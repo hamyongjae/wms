@@ -2,6 +2,30 @@ spring:
   application:
     name: wms
 
+  # ===== 메일(SMTP) 발송 — 비밀번호 재설정 링크 =====
+  # 값이 비어 있으면 콘솔 로그 발송(LoggingMailSender)으로 동작.
+  # Gmail 사용 시: 2단계 인증 → 앱 비밀번호 발급 후 MAIL_USERNAME/MAIL_PASSWORD 환경변수로 주입.
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+        transport:
+          protocol: smtp
+    default-encoding: UTF-8
+
+# 발신자 표기 (미지정 시 username 사용)
+app:
+  mail:
+    from: ${MAIL_FROM:${MAIL_USERNAME:}}
+
   # ===== PostgreSQL 연결 =====
   datasource:
     url: jdbc:postgresql://localhost:5432/wms   # 맨 뒤 wms 자리에 본인 DB 이름
