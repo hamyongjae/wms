@@ -65,6 +65,10 @@ public class Container {
     @Column(name = "memo", length = 255)
     private String memo;
 
+    // 출고 시 비운 슬롯 id (출고 취소 시 원자리 복구용)
+    @Column(name = "released_slot_id")
+    private Long releasedSlotId;
+
     // ===== 보관 일정 =====
     @Column(name = "inbound_date")
     private LocalDate inboundDate;             // 입고일
@@ -131,6 +135,18 @@ public class Container {
             throw new IllegalStateException("배정은 빈(AVAILABLE) 컨테이너만 가능합니다. 현재=" + status);
         }
         this.currentOrder = order;
+        this.status = ContainerStatus.OCCUPIED;
+    }
+
+    // ===== [출고] 슬롯을 비우되 계약 링크는 유지 — 출고 취소 복구를 위해 원자리 기억 =====
+    public void markReleasedFromSlot(Long slotId) {
+        this.releasedSlotId = slotId;
+        this.status = ContainerStatus.AVAILABLE;   // 물리적으로 야적장을 벗어남
+    }
+
+    // ===== [출고 취소] 원자리 복구 완료 → 다시 사용중 =====
+    public void restoredToSlot() {
+        this.releasedSlotId = null;
         this.status = ContainerStatus.OCCUPIED;
     }
 

@@ -156,6 +156,7 @@ public class StorageOrderService {
     @Transactional
     public StorageOrderResponse changeStatus(Long id, StorageOrderStatusChangeRequest req) {
         StorageOrder order = findOrderOrThrow(id);
+        Long tenantId = SecurityUtils.getCurrentTenantId();
         // targetStatus 미지정 시 현재의 반대로 판정
         OrderStatus target = req.getTargetStatus() != null
                 ? req.getTargetStatus()
@@ -174,29 +175,39 @@ public class StorageOrderService {
                         "보관 종료일이 아직 도래하지 않아 정상 출고할 수 없습니다. 중도 출고로 처리하세요.");
             }
             order.release(actualEnd);
-            syncContainerSchedule(order, order.getStorageStartDate(), actualEnd);
             // [매출 소급] 중도출고 + 소급 선택 시 원장 정산.
-            //   실사용 보관료를 직접 입력했으면 그 값으로, 아니면 실제 점유 기간 일할로.
             if (req.isApplySettlement()) {
                 if (req.getSettledAmount() != null) {
                     billingService.settleManualForOrder(order.getId(), req.getSettledAmount());
-                    // [보관료 동기화] 계약 보관료도 실사용 정산 금액으로 갱신 → 계약 목록 컬럼에 반영
-                    order.setMonthlyFee(req.getSettledAmount().intValue());
+                    order.applySettledFee(req.getSettledAmount().intValue()); // 계약 보관료도 실사용 금액으로
                 } else {
                     billingService.settleMidReleaseForOrder(order.getId(), actualEnd);
                 }
             }
-        } else {
-            // 출고 → 입고(되돌리기). 지연 입고면 실제 입고일로 시작일 조정
-            if (req.getActualStartDate() != null) {
-                // [이중 방어] 실제 입고일은 미래일 수 없다
-                if (req.getActualStartDate().isAfter(today)) {
-                    throw new IllegalArgumentException("실제 입고일은 미래일 수 없습니다.");
-                }
-                TemporalValidator.validateContractPeriod(req.getActualStartDate(), order.getExpectedEndDate());
-                order.setStorageStartDate(req.getActualStartDate());
+            // [자원 동기화] 점유하던 슬롯을 즉시 공실 처리 (원자리는 컨테이너에 기억 → 출고취소 복구용)
+            for (Container c : containerRepository.findByTenantIdAndCurrentOrderId(tenantId, order.getId())) {
+                yardSlotRepository.findByTenantIdAndContainerId(tenantId, c.getId()).ifPresent(slot -> {
+                    c.markReleasedFromSlot(slot.getId());
+                    slot.vacate();
+                });
             }
+            // 배정 컨테이너 출고예정일도 실제 출고일로 확정
+            syncContainerSchedule(order, order.getStorageStartDate(), actualEnd);
+        } else {
+            // ===== [출고 취소] 마감 전 상태로 소급 복구 =====
+            // 정산 취소 → 보관 종료일·보관료 롤백(unreleased) → 컨테이너 원자리 복구
+            billingService.reverseMidReleaseForOrder(order.getId());
             order.unreleased();
+            for (Container c : containerRepository.findByTenantIdAndCurrentOrderId(tenantId, order.getId())) {
+                Long sid = c.getReleasedSlotId();
+                if (sid == null) continue;
+                yardSlotRepository.findById(sid)
+                        .filter(s -> s.getTenant().getId().equals(tenantId) && !s.isOccupied())
+                        .ifPresent(slot -> {
+                            slot.place(c);        // 원자리 재적재
+                            c.restoredToSlot();
+                        });
+            }
             syncContainerSchedule(order, order.getStorageStartDate(), order.getExpectedEndDate());
         }
         return new StorageOrderResponse(order);

@@ -75,6 +75,13 @@ public class StorageOrder {
     @Column(name = "actual_end_date")
     private LocalDate actualEndDate;         // 실제 출고일
 
+    // ===== 출고 취소(소급 복구)용 스냅샷 =====
+    @Column(name = "original_end_date")
+    private LocalDate originalEndDate;       // 출고 전 보관 종료일 (롤백용)
+
+    @Column(name = "original_monthly_fee")
+    private Integer originalMonthlyFee;      // 출고 전 보관료 (롤백용)
+
     // ===== 금액·물량 =====
     @Column(name = "monthly_fee", nullable = false)
     private Integer monthlyFee;              // 월 보관료
@@ -124,18 +131,33 @@ public class StorageOrder {
     // ===== [출고 마감] 입고 → 출고: 실제 출고일로 보관 종료일을 마감(override) =====
     /**
      * 실제 출고일을 기록하며 보관 종료일(expectedEndDate)을 그 날짜로 강제 마감한다.
-     * → 보관 기간이 실물 출고 시점으로 확정되어 일할 계산·소급 정산이 오차 없이 이어진다.
+     * 롤백을 위해 마감 전 종료일·보관료를 스냅샷으로 보존한다.
      */
     public void release(LocalDate actualEndDate) {
+        this.originalEndDate = this.expectedEndDate;   // 롤백 스냅샷
+        this.originalMonthlyFee = this.monthlyFee;
         this.status = OrderStatus.OUTBOUND;
         this.actualEndDate = actualEndDate;
-        this.expectedEndDate = actualEndDate; // 보관 종료일 자동 마감
+        this.expectedEndDate = actualEndDate;          // 보관 종료일 자동 마감
     }
 
-    // ===== [출고 취소] 출고 → 입고 =====
+    // 출고 소급 정산으로 확정된 실사용 보관료를 반영 (원장 정산과 함께 호출)
+    public void applySettledFee(Integer fee) {
+        this.monthlyFee = fee;
+    }
+
+    // ===== [출고 취소] 출고 → 입고: 마감 전 상태로 소급 복구 =====
     public void unreleased() {
         this.status = OrderStatus.INBOUND;
         this.actualEndDate = null;
+        if (this.originalEndDate != null) {
+            this.expectedEndDate = this.originalEndDate;   // 보관 종료일 롤백
+            this.originalEndDate = null;
+        }
+        if (this.originalMonthlyFee != null) {
+            this.monthlyFee = this.originalMonthlyFee;      // 보관료 롤백
+            this.originalMonthlyFee = null;
+        }
     }
 
     // ===== 편의 판별 =====

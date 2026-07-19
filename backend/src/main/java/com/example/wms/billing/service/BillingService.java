@@ -276,6 +276,37 @@ public class BillingService {
         locked.applyAdjustment(diff);
     }
 
+    /**
+     * [출고 취소] 계약의 중도출고 소급 정산을 되돌린다.
+     * 마지막 '출고취소' 이후 쌓인 '중도출고' 조정들의 순합을 구해 반대 부호 조정으로 상쇄한다.
+     * (조정은 불변 이력이므로 삭제 대신 역조정을 추가 — 오딧 트레일 보존)
+     */
+    @Transactional
+    public void reverseMidReleaseForOrder(Long storageOrderId) {
+        Long userId = SecurityUtils.getCurrentUser().getUserId();
+        for (BillingLedger ledger : ledgerRepository.findByStorageOrderId(storageOrderId)) {
+            if (ledger.getStatus() == BillingStatus.CANCELED) continue;
+            BigDecimal net = BigDecimal.ZERO;
+            for (BillingAdjustment adj : adjustmentRepository
+                    .findByBillingLedgerIdAndTenantIdOrderByCreatedAtAsc(ledger.getId(), ledger.getTenant().getId())) {
+                String reason = adj.getReason();
+                if (reason == null) continue;
+                if (reason.startsWith("출고취소")) {
+                    net = BigDecimal.ZERO;            // 이전 정산은 이미 취소됨 → 리셋
+                } else if (reason.startsWith("중도출고")) {
+                    net = net.add(adj.getAmount());
+                }
+            }
+            if (net.signum() != 0) {
+                BillingLedger locked = lockLedger(ledger.getId());
+                BigDecimal reverse = net.negate();
+                adjustmentRepository.save(new BillingAdjustment(
+                        locked.getTenant(), locked, AdjustmentType.CORRECTION, reverse, "출고취소 - 중도출고 정산 취소", userId));
+                locked.applyAdjustment(reverse);
+            }
+        }
+    }
+
     /** 중도출고 정산 코어 — 이미 잠근 원장에 환급(차감)/추가청구(가산)를 반영 */
     private MidReleaseSettlementResponse applyMidReleaseTo(BillingLedger ledger, LocalDate actualEndDate) {
         Long userId = SecurityUtils.getCurrentUser().getUserId();
