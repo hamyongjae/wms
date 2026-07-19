@@ -175,6 +175,7 @@ export default function CustomersPage() {
               <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
                 <th className="px-4 py-3 font-medium">고객명</th>
                 <th className="px-3 py-3 font-medium">유형</th>
+                <th className="px-3 py-3 font-medium">사업자번호</th>
                 <th className="px-3 py-3 font-medium">연락처</th>
                 <th className="px-4 py-3 font-medium">메모</th>
                 <th className="px-4 py-3 font-medium">상태</th>
@@ -202,6 +203,7 @@ export default function CustomersPage() {
                       {c.customerType === 'CORPORATE' ? '기업' : '개인'}
                     </span>
                   </td>
+                  <td className="px-3 py-3 text-slate-500 tabular-nums">{c.businessNumber || '—'}</td>
                   <td className="px-3 py-3 text-slate-500">{c.phoneNumber || '—'}</td>
                   <td className="px-4 py-3 text-slate-500">
                     <span className="truncate text-xs" title={c.memo || ''}>
@@ -424,19 +426,31 @@ function CustomerModal({
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">유형</label>
-            <select value={customerType} onChange={(e) => setType(e.target.value as CustomerType)} className={inputCls}>
+            <select
+              value={customerType}
+              onChange={(e) => {
+                const next = e.target.value as CustomerType
+                setType(next)
+                // 개인으로 전환하면 사업자번호는 의미가 없으므로 비운다
+                if (next === 'INDIVIDUAL') setBusinessNumber('')
+              }}
+              className={inputCls}
+            >
               <option value="INDIVIDUAL">개인</option>
               <option value="CORPORATE">기업</option>
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">사업자등록번호</label>
+            <label className={cn('mb-1 block text-sm font-medium', customerType === 'CORPORATE' ? 'text-slate-700' : 'text-slate-400')}>
+              사업자등록번호
+            </label>
             <input
               value={businessNumber}
               onChange={(e) => setBusinessNumber(formatBusinessNumber(e.target.value))}
+              disabled={customerType !== 'CORPORATE'}
               inputMode="numeric"
-              placeholder="000-00-00000"
-              className={inputCls}
+              placeholder={customerType === 'CORPORATE' ? '000-00-00000' : '기업만 입력'}
+              className={cn(inputCls, 'disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400')}
             />
           </div>
           <div className="col-span-2">
