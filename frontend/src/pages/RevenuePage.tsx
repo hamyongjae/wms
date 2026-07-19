@@ -60,7 +60,7 @@ export default function RevenuePage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">보관 매출 관리</h2>
+          <h2 className="text-xl font-bold text-slate-800">매출 관리</h2>
           <p className="mt-1 text-sm text-slate-500">계약 점유 기간에 따라 자동 누적되는 보관 매출을 한 화면에서 확인합니다.</p>
         </div>
         {/* 월 이동 — 단일 뷰 안에서 조회 버튼 없이 즉시 전환 */}
@@ -135,7 +135,7 @@ export default function RevenuePage() {
           <section className="rounded-2xl bg-white p-6 shadow-soft ring-1 ring-slate-200/60">
             <div className="flex items-center justify-between">
               <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                <PieChart size={15} className="text-slate-400" /> 고객사별 매출 비중
+                <PieChart size={15} className="text-slate-400" /> 고객별 매출 비중
               </h3>
               <span className="text-xs text-slate-400">{cursor.month1}월 기준</span>
             </div>

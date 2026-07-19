@@ -99,9 +99,10 @@ export interface LedgerCreateRequest {
 }
 
 export const billingApi = {
-  async list(): Promise<BillingLedger[]> {
+  // [기간 조회] from·to(yyyy-MM-dd) 지정 시 청구 기간이 겹치는 원장만 서버에서 필터링
+  async list(range?: { from?: string; to?: string }): Promise<BillingLedger[]> {
     const { data } = await api.get<Page<BillingLedger>>('/api/billing/ledgers', {
-      params: { size: 500, sort: 'id,desc' },
+      params: { size: 500, sort: 'id,desc', from: range?.from, to: range?.to },
     })
     return data.content
   },

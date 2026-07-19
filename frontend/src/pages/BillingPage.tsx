@@ -14,6 +14,8 @@ import {
   SlidersHorizontal,
   ArrowRightCircle,
   Undo2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import {
   billingApi,
@@ -71,6 +73,13 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const totalDue = (l: BillingLedger) => l.baseAmount + l.carriedOverIn + l.adjustmentTotal
 
+const pad2 = (n: number) => String(n).padStart(2, '0')
+/** 해당 연·월(1~12)의 1일~말일 (yyyy-MM-dd) */
+function monthBounds(year: number, month1: number): { from: string; to: string } {
+  const last = new Date(year, month1, 0).getDate()
+  return { from: `${year}-${pad2(month1)}-01`, to: `${year}-${pad2(month1)}-${pad2(last)}` }
+}
+
 export default function BillingPage() {
   const isAdmin = authStorage.getUser()?.role === 'ADMIN'
 
@@ -81,6 +90,11 @@ export default function BillingPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  // [제로 클릭] 진입 즉시 '당월 1일~말일'을 기본 조회 기간으로 세팅
+  const [range, setRange] = useState(() => {
+    const n = new Date()
+    return monthBounds(n.getFullYear(), n.getMonth() + 1)
+  })
   // [딥링크] 캘린더 등에서 /billing?ledger=ID 로 진입하면 해당 원장 상세를 바로 연다
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -98,12 +112,13 @@ export default function BillingPage() {
   useEffect(() => {
     setLoading(true)
     setError(null)
+    // 기간(range)이나 새로고침 키가 바뀌면 해당 기간 원장만 서버에서 받아 카드·표를 함께 갱신
     billingApi
-      .list()
+      .list(range.from && range.to ? range : undefined)
       .then(setLedgers)
       .catch(() => setError('청구 원장을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
-  }, [refreshKey])
+  }, [refreshKey, range])
 
   const kpi = useMemo(() => {
     const active = ledgers.filter((l) => l.status !== 'CANCELED')
@@ -127,6 +142,22 @@ export default function BillingPage() {
     } catch (err) {
       setNotice(errMsg(err, '촉구 발송에 실패했습니다.'))
     }
+  }
+
+  // 현재 조회 기간의 기준 연·월 (from 기준)
+  const cursor = useMemo(() => {
+    const [y, m] = range.from.split('-').map(Number)
+    return { year: y || new Date().getFullYear(), month1: m || new Date().getMonth() + 1 }
+  }, [range.from])
+
+  // 월 단위 이동 — 해당 월의 1일~말일로 기간을 통째로 세팅 (연·월 동시 전환)
+  function moveMonth(step: number) {
+    const d = new Date(cursor.year, cursor.month1 - 1 + step, 1)
+    setRange(monthBounds(d.getFullYear(), d.getMonth() + 1))
+  }
+  function goThisMonth() {
+    const n = new Date()
+    setRange(monthBounds(n.getFullYear(), n.getMonth() + 1))
   }
 
   return (
@@ -156,6 +187,39 @@ export default function BillingPage() {
           </button>
         </div>
       )}
+
+      {/* [기간 필터] 진입 즉시 당월. 월 이동(연·월 동시) + 사용자 지정 기간 — 변경 시 카드·표 동시 갱신 */}
+      <div className="flex flex-col gap-3 rounded-2xl bg-white p-3.5 shadow-soft ring-1 ring-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => moveMonth(-1)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" title="이전 달">
+            <ChevronLeft size={16} />
+          </button>
+          <span className="min-w-24 text-center text-sm font-semibold text-slate-800">{cursor.year}년 {cursor.month1}월</span>
+          <button type="button" onClick={() => moveMonth(1)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" title="다음 달">
+            <ChevronRight size={16} />
+          </button>
+          <button type="button" onClick={goThisMonth} className="ml-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+            이번 달
+          </button>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <input
+            type="date"
+            value={range.from}
+            max={range.to || undefined}
+            onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
+            className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+          <span className="text-slate-400">~</span>
+          <input
+            type="date"
+            value={range.to}
+            min={range.from || undefined}
+            onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
+            className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="미수금 총액" value={won(kpi.outstanding)} icon={Wallet} tone="amber" />
