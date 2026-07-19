@@ -286,9 +286,13 @@ public class BillingService {
     }
 
     @Transactional(readOnly = true)
-    public Page<BillingLedgerResponse> listLedgers(Pageable pageable) {
+    public Page<BillingLedgerResponse> listLedgers(LocalDate from, LocalDate to, Pageable pageable) {
         Long tenantId = SecurityUtils.getCurrentTenantId();
-        return ledgerRepository.findByTenantId(tenantId, pageable).map(BillingLedgerResponse::new);
+        // [기간 필터] 둘 다 있으면 인덱스 기반 겹침 조회, 아니면 전체 조회 (기존 동작 호환)
+        Page<BillingLedger> page = (from != null && to != null)
+                ? ledgerRepository.findByTenantIdAndPeriodOverlap(tenantId, from, to, pageable)
+                : ledgerRepository.findByTenantId(tenantId, pageable);
+        return page.map(BillingLedgerResponse::new);
     }
 
     @Transactional(readOnly = true)

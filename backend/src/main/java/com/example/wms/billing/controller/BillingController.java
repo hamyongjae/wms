@@ -48,8 +48,13 @@ public class BillingController {
     // ===== 조회 =====
 
     @GetMapping
-    public ResponseEntity<Page<BillingLedgerResponse>> listLedgers(Pageable pageable) {
-        return ResponseEntity.ok(billingService.listLedgers(pageable));
+    public ResponseEntity<Page<BillingLedgerResponse>> listLedgers(
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            Pageable pageable) {
+        return ResponseEntity.ok(billingService.listLedgers(from, to, pageable));
     }
 
     @GetMapping("/{id}")

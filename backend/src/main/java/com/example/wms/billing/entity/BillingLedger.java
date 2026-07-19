@@ -32,7 +32,9 @@ import java.util.List;
                 name = "uk_billing_ledger_no", columnNames = "ledger_no"),
         indexes = {
                 @Index(name = "idx_ledger_tenant", columnList = "tenant_id"),
-                @Index(name = "idx_ledger_order", columnList = "storage_order_id")
+                @Index(name = "idx_ledger_order", columnList = "storage_order_id"),
+                // [기간 조회] tenant + 청구 시작일 복합 인덱스 — 월별/기간별 조회가 인덱스를 타도록
+                @Index(name = "idx_ledger_tenant_period", columnList = "tenant_id, period_start")
         })
 @Getter
 @NoArgsConstructor

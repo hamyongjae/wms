@@ -21,6 +21,22 @@ public interface BillingLedgerRepository extends JpaRepository<BillingLedger, Lo
 
     Page<BillingLedger> findByTenantId(Long tenantId, Pageable pageable);
 
+    /**
+     * [기간 조회] 청구 기간이 [from, to]와 겹치는 원장만 조회 (인덱스 idx_ledger_tenant_period 활용).
+     * 겹침 조건: 시작일 <= to  AND  종료일 >= from  → 자바 전체 로드 후 필터링 낭비 제거.
+     */
+    @Query("""
+            select l from BillingLedger l
+            where l.tenant.id = :tenantId
+              and l.billingPeriodStart <= :to
+              and l.billingPeriodEnd >= :from
+            """)
+    Page<BillingLedger> findByTenantIdAndPeriodOverlap(
+            @Param("tenantId") Long tenantId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            Pageable pageable);
+
     Page<BillingLedger> findByTenantIdAndStatus(Long tenantId, BillingStatus status, Pageable pageable);
 
     // [캘린더] 해당 테넌트의 전체 원장 (청구 이벤트 파생용)
