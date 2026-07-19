@@ -46,6 +46,7 @@ public class BillingService {
     private final PaymentHistoryRepository paymentHistoryRepository;
     private final BillingAdjustmentRepository adjustmentRepository;
     private final StorageOrderRepository storageOrderRepository;
+    private final com.example.wms.container.repository.ContainerRepository containerRepository;
     private final ProrationCalculator prorationCalculator;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -90,6 +91,12 @@ public class BillingService {
         LocalDate current = order.getExpectedEndDate();
         if (current == null || periodEnd.isAfter(current)) {
             order.setExpectedEndDate(periodEnd);
+            // [일정 동기화] 배정된 컨테이너의 출고예정일도 계약 기준으로 즉시 맞춘다.
+            //   (tenant는 SecurityUtils가 아닌 계약 엔티티에서 얻어 배치/요청 문맥 모두에서 동작)
+            Long tenantId = order.getTenant().getId();
+            for (var c : containerRepository.findByTenantIdAndCurrentOrderId(tenantId, order.getId())) {
+                c.setStorageDates(order.getStorageStartDate(), periodEnd);
+            }
         }
     }
 
