@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
 import { Plus, Loader2, Trash2, FileText, ShieldAlert, AlertTriangle, Pencil, X, Wallet } from 'lucide-react'
-import { orderApi, type StorageOrder, type OrderStatus, type PaymentType } from '@/api/orderApi'
+import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod } from '@/api/orderApi'
+import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger, type PaymentMethod } from '@/api/billingApi'
 import { displayStatus, isOpenLedger } from '@/lib/billing'
 import { customerApi, type Customer, type CustomerType } from '@/api/customerApi'
@@ -925,6 +926,9 @@ function CreateOrderModal({
   const [expectedEndDate, setEndDate] = useState('')
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
   const [paymentType, setPaymentType] = useState<PaymentType>('PREPAID')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('BANK_TRANSFER') // 결제 수단 기본 계좌이체
+  const [settlementUserId, setSettlementUserId] = useState<number | null>(null)
+  const [staffList, setStaffList] = useState<Staff[]>([])
   const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -951,6 +955,8 @@ function CreateOrderModal({
       setEndDate(addDays(today(), 7))
       setMonthlyFee(null)
       setPaymentType('PREPAID')
+      setPaymentMethod('BANK_TRANSFER')
+      setSettlementUserId(null)
       setMemo('')
       setFormError(null)
       setDormantConfirm(false)
@@ -963,6 +969,16 @@ function CreateOrderModal({
       setEndDate(addDays(storageStartDate, 7))
     }
   }, [storageStartDate])
+
+  // [수납 계좌] 직원 목록 로드 (계좌이체 시 담당 직원 선택용) — 권한 없으면 빈 목록
+  useEffect(() => {
+    if (!open) return
+    let alive = true
+    staffApi.list().then((s) => alive && setStaffList(s)).catch(() => alive && setStaffList([]))
+    return () => {
+      alive = false
+    }
+  }, [open])
 
   // [층 단가] 선택 창고의 층별 단가 로드 (슬롯 선택 시 보관료 기본값 연동용)
   const [floorPrices, setFloorPrices] = useState<Map<number, number>>(new Map())
@@ -1016,6 +1032,8 @@ function CreateOrderModal({
         expectedEndDate: expectedEndDate || undefined,
         monthlyFee: monthlyFee!,
         paymentType,
+        paymentMethod,
+        settlementUserId: paymentMethod === 'BANK_TRANSFER' ? (settlementUserId ?? undefined) : undefined,
         memo: memo || undefined,
       })
       // 위치를 지정했으면 컨테이너 생성·배정·적재까지 이어서 처리(미지정이면 생략)
@@ -1190,7 +1208,24 @@ function CreateOrderModal({
                     <option value="POSTPAID">후불 (매월 청구)</option>
                   </select>
                 </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">결제 수단 *</label>
+                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)} className={inputCls}>
+                    <option value="BANK_TRANSFER">계좌이체</option>
+                    <option value="CASH">현금</option>
+                    <option value="CARD">카드</option>
+                  </select>
+                </div>
               </div>
+
+              {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 */}
+              {paymentMethod === 'BANK_TRANSFER' && (
+                <PaymentAccountPicker
+                  staffList={staffList}
+                  value={settlementUserId}
+                  onChange={setSettlementUserId}
+                />
+              )}
 
               {periodError && (
                 <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -1569,6 +1604,55 @@ function RadioRow({
         <span className="mt-0.5 block text-xs text-slate-500">{desc}</span>
       </span>
     </button>
+  )
+}
+
+/* ===== 계좌이체 시 입금 계좌(담당 직원) 지정 =====
+ * 직원 정보에 등록된 주거래 계좌를 동적으로 불러와, 타이핑 없이 선택만으로 수납 계좌를 매핑한다.
+ */
+function PaymentAccountPicker({
+  staffList,
+  value,
+  onChange,
+}: {
+  staffList: Staff[]
+  value: number | null
+  onChange: (id: number | null) => void
+}) {
+  // 계좌가 등록된 직원만 후보로 (계좌 없는 직원은 매핑 불가)
+  const withAccount = staffList.filter((s) => s.accountNumber)
+  const selected = withAccount.find((s) => s.id === value) ?? null
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+      <label className="mb-1 block text-sm font-medium text-slate-700">입금 계좌 (담당 직원)</label>
+      {withAccount.length === 0 ? (
+        <p className="text-xs text-slate-400">
+          계좌가 등록된 직원이 없습니다. 직원 관리 화면에서 주거래 계좌를 먼저 등록하세요.
+        </p>
+      ) : (
+        <>
+          <select
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+            className={inputCls}
+          >
+            <option value="">계좌 미지정</option>
+            {withAccount.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} · {s.bankName ?? ''} {s.accountNumber}
+              </option>
+            ))}
+          </select>
+          {selected && (
+            <div className="mt-2 rounded-lg bg-white px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200">
+              <span className="font-medium text-slate-800">{selected.bankName}</span> {selected.accountNumber}
+              <span className="ml-1 text-slate-400">· 예금주 {selected.accountHolder ?? selected.name}</span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   )
 }
 

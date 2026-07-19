@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, ShieldCheck, User as UserIcon, Users } from 'lucide-react'
-import { staffApi, type Staff, type StaffCreate } from '@/api/staffApi'
+import { Plus, Loader2, ShieldCheck, User as UserIcon, Users, CreditCard, Pencil } from 'lucide-react'
+import { staffApi, type Staff, type StaffCreate, type StaffAccount } from '@/api/staffApi'
 import type { UserRole } from '@/lib/auth'
 import { authStorage } from '@/lib/auth'
 import { validateUsername, validatePassword, USERNAME_REGEX, PASSWORD_REGEX } from '@/hooks/useFormValidation'
@@ -27,6 +27,7 @@ export default function StaffPage() {
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [createOpen, setCreateOpen] = useState(false)
+  const [accountTarget, setAccountTarget] = useState<Staff | null>(null)
 
   useEffect(() => {
     if (!isAdmin) {
@@ -97,6 +98,7 @@ export default function StaffPage() {
                 <th className="px-5 py-3 font-medium">이름</th>
                 <th className="px-5 py-3 font-medium">아이디</th>
                 <th className="px-5 py-3 font-medium">권한</th>
+                <th className="px-5 py-3 font-medium">수납 계좌</th>
                 <th className="px-5 py-3 font-medium">상태</th>
                 <th className="px-5 py-3 font-medium">가입일</th>
               </tr>
@@ -129,6 +131,27 @@ export default function StaffPage() {
                     </span>
                   </td>
                   <td className="px-5 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setAccountTarget(s)}
+                      className={cn(
+                        'group inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition',
+                        s.accountNumber
+                          ? 'text-slate-600 hover:bg-slate-100'
+                          : 'text-slate-400 hover:bg-slate-100',
+                      )}
+                      title="수납 계좌 등록/수정"
+                    >
+                      <CreditCard size={13} />
+                      {s.accountNumber ? (
+                        <span className="tabular-nums">{s.bankName} {s.accountNumber}</span>
+                      ) : (
+                        '계좌 등록'
+                      )}
+                      <Pencil size={11} className="opacity-0 transition group-hover:opacity-100" />
+                    </button>
+                  </td>
+                  <td className="px-5 py-3">
                     <span
                       className={cn(
                         'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1',
@@ -154,7 +177,99 @@ export default function StaffPage() {
           setRefreshKey((k) => k + 1)
         }}
       />
+
+      <AccountModal
+        target={accountTarget}
+        onClose={() => setAccountTarget(null)}
+        onDone={(updated) => {
+          // 새로고침 없이 해당 직원 행만 갱신
+          setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+          setAccountTarget(null)
+        }}
+      />
     </div>
+  )
+}
+
+/* ===== 직원 수납 계좌 등록/수정 ===== */
+function AccountModal({
+  target,
+  onClose,
+  onDone,
+}: {
+  target: Staff | null
+  onClose: () => void
+  onDone: (updated: Staff) => void
+}) {
+  const [bankName, setBankName] = useState('')
+  const [accountNumber, setAccountNumber] = useState('')
+  const [accountHolder, setAccountHolder] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!target) return
+    setBankName(target.bankName ?? '')
+    setAccountNumber(target.accountNumber ?? '')
+    setAccountHolder(target.accountHolder ?? target.name)
+    setFormError(null)
+  }, [target])
+
+  if (!target) return null
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    setFormError(null)
+    const body: StaffAccount = {
+      bankName: bankName.trim() || undefined,
+      accountNumber: accountNumber.replace(/[^0-9-]/g, '') || undefined,
+      accountHolder: accountHolder.trim() || undefined,
+    }
+    try {
+      const updated = await staffApi.updateAccount(target!.id, body)
+      onDone(updated)
+    } catch (err) {
+      setFormError(isAxiosError(err) ? (err.response?.data?.message ?? '저장에 실패했습니다.') : '저장에 실패했습니다.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`${target.name} · 수납 계좌`}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">은행명</label>
+          <input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="예: 국민은행" autoFocus className={inputCls} />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">계좌번호</label>
+          <input
+            value={accountNumber}
+            onChange={(e) => setAccountNumber(e.target.value)}
+            inputMode="numeric"
+            placeholder="숫자·하이픈"
+            className={cn(inputCls, 'tabular-nums')}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">예금주</label>
+          <input value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)} className={inputCls} />
+        </div>
+
+        {formError && <p className="text-sm text-red-600">{formError}</p>}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
+            취소
+          </button>
+          <button type="submit" disabled={submitting} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
+            {submitting ? '저장 중…' : '저장'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 

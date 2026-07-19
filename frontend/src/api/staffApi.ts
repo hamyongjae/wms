@@ -11,7 +11,16 @@ export interface Staff {
   name: string
   role: UserRole
   status: UserStatus
+  bankName: string | null
+  accountNumber: string | null
+  accountHolder: string | null
   createdAt: string
+}
+
+export interface StaffAccount {
+  bankName?: string
+  accountNumber?: string
+  accountHolder?: string
 }
 
 export interface StaffCreate {
@@ -30,6 +39,11 @@ export const staffApi = {
   // 직원 계정 추가 (ADMIN) — tenantId는 서버가 토큰에서 상속
   async create(body: StaffCreate): Promise<Staff> {
     const { data } = await api.post<Staff>('/api/auth/signup-staff', body)
+    return data
+  },
+  // 직원 주거래 계좌 등록·수정 (ADMIN)
+  async updateAccount(id: number, body: StaffAccount): Promise<Staff> {
+    const { data } = await api.patch<Staff>(`/api/auth/staff/${id}/account`, body)
     return data
   },
 }

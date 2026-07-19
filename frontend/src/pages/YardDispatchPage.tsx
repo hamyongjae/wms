@@ -17,7 +17,8 @@ import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { yardApi, type YardSlot, type FloorPrice } from '@/api/yardApi'
 import { containerApi, type Container } from '@/api/containerApi'
 import { customerApi, type Customer } from '@/api/customerApi'
-import { orderApi, type StorageOrder, type PaymentType } from '@/api/orderApi'
+import { orderApi, type StorageOrder, type PaymentType, type PaymentMethod } from '@/api/orderApi'
+import { staffApi, type Staff } from '@/api/staffApi'
 import { addDays } from '@/lib/dates'
 import { orderSync } from '@/lib/orderEvents'
 import StatCard from '@/components/ui/StatCard'
@@ -49,6 +50,8 @@ export interface QuickInboundDto {
   orderId?: number // 선택 시 해당 계약에 배정 / 없으면 새 계약 생성
   monthlyFee?: number // 새 계약 생성 시 보관료
   paymentType?: PaymentType // 새 계약 생성 시 결제 방식
+  paymentMethod?: PaymentMethod // 결제 수단 (계좌이체 기본)
+  settlementUserId?: number // 계좌이체 시 수납 담당 직원
   inboundDate?: string
   outboundDate?: string
   memo?: string
@@ -648,6 +651,9 @@ function InboundModal({
   const [orderId, setOrderId] = useState('') // 선택 계약(빈 값이면 배정 안 함)
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
   const [paymentType, setPaymentType] = useState<PaymentType>('PREPAID')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('BANK_TRANSFER')
+  const [settlementUserId, setSettlementUserId] = useState<number | null>(null)
+  const [staffList, setStaffList] = useState<Staff[]>([])
   const today = new Date().toISOString().slice(0, 10)
   const [inboundDate, setInboundDate] = useState(today)
   const [outboundDate, setOutboundDate] = useState(addDays(today, 7))
@@ -657,6 +663,15 @@ function InboundModal({
 
   // 컨테이너 번호 자동 배정 (접두사 없이 순번) — 기존 번호 중 최대 정수 +1
   const autoNo = useMemo(() => nextContainerNo(existingNos), [existingNos])
+
+  // [수납 계좌] 직원 목록 (계좌이체 담당 선택용) — 권한 없으면 빈 목록
+  useEffect(() => {
+    let alive = true
+    staffApi.list().then((s) => alive && setStaffList(s)).catch(() => alive && setStaffList([]))
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // [자동 계산] 입고일이 변경되면 출고 예정일을 자동으로 +7일로 설정
   useEffect(() => {
@@ -717,6 +732,8 @@ function InboundModal({
         orderId: orderId ? Number(orderId) : undefined,
         monthlyFee: monthlyFee ?? undefined,
         paymentType: !orderId ? paymentType : undefined,
+        paymentMethod: !orderId ? paymentMethod : undefined,
+        settlementUserId: !orderId && paymentMethod === 'BANK_TRANSFER' ? (settlementUserId ?? undefined) : undefined,
         inboundDate: inboundDate || undefined,
         outboundDate: outboundDate || undefined,
         memo: memo.trim() || undefined,
@@ -821,7 +838,20 @@ function InboundModal({
                   <option value="POSTPAID">후불 (매월 청구)</option>
                 </select>
               </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">결제 수단</label>
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)} className={inputCls}>
+                  <option value="BANK_TRANSFER">계좌이체</option>
+                  <option value="CASH">현금</option>
+                  <option value="CARD">카드</option>
+                </select>
+              </div>
             </div>
+
+            {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 */}
+            {!orderId && paymentMethod === 'BANK_TRANSFER' && (
+              <InboundAccountPicker staffList={staffList} value={settlementUserId} onChange={setSettlementUserId} />
+            )}
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">특이사항</label>
               <textarea
@@ -1239,6 +1269,49 @@ function FloorPriceInline({
         취소
       </button>
     </span>
+  )
+}
+
+/* 계좌이체 시 입금 계좌(담당 직원) 지정 — 직원 정보에 등록된 계좌를 선택만으로 매핑 */
+function InboundAccountPicker({
+  staffList,
+  value,
+  onChange,
+}: {
+  staffList: Staff[]
+  value: number | null
+  onChange: (id: number | null) => void
+}) {
+  const withAccount = staffList.filter((s) => s.accountNumber)
+  const selected = withAccount.find((s) => s.id === value) ?? null
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+      <label className="mb-1 block text-sm font-medium text-slate-700">입금 계좌 (담당 직원)</label>
+      {withAccount.length === 0 ? (
+        <p className="text-xs text-slate-400">계좌가 등록된 직원이 없습니다. 직원 관리에서 계좌를 먼저 등록하세요.</p>
+      ) : (
+        <>
+          <select
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+            className={inputCls}
+          >
+            <option value="">계좌 미지정</option>
+            {withAccount.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} · {s.bankName ?? ''} {s.accountNumber}
+              </option>
+            ))}
+          </select>
+          {selected && (
+            <div className="mt-2 rounded-lg bg-white px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200">
+              <span className="font-medium text-slate-800">{selected.bankName}</span> {selected.accountNumber}
+              <span className="ml-1 text-slate-400">· 예금주 {selected.accountHolder ?? selected.name}</span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   )
 }
 

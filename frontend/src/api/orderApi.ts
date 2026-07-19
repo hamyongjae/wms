@@ -3,6 +3,7 @@ import type { Page } from '@/api/yardApi'
 
 export type OrderStatus = 'INBOUND' | 'OUTBOUND'
 export type PaymentType = 'PREPAID' | 'POSTPAID'
+export type PaymentMethod = 'BANK_TRANSFER' | 'CASH' | 'CARD'
 
 export interface StorageOrder {
   id: number
@@ -20,6 +21,12 @@ export interface StorageOrder {
   totalVolume: number | null
   paymentType: PaymentType
   memo: string | null
+  paymentMethod: PaymentMethod
+  settlementUserId: number | null
+  settlementUserName: string | null
+  bankName: string | null
+  accountNumber: string | null
+  accountHolder: string | null
 }
 
 export interface OrderCreate {
@@ -29,6 +36,8 @@ export interface OrderCreate {
   expectedEndDate?: string
   monthlyFee: number
   paymentType?: PaymentType
+  paymentMethod?: PaymentMethod
+  settlementUserId?: number
   totalVolume?: number
   memo?: string
 }
