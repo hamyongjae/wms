@@ -6,6 +6,7 @@ import {
   Warehouse,
   Grid3x3,
   CreditCard,
+  TrendingUp,
   Building2,
   UserCog,
   type LucideIcon,
@@ -28,6 +29,7 @@ export const navItems: NavItem[] = [
   { to: '/warehouses', label: '창고 관리', description: '구역 및 보관 시설 설정', icon: Warehouse },
   { to: '/yard', label: '컨테이너 관리', description: '격자 맵에서 입출고·이동 처리', icon: Grid3x3 },
   { to: '/billing', label: '정산 관리', description: '청구 원장·미수금·세금계산서', icon: CreditCard },
+  { to: '/revenue', label: '보관 매출 관리', description: '월 매출 요약·고객사별 비중', icon: TrendingUp },
   { to: '/staff', label: '직원 관리', description: '계정 추가·권한 관리', icon: UserCog, adminOnly: true },
   { to: '/settings', label: '회사 정보', description: '업체 기본 정보 설정', icon: Building2, adminOnly: true },
 ]

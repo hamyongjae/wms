@@ -133,7 +133,7 @@ export default function BillingPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">청구 · 정산</h2>
+          <h2 className="text-xl font-bold text-slate-800">정산 관리</h2>
           <p className="mt-1 text-sm text-slate-500">보관료 청구 원장과 수금·조정·미수금 이월을 관리합니다.</p>
         </div>
         {isAdmin && (
