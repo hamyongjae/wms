@@ -113,6 +113,9 @@ export default function OrdersPage() {
       .finally(() => setLoading(false))
   }, [refreshKey])
 
+  // [실시간 동기화] 컨테이너 관리에서 출고 등 상태 변경 시 계약 목록도 갱신
+  useEffect(() => orderSync.subscribe(reload), [])
+
   /**
    * 계약별 배치 위치 계산 (부가 정보 — 실패해도 목록은 정상 표시).
    * 이 앱은 계약↔컨테이너 직접 링크가 없으므로, 계약의 '창고 + 고객(화주)'과

@@ -224,6 +224,8 @@ export default function YardDispatchPage() {
       setActionSlot(null)
       setBanner(`${owner} 출고 완료`)
       reload()
+      orderSync.emit() // 계약관리·캘린더에 출고 전파
+
     } catch (err) {
       alert(errMsg(err, '출고에 실패했습니다.'))
     }

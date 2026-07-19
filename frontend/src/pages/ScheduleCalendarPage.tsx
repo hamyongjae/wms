@@ -65,12 +65,8 @@ const fmtDate = (s: string) => {
   return d ? `${y}. ${m}. ${d}` : s
 }
 
-// 입고/출고 이벤트는 상태에 따라 "예정/지연"을 붙여 명확히 보여준다.
+// [정책] 예정/지연 구분 없이 입고/출고 라벨만 표시한다.
 function eventLabel(e: CalendarEvent): string {
-  if (e.type === 'INBOUND' || e.type === 'OUTBOUND') {
-    if (e.status === 'PENDING') return `${e.title} 예정`
-    if (e.status === 'OVERDUE') return `${e.title} 지연`
-  }
   return e.title
 }
 
@@ -285,7 +281,6 @@ export default function ScheduleCalendarPage() {
                             className={cn(
                               'truncate rounded px-1 py-0.5 text-[11px] font-medium ring-1',
                               TYPE_META[e.type].badge,
-                              e.status === 'OVERDUE' && 'ring-red-300',
                             )}
                             title={eventLabel(e)}
                           >
