@@ -84,6 +84,11 @@ export const containerApi = {
   async remove(id: number): Promise<void> {
     await api.delete(`/api/containers/${id}`)
   },
+  /** [정합성 정리] 계약과 연결이 끊긴 유령 컨테이너 일괄 정리 → 정리 건수 반환 */
+  async cleanupOrphans(): Promise<number> {
+    const { data } = await api.post<number>('/api/containers/cleanup-orphans', {})
+    return data
+  },
 
   // ===== 보관창고 배치(입고/이동/반출) — 현장(STAFF+) =====
   /** 컨테이너를 특정 계약(주문)에 배정 — 빈(AVAILABLE) 컨테이너 → 사용중 + currentOrder 설정 */

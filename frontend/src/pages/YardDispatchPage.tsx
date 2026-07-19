@@ -93,7 +93,23 @@ export default function YardDispatchPage() {
   const isMobile = useIsMobile()
   const [floorIdx, setFloorIdx] = useState(0)
 
+  const [cleaning, setCleaning] = useState(false)
   const reload = () => setRefreshKey((k) => k + 1)
+
+  // [정합성 정리] 계약과 연결이 끊긴 유령 컨테이너를 일괄 정리하고 화면 갱신
+  async function handleCleanupOrphans() {
+    if (!window.confirm('삭제된 계약의 미연결 컨테이너를 정리할까요?\n(연결이 끊긴 컨테이너와 점유 자리가 정리됩니다)')) return
+    setCleaning(true)
+    try {
+      const n = await containerApi.cleanupOrphans()
+      setBanner(n > 0 ? `유령 컨테이너 ${n}건을 정리했습니다.` : '정리할 미연결 컨테이너가 없습니다.')
+      reload()
+    } catch (err) {
+      setBanner(isAxiosError(err) ? (err.response?.data?.message ?? '정합성 정리 실패') : '정합성 정리 실패')
+    } finally {
+      setCleaning(false)
+    }
+  }
 
   useEffect(() => {
     warehouseApi
@@ -277,13 +293,25 @@ export default function YardDispatchPage() {
         </div>
         {/* 데스크톱: 상단 버튼 / 모바일: 하단 FAB(엄지 존)이 대신한다 */}
         {isAdmin && selectedId != null && (
-          <button
-            type="button"
-            onClick={() => setGridOpen(true)}
-            className="hidden shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 md:flex"
-          >
-            <Plus size={16} /> 자리 생성
-          </button>
+          <div className="hidden shrink-0 items-center gap-2 md:flex">
+            <button
+              type="button"
+              onClick={handleCleanupOrphans}
+              disabled={cleaning}
+              title="삭제된 계약의 미연결 컨테이너를 자동 정리합니다"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+            >
+              <Loader2 size={15} className={cn('animate-spin', !cleaning && 'hidden')} />
+              정합성 정리
+            </button>
+            <button
+              type="button"
+              onClick={() => setGridOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+            >
+              <Plus size={16} /> 자리 생성
+            </button>
+          </div>
         )}
       </div>
 
