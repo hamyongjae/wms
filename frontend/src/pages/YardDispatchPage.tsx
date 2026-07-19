@@ -22,6 +22,8 @@ import { staffApi, type Staff } from '@/api/staffApi'
 import { addDays } from '@/lib/dates'
 import { calcFloorFee } from '@/lib/fee'
 import { useFloorPricing } from '@/hooks/useFloorPricing'
+import { tenantApi } from '@/api/tenantApi'
+import OutboundDatePresets from '@/components/ui/OutboundDatePresets'
 import { orderSync } from '@/lib/orderEvents'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
@@ -658,6 +660,7 @@ function InboundModal({
   const today = new Date().toISOString().slice(0, 10)
   const [inboundDate, setInboundDate] = useState(today)
   const [outboundDate, setOutboundDate] = useState(addDays(today, 7))
+  const [defaultDays, setDefaultDays] = useState(7) // 전역 기본 계약 유지 기간
   const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -674,10 +677,15 @@ function InboundModal({
     }
   }, [])
 
-  // [자동 계산] 입고일이 변경되면 출고 예정일을 자동으로 +7일로 설정
+  // 전역 기본 계약 유지 기간 로드 (출고 예정일 기본값)
+  useEffect(() => {
+    tenantApi.me().then((t) => setDefaultDays(t.defaultStoragePeriodDays ?? 7)).catch(() => {})
+  }, [])
+
+  // [자동 계산] 입고일이 변경되면 출고 예정일을 전역 기본 기간만큼 뒤로 설정
   useEffect(() => {
     if (inboundDate && !outboundDate) {
-      setOutboundDate(addDays(inboundDate, 7))
+      setOutboundDate(addDays(inboundDate, defaultDays))
     }
   }, [inboundDate])
 
@@ -840,6 +848,7 @@ function InboundModal({
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
                 <input type="date" value={outboundDate} min={inboundDate || undefined} onChange={(e) => setOutboundDate(e.target.value)} className={inputCls} />
+                <OutboundDatePresets startDate={inboundDate} onPick={setOutboundDate} className="mt-1.5" />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">결제 방식 (신규 계약 시)</label>

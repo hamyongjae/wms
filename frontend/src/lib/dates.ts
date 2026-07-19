@@ -28,3 +28,11 @@ export function getDurationDays(startDate: string, endDate: string | null | unde
   const end = new Date(`${endDate ?? startDate}T00:00:00Z`).getTime()
   return Math.round((end - start) / 86_400_000) + 1
 }
+
+/** 해당 날짜가 속한 달의 말일 (yyyy-MM-dd, UTC 기준) */
+export function endOfMonth(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00Z`)
+  // 다음 달 0일 = 이번 달 말일
+  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0))
+  return last.toISOString().slice(0, 10)
+}

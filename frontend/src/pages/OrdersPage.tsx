@@ -7,6 +7,8 @@ import { billingApi, type BillingLedger, type PaymentMethod } from '@/api/billin
 import { displayStatus, isOpenLedger } from '@/lib/billing'
 import { customerApi, type Customer, type CustomerType } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
+import { tenantApi } from '@/api/tenantApi'
+import OutboundDatePresets from '@/components/ui/OutboundDatePresets'
 import { containerApi } from '@/api/containerApi'
 import { yardApi } from '@/api/yardApi'
 import { authStorage } from '@/lib/auth'
@@ -839,6 +841,7 @@ function EditOrderModal({
                   onChange={(e) => setEndDate(e.target.value)}
                   className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
                 />
+                <OutboundDatePresets startDate={storageStartDate} onPick={setEndDate} className="mt-1.5" />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">보관료 *</label>
@@ -948,6 +951,11 @@ function CreateOrderModal({
   const [formError, setFormError] = useState<string | null>(null)
   const [custOpen, setCustOpen] = useState(false)
   const [dormantConfirm, setDormantConfirm] = useState(false)
+  // [마스터 기본값] 전역 기본 계약 유지 기간(일) — 출고예정일 기본값 산정
+  const [defaultDays, setDefaultDays] = useState(7)
+  useEffect(() => {
+    tenantApi.me().then((t) => setDefaultDays(t.defaultStoragePeriodDays ?? 7)).catch(() => {})
+  }, [])
 
   // [실시간 계산] 하루 보관료 = 보관료 ÷ (보관시작일~출고예정일 총 일수, 당일 포함).
   // 보관료·시작일·출고예정일 세 값이 모두 유효할 때만 값이 나오고, 그 외(출고예정일 미입력,
@@ -966,7 +974,7 @@ function CreateOrderModal({
       setWarehouseId(warehouses[0] ? String(warehouses[0].id) : '')
       setSlotId(null)
       setStartDate(today())
-      setEndDate(addDays(today(), 7))
+      setEndDate(addDays(today(), defaultDays))
       setMonthlyFee(null)
       setPaymentType('PREPAID')
       setPaymentMethod('BANK_TRANSFER')
@@ -978,10 +986,10 @@ function CreateOrderModal({
     }
   }, [open, warehouses])
 
-  // [자동 계산] 보관 시작일이 변경되면 출고 예정일을 자동으로 +7일로 설정
+  // [자동 계산] 보관 시작일이 변경되면 출고 예정일을 전역 기본 기간만큼 뒤로 설정
   useEffect(() => {
     if (storageStartDate && !expectedEndDate) {
-      setEndDate(addDays(storageStartDate, 7))
+      setEndDate(addDays(storageStartDate, defaultDays))
     }
   }, [storageStartDate])
 
@@ -1183,6 +1191,7 @@ function CreateOrderModal({
                     onChange={(e) => setEndDate(e.target.value)}
                     className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
                   />
+                  <OutboundDatePresets startDate={storageStartDate} onPick={setEndDate} className="mt-1.5" />
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">보관료 *</label>

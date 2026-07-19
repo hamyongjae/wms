@@ -9,6 +9,7 @@ export interface TenantInfo {
   email: string | null
   address: string | null
   status: string
+  defaultStoragePeriodDays: number | null
 }
 
 export interface TenantUpdate {
@@ -17,6 +18,7 @@ export interface TenantUpdate {
   phone?: string
   email?: string
   address?: string
+  defaultStoragePeriodDays?: number
 }
 
 export const tenantApi = {

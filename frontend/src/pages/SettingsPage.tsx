@@ -19,6 +19,7 @@ export default function SettingsPage() {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [address, setAddress] = useState('')
+  const [defaultPeriod, setDefaultPeriod] = useState('7')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -33,6 +34,7 @@ export default function SettingsPage() {
         setPhone(t.phone ?? '')
         setEmail(t.email ?? '')
         setAddress(t.address ?? '')
+        setDefaultPeriod(String(t.defaultStoragePeriodDays ?? 7))
       })
       .catch(() => setError('업체 정보를 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
@@ -50,6 +52,7 @@ export default function SettingsPage() {
         phone: phone || undefined,
         email: email || undefined,
         address: address || undefined,
+        defaultStoragePeriodDays: Number(defaultPeriod) > 0 ? Number(defaultPeriod) : undefined,
       })
       setTenant(updated)
       // 헤더/사이드바 동적 타이틀 캐시 갱신 (업체명 변경 즉시 반영)
@@ -113,6 +116,17 @@ export default function SettingsPage() {
             </Field>
             <Field label="주소" className="sm:col-span-2">
               <input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!isAdmin} className={inputCls} />
+            </Field>
+            <Field label="기본 계약 유지 기간(일)" className="sm:col-span-2">
+              <input
+                type="number"
+                min={1}
+                value={defaultPeriod}
+                onChange={(e) => setDefaultPeriod(e.target.value)}
+                disabled={!isAdmin}
+                className={inputCls}
+              />
+              <p className="mt-1 text-xs text-slate-400">계약 등록 시 출고 예정일이 보관 시작일 + 이 일수로 자동 세팅됩니다.</p>
             </Field>
           </div>
 
