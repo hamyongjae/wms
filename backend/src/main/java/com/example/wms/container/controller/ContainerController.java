@@ -96,4 +96,11 @@ public class ContainerController {
         containerService.deleteContainer(id);
         return ResponseEntity.noContent().build();
     }
+
+    // [정합성 정리] 계약과 연결이 끊긴 유령 컨테이너 일괄 정리 — ADMIN, 정리 건수 반환
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/cleanup-orphans")
+    public ResponseEntity<Integer> cleanupOrphans() {
+        return ResponseEntity.ok(containerService.cleanupOrphans());
+    }
 }
