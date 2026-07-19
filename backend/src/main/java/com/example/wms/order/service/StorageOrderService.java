@@ -161,12 +161,18 @@ public class StorageOrderService {
                 ? req.getTargetStatus()
                 : (order.isInbound() ? OrderStatus.OUTBOUND : OrderStatus.INBOUND);
 
+        LocalDate today = LocalDate.now();
         if (target == OrderStatus.OUTBOUND) {
             // 정상 출고: 예정일(없으면 오늘) / 중도 출고: 입력받은 실제 출고일
             LocalDate actualEnd = req.getActualEndDate() != null
                     ? req.getActualEndDate()
-                    : (order.getExpectedEndDate() != null ? order.getExpectedEndDate() : LocalDate.now());
+                    : (order.getExpectedEndDate() != null ? order.getExpectedEndDate() : today);
             TemporalValidator.validateContractPeriod(order.getStorageStartDate(), actualEnd);
+            // [이중 방어] 실제 출고일은 미래일 수 없다 — '만기 전 정상 출고'(미래 종료일 확정) 모순 차단
+            if (actualEnd.isAfter(today)) {
+                throw new IllegalArgumentException(
+                        "보관 종료일이 아직 도래하지 않아 정상 출고할 수 없습니다. 중도 출고로 처리하세요.");
+            }
             order.release(actualEnd);
             syncContainerSchedule(order, order.getStorageStartDate(), actualEnd);
             // [매출 소급] 중도출고 + 소급 선택 시 원장 정산.
@@ -183,6 +189,10 @@ public class StorageOrderService {
         } else {
             // 출고 → 입고(되돌리기). 지연 입고면 실제 입고일로 시작일 조정
             if (req.getActualStartDate() != null) {
+                // [이중 방어] 실제 입고일은 미래일 수 없다
+                if (req.getActualStartDate().isAfter(today)) {
+                    throw new IllegalArgumentException("실제 입고일은 미래일 수 없습니다.");
+                }
                 TemporalValidator.validateContractPeriod(req.getActualStartDate(), order.getExpectedEndDate());
                 order.setStorageStartDate(req.getActualStartDate());
             }
