@@ -41,10 +41,11 @@ public class FloorPriceService {
         Warehouse warehouse = warehouseRepository.findByIdAndTenantId(req.getWarehouseId(), tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 창고입니다. id=" + req.getWarehouseId()));
 
+        Integer minFee = req.getMinFee() != null ? req.getMinFee() : 0;
         FloorPrice fp = floorPriceRepository
                 .findByTenantIdAndWarehouseIdAndTier(tenantId, req.getWarehouseId(), req.getTier())
-                .orElseGet(() -> new FloorPrice(warehouse.getTenant(), warehouse, req.getTier(), req.getUnitPrice()));
-        fp.changePrice(req.getUnitPrice());
+                .orElseGet(() -> new FloorPrice(warehouse.getTenant(), warehouse, req.getTier(), req.getUnitPrice(), minFee));
+        fp.changePrice(req.getUnitPrice(), minFee);
         return new FloorPriceResponse(floorPriceRepository.save(fp));
     }
 }

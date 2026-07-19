@@ -41,20 +41,25 @@ public class FloorPrice {
     private Integer tier;             // 층 (1=바닥)
 
     @Column(name = "unit_price", nullable = false)
-    private Integer unitPrice;        // 층 기본 보관 단가(원)
+    private Integer unitPrice;        // 층 기본 보관 단가(원/일)
+
+    @Column(name = "min_fee")
+    private Integer minFee;           // 최소 보관료(원) — 실제 보관료가 미달 시 이 금액으로 상향
 
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    public FloorPrice(Tenant tenant, Warehouse warehouse, Integer tier, Integer unitPrice) {
+    public FloorPrice(Tenant tenant, Warehouse warehouse, Integer tier, Integer unitPrice, Integer minFee) {
         this.tenant = tenant;
         this.warehouse = warehouse;
         this.tier = tier;
         this.unitPrice = unitPrice;
+        this.minFee = minFee;
     }
 
-    public void changePrice(Integer unitPrice) {
+    public void changePrice(Integer unitPrice, Integer minFee) {
         this.unitPrice = unitPrice;
+        this.minFee = minFee;
     }
 }
