@@ -42,35 +42,40 @@ function overlapDays(aStart: string, aEnd: string, bStart: string, bEnd: string)
   return getDurationDays(s, e)
 }
 
-/** 한 계약이 해당 월에 인식하는 매출액 */
-function accruedForMonth(o: StorageOrder, mStart: string, mEnd: string): number {
+/** 한 계약이 [rangeStart, rangeEnd] 구간에 인식하는 매출액 */
+function accruedInRange(o: StorageOrder, rangeStart: string, rangeEnd: string): number {
   if (!o.storageStartDate || !o.monthlyFee) return 0
   const start = o.storageStartDate
-  // 출고 완료면 실제 출고일, 진행 중이면 출고예정일. 둘 다 없으면 월말까지 진행으로 간주.
-  const periodEnd = o.actualEndDate ?? o.expectedEndDate ?? mEnd
+  // 출고 완료면 실제 출고일, 진행 중이면 출고예정일. 둘 다 없으면 구간 끝까지 진행으로 간주.
+  const periodEnd = o.actualEndDate ?? o.expectedEndDate ?? rangeEnd
   const durationDays = getDurationDays(start, periodEnd)
   if (durationDays <= 0) return 0
   const dailyRate = o.monthlyFee / durationDays
-  const days = overlapDays(start, periodEnd, mStart, mEnd)
+  const days = overlapDays(start, periodEnd, rangeStart, rangeEnd)
   return Math.round(dailyRate * days)
 }
 
 /**
- * 특정 연·월의 보관 매출 요약을 계약 목록에서 계산한다.
- * @param orders 계약 전체
- * @param year 연도
- * @param month1 1~12
+ * 임의 기간 [from, to]의 보관 매출 요약을 계약 목록에서 계산한다. (yyyy-MM-dd)
+ */
+export function computeRangeRevenue(orders: StorageOrder[], from: string, to: string): RevenueSummary {
+  return aggregate(orders, from, to)
+}
+
+/**
+ * 특정 연·월의 보관 매출 요약. (내부적으로 1일~말일 구간 계산)
  */
 export function computeMonthlyRevenue(orders: StorageOrder[], year: number, month1: number): RevenueSummary {
-  const mStart = monthStartStr(year, month1)
-  const mEnd = monthEndStr(year, month1)
+  return aggregate(orders, monthStartStr(year, month1), monthEndStr(year, month1))
+}
 
+function aggregate(orders: StorageOrder[], rangeStart: string, rangeEnd: string): RevenueSummary {
   const byCustomer = new Map<number, CustomerRevenue>()
   let total = 0
   let contractCount = 0
 
   for (const o of orders) {
-    const amount = accruedForMonth(o, mStart, mEnd)
+    const amount = accruedInRange(o, rangeStart, rangeEnd)
     if (amount <= 0) continue
     total += amount
     contractCount++
