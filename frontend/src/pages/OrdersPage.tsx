@@ -13,6 +13,7 @@ import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { validateContractPeriod } from '@/lib/dateValidation'
 import { calcDailyFee, calcFloorFee, type FloorRate } from '@/lib/fee'
+import { useFloorPricing } from '@/hooks/useFloorPricing'
 import { extractOwner } from '@/lib/owner'
 import { nextContainerNo } from '@/lib/containerNo'
 import { orderSync } from '@/lib/orderEvents'
@@ -379,6 +380,7 @@ export default function OrdersPage() {
         onDone={() => {
           setEditTarget(null)
           reload()
+          orderSync.emit() // 위치·기간·보관료 변경을 야적장/캘린더/매출 화면에 실시간 전파
         }}
       />
 
@@ -696,6 +698,9 @@ function EditOrderModal({
   const [slotId, setSlotId] = useState<number | null>(null)
   const [currentSlotId, setCurrentSlotId] = useState<number | null>(null)
   const [currentContainerId, setCurrentContainerId] = useState<number | null>(null)
+  // [층 단가 연동] 사용자가 위치를 바꾼 뒤부터 자동 보정 (초기 로드값은 보존)
+  const [feeTier, setFeeTier] = useState<number | null>(null)
+  const floorPrices = useFloorPricing(target?.warehouseId ?? null, target != null)
 
   useEffect(() => {
     if (target) {
@@ -704,9 +709,17 @@ function EditOrderModal({
       setMonthlyFee(target.monthlyFee)
       setVolume(target.totalVolume != null ? String(target.totalVolume) : '')
       setMemo(target.memo ?? '')
+      setFeeTier(null)
       setFormError(null)
     }
   }, [target])
+
+  // 위치(층) 선택 또는 보관 기간 변경 시 층 단가·최소료로 보관료 자동 보정 (공통 엔진)
+  useEffect(() => {
+    if (feeTier == null) return
+    const rate = floorPrices.get(feeTier)
+    if (rate) setMonthlyFee(calcFloorFee(rate, storageStartDate, expectedEndDate))
+  }, [feeTier, floorPrices, storageStartDate, expectedEndDate])
 
   // 이 계약에 배정·적재된 컨테이너의 현재 자리를 조회 (수정 모드 강조/이동 기준)
   useEffect(() => {
@@ -883,6 +896,7 @@ function EditOrderModal({
               warehouseId={target.warehouseId}
               value={slotId}
               onChange={setSlotId}
+              onPickSlot={(s) => setFeeTier(s?.tier ?? null)}
               currentSlotId={currentSlotId}
             />
           </div>
@@ -957,6 +971,7 @@ function CreateOrderModal({
       setPaymentType('PREPAID')
       setPaymentMethod('BANK_TRANSFER')
       setSettlementUserId(null)
+      setFeeTier(null)
       setMemo('')
       setFormError(null)
       setDormantConfirm(false)
@@ -980,22 +995,14 @@ function CreateOrderModal({
     }
   }, [open])
 
-  // [층 단가] 선택 창고의 층별 단가·최소료 로드 (슬롯 선택 시 보관료 기본값 연동용)
-  const [floorPrices, setFloorPrices] = useState<Map<number, { unitPrice: number; minFee: number }>>(new Map())
+  // [층 단가 연동] 공통 로더 — 슬롯 선택/기간 변경 시 보관료 자동 보정
+  const floorPrices = useFloorPricing(warehouseId ? Number(warehouseId) : null, open)
+  const [feeTier, setFeeTier] = useState<number | null>(null)
   useEffect(() => {
-    if (!open || !warehouseId) {
-      setFloorPrices(new Map())
-      return
-    }
-    let alive = true
-    yardApi
-      .floorPrices(Number(warehouseId))
-      .then((fp) => alive && setFloorPrices(new Map(fp.map((p) => [p.tier, { unitPrice: p.unitPrice, minFee: p.minFee ?? 0 }]))))
-      .catch(() => alive && setFloorPrices(new Map()))
-    return () => {
-      alive = false
-    }
-  }, [open, warehouseId])
+    if (feeTier == null) return
+    const rate = floorPrices.get(feeTier)
+    if (rate) setMonthlyFee(calcFloorFee(rate, storageStartDate, expectedEndDate))
+  }, [feeTier, floorPrices, storageStartDate, expectedEndDate])
 
   const periodError = validateContractPeriod(storageStartDate, expectedEndDate)
 
@@ -1158,18 +1165,7 @@ function CreateOrderModal({
                   warehouseId={warehouseId ? Number(warehouseId) : null}
                   value={slotId}
                   onChange={setSlotId}
-                  onPickSlot={(s) => {
-                    // [층 단가 연동] 슬롯 선택 시 해당 층 단가로 보관료 자동 계산.
-                    //   실제 보관료 = 일 단가 × 보관일수, 단 최소 보관료 미달 시 최소 보관료로 상향(Math.max)
-                    if (s) {
-                      const p = floorPrices.get(s.tier)
-                      if (p != null) {
-                        const days = expectedEndDate ? getDurationDays(storageStartDate, expectedEndDate) : 1
-                        const base = p.unitPrice * Math.max(days, 1)
-                        setMonthlyFee(Math.max(base, p.minFee))
-                      }
-                    }
-                  }}
+                  onPickSlot={(s) => setFeeTier(s?.tier ?? null)}
                 />
               </div>
 

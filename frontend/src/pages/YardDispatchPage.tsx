@@ -20,6 +20,8 @@ import { customerApi, type Customer } from '@/api/customerApi'
 import { orderApi, type StorageOrder, type PaymentType, type PaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
 import { addDays } from '@/lib/dates'
+import { calcFloorFee } from '@/lib/fee'
+import { useFloorPricing } from '@/hooks/useFloorPricing'
 import { orderSync } from '@/lib/orderEvents'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
@@ -679,6 +681,15 @@ function InboundModal({
       setOutboundDate(addDays(inboundDate, 7))
     }
   }, [inboundDate])
+
+  // [층 단가 연동] 이 슬롯의 층 단가·최소료로 보관료 자동 보정 (공통 엔진).
+  //   새 계약 생성 시(기존 계약 미연결)만, 기간이 바뀌면 실시간 재계산 — 제로 타이핑.
+  const floorPrices = useFloorPricing(warehouseId, true)
+  useEffect(() => {
+    if (orderId) return // 기존 계약에 연결하면 보관료는 그 계약을 따른다
+    const rate = floorPrices.get(slot.tier)
+    if (rate) setMonthlyFee(calcFloorFee(rate, inboundDate, outboundDate))
+  }, [floorPrices, slot.tier, orderId, inboundDate, outboundDate])
 
   const selectedCustomer = useMemo(
     () => customers.find((c) => String(c.id) === customerId) ?? null,
