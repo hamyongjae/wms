@@ -174,6 +174,8 @@ public class StorageOrderService {
             if (req.isApplySettlement()) {
                 if (req.getSettledAmount() != null) {
                     billingService.settleManualForOrder(order.getId(), req.getSettledAmount());
+                    // [보관료 동기화] 계약 보관료도 실사용 정산 금액으로 갱신 → 계약 목록 컬럼에 반영
+                    order.setMonthlyFee(req.getSettledAmount().intValue());
                 } else {
                     billingService.settleMidReleaseForOrder(order.getId(), actualEnd);
                 }
