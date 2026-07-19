@@ -25,3 +25,21 @@ export function calcDailyFee(fee: number | null, startStr: string, endStr: strin
   if (days == null) return null
   return Math.round(fee / days)
 }
+
+/** 층별 단가 정보 (일 단가 + 최소 보관료) */
+export interface FloorRate {
+  unitPrice: number // 일 단가(원/일)
+  minFee: number // 최소 보관료(원)
+}
+
+/**
+ * [공통 보관료 계산 엔진] 층 단가 × 보관일수, 단 최소 보관료 미달 시 최소 보관료로 상향(Math.max).
+ * 계약 등록·수정·즉시 입고 등 모든 파이프라인이 이 한 함수로 동일한 정산 원칙을 공유한다.
+ *
+ * @returns 보정된 총 보관료(원). 기간이 유효하지 않으면 최소 1일로 간주해 계산.
+ */
+export function calcFloorFee(rate: FloorRate, startStr: string, endStr: string): number {
+  const days = storageDays(startStr, endStr) ?? 1
+  const base = rate.unitPrice * Math.max(days, 1)
+  return Math.max(base, rate.minFee ?? 0)
+}

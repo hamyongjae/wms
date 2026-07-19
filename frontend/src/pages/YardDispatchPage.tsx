@@ -1232,11 +1232,11 @@ function FloorPriceInline({
         disabled={!editable}
         title={editable ? `${tier}층 단가·최소 보관료 설정` : undefined}
         className={cn(
-          'group inline-flex min-w-[14.5rem] items-center justify-end gap-2 rounded-lg border px-3 py-1 text-xs font-medium shadow-sm backdrop-blur-sm transition-all duration-200',
+          'group inline-flex w-[16.5rem] shrink-0 items-center justify-end gap-2 whitespace-nowrap rounded-lg border px-3 py-1 text-xs font-medium shadow-sm transition-all duration-200',
           price != null
-            ? 'border-indigo-200/70 bg-indigo-50/70 text-indigo-700'
-            : 'border-slate-200/70 bg-white/60 text-slate-400',
-          editable && 'hover:-translate-y-px hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md active:translate-y-0',
+            ? 'border-indigo-200/70 bg-indigo-50 text-indigo-700'
+            : 'border-slate-200/70 bg-white text-slate-400',
+          editable && 'hover:-translate-y-px hover:border-indigo-300 hover:shadow-md active:translate-y-0',
         )}
       >
         {price != null ? (
