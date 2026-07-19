@@ -121,10 +121,15 @@ public class StorageOrder {
         this.memo = memo;
     }
 
-    // ===== [출고 처리] 입고 → 출고 =====
+    // ===== [출고 마감] 입고 → 출고: 실제 출고일로 보관 종료일을 마감(override) =====
+    /**
+     * 실제 출고일을 기록하며 보관 종료일(expectedEndDate)을 그 날짜로 강제 마감한다.
+     * → 보관 기간이 실물 출고 시점으로 확정되어 일할 계산·소급 정산이 오차 없이 이어진다.
+     */
     public void release(LocalDate actualEndDate) {
         this.status = OrderStatus.OUTBOUND;
         this.actualEndDate = actualEndDate;
+        this.expectedEndDate = actualEndDate; // 보관 종료일 자동 마감
     }
 
     // ===== [출고 취소] 출고 → 입고 =====
