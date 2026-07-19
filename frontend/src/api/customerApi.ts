@@ -9,6 +9,7 @@ export interface Customer {
   id: number
   name: string
   customerType: CustomerType | null
+  businessNumber: string | null
   phoneNumber: string | null
   email: string | null
   status: CustomerStatus
@@ -26,6 +27,7 @@ export interface UpdateCustomerStatusRequestDto {
 export interface CustomerUpsert {
   name: string
   customerType?: CustomerType
+  businessNumber?: string
   phoneNumber?: string
   email?: string
   memo?: string

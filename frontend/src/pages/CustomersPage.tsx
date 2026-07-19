@@ -10,6 +10,7 @@ import {
 } from '@/api/customerApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
+import { formatBusinessNumber } from '@/lib/format'
 import Modal from '@/components/ui/Modal'
 
 const inputCls =
@@ -372,6 +373,7 @@ function CustomerModal({
 }) {
   const [name, setName] = useState('')
   const [customerType, setType] = useState<CustomerType>('INDIVIDUAL')
+  const [businessNumber, setBusinessNumber] = useState('')
   const [phoneNumber, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [memo, setMemo] = useState('')
@@ -382,6 +384,7 @@ function CustomerModal({
     if (!open) return
     setName(target?.name ?? '')
     setType(target?.customerType ?? 'INDIVIDUAL')
+    setBusinessNumber(target?.businessNumber ?? '')
     setPhone(target?.phoneNumber ?? '')
     setEmail(target?.email ?? '')
     setMemo(target?.memo ?? '')
@@ -395,6 +398,7 @@ function CustomerModal({
     const body: CustomerUpsert = {
       name,
       customerType,
+      businessNumber: businessNumber || undefined,
       phoneNumber: phoneNumber || undefined,
       email: email || undefined,
       memo: memo || undefined,
@@ -424,6 +428,16 @@ function CustomerModal({
               <option value="INDIVIDUAL">개인</option>
               <option value="CORPORATE">기업</option>
             </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">사업자등록번호</label>
+            <input
+              value={businessNumber}
+              onChange={(e) => setBusinessNumber(formatBusinessNumber(e.target.value))}
+              inputMode="numeric"
+              placeholder="000-00-00000"
+              className={inputCls}
+            />
           </div>
           <div className="col-span-2">
             <label className="mb-1 block text-sm font-medium text-slate-700">연락처</label>
