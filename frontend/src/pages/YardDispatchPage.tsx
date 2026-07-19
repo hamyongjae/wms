@@ -1227,15 +1227,28 @@ function FloorPriceInline({
         disabled={!editable}
         title={editable ? `${tier}층 단가 설정` : undefined}
         className={cn(
-          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 transition',
+          'group inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur-sm transition-all duration-200',
           price != null
-            ? 'bg-indigo-50 text-indigo-700 ring-indigo-200'
-            : 'bg-slate-50 text-slate-400 ring-slate-200',
-          editable && 'hover:brightness-95',
+            ? 'border-indigo-200/70 bg-indigo-50/70 text-indigo-700'
+            : 'border-slate-200/70 bg-white/60 text-slate-400',
+          editable && 'hover:-translate-y-px hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md active:translate-y-0',
         )}
       >
-        {price != null ? `기본 단가 : ${fmt(price)}원 / 일` : '단가 미설정'}
-        {editable && <Pencil size={11} />}
+        {price != null ? (
+          <span className="flex items-baseline gap-1">
+            <span className="text-[10px] font-normal uppercase tracking-wide text-indigo-400">기본 단가</span>
+            <span className="tabular-nums font-semibold text-indigo-700">{fmt(price)}원</span>
+            <span className="text-[10px] font-normal text-indigo-400">/ 일</span>
+          </span>
+        ) : (
+          <span>단가 미설정</span>
+        )}
+        {editable && (
+          <Pencil
+            size={11}
+            className="text-slate-300 transition-colors duration-200 group-hover:text-indigo-500"
+          />
+        )}
       </button>
     )
   }
