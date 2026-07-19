@@ -14,7 +14,7 @@ import {
   Square,
 } from 'lucide-react'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
-import { yardApi, type YardSlot } from '@/api/yardApi'
+import { yardApi, type YardSlot, type FloorPrice } from '@/api/yardApi'
 import { containerApi, type Container } from '@/api/containerApi'
 import { customerApi, type Customer } from '@/api/customerApi'
 import { orderApi, type StorageOrder, type PaymentType } from '@/api/orderApi'
@@ -78,6 +78,7 @@ export default function YardDispatchPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [floorPrices, setFloorPrices] = useState<Map<number, number>>(new Map()) // 층(tier) → 단가
 
   const [query, setQuery] = useState('')
   // [화주명 검색] 백엔드가 검증·매칭해 돌려준 하이라이트 대상 컨테이너 id 집합
@@ -118,16 +119,25 @@ export default function YardDispatchPage() {
       containerApi.list({ warehouseId: selectedId }),
       customerApi.list().catch(() => [] as Customer[]),
       orderApi.list().catch(() => [] as StorageOrder[]),
+      yardApi.floorPrices(selectedId).catch(() => [] as FloorPrice[]),
     ])
-      .then(([sl, cs, cu, os]) => {
+      .then(([sl, cs, cu, os, fp]) => {
         setSlots(sl)
         setContainersById(new Map(cs.map((c) => [c.id, c])))
         setCustomers(cu)
         setOrders(os)
+        setFloorPrices(new Map(fp.map((p) => [p.tier, p.unitPrice])))
       })
       .catch(() => setError('보관창고 현황을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [selectedId, refreshKey])
+
+  // [층별 단가] 저장 → 전체 리로드 없이 해당 층 단가만 즉시 반영
+  async function handleSaveFloorPrice(tier: number, unitPrice: number) {
+    if (selectedId == null) return
+    const saved = await yardApi.setFloorPrice({ warehouseId: selectedId, tier, unitPrice })
+    setFloorPrices((prev) => new Map(prev).set(saved.tier, saved.unitPrice))
+  }
 
   // [실시간 동기화] 계약관리에서 상태 전환·삭제 시 슬롯/컨테이너를 다시 불러온다.
   useEffect(() => orderSync.subscribe(() => setRefreshKey((k) => k + 1)), [])
@@ -412,6 +422,16 @@ export default function YardDispatchPage() {
                       ))}
                     </div>
 
+                    {/* 현재 층 단가 인라인 설정 */}
+                    <div className="mb-2">
+                      <FloorPriceInline
+                        tier={floor.tier}
+                        price={floorPrices.get(floor.tier) ?? null}
+                        editable={isAdmin}
+                        onSave={(p) => handleSaveFloorPrice(floor.tier, p)}
+                      />
+                    </div>
+
                     <PinchZoom
                       className="rounded-xl"
                       onSwipeLeft={() => setFloorIdx((i) => Math.min(floors.length - 1, i + 1))}
@@ -432,9 +452,17 @@ export default function YardDispatchPage() {
                 <div className="space-y-6">
                   {floors.map(({ tier, cells }) => (
                     <div key={tier}>
-                      <p className="mb-2 text-sm font-medium text-slate-700">
-                        {tier}층 <span className="text-xs font-normal text-slate-400">· {cells.length}칸</span>
-                      </p>
+                      <div className="mb-2 flex items-center gap-2">
+                        <p className="text-sm font-medium text-slate-700">
+                          {tier}층 <span className="text-xs font-normal text-slate-400">· {cells.length}칸</span>
+                        </p>
+                        <FloorPriceInline
+                          tier={tier}
+                          price={floorPrices.get(tier) ?? null}
+                          editable={isAdmin}
+                          onSave={(p) => handleSaveFloorPrice(tier, p)}
+                        />
+                      </div>
                       {renderCells(cells)}
                     </div>
                   ))}
@@ -1122,6 +1150,93 @@ function Legend() {
         <span className="h-3 w-3 rounded border border-dashed border-slate-200 bg-slate-50" /> 공실
       </span>
     </div>
+  )
+}
+
+/* ===== 층 레이블 옆 인라인 단가 설정 =====
+ * 화면 이동/모달 없이 층 레이블 옆에서 바로 단가를 보고 수정한다.
+ * 저장은 비동기(층 메타 1행 upsert) — 완료 후 해당 층 칩만 즉시 갱신된다.
+ */
+function FloorPriceInline({
+  tier,
+  price,
+  editable,
+  onSave,
+}: {
+  tier: number
+  price: number | null
+  editable: boolean
+  onSave: (unitPrice: number) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState<number | null>(price)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => setValue(price), [price])
+
+  async function save() {
+    if (value == null || value < 0) return
+    setSaving(true)
+    try {
+      await onSave(value)
+      setEditing(false)
+    } catch {
+      // 저장 실패 시 편집 상태 유지
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => editable && setEditing(true)}
+        disabled={!editable}
+        title={editable ? `${tier}층 단가 설정` : undefined}
+        className={cn(
+          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 transition',
+          price != null
+            ? 'bg-indigo-50 text-indigo-700 ring-indigo-200'
+            : 'bg-slate-50 text-slate-400 ring-slate-200',
+          editable && 'hover:brightness-95',
+        )}
+      >
+        {price != null ? `개당 ${fmt(price)}원` : '단가 미설정'}
+        {editable && <Pencil size={11} />}
+      </button>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <div className="w-28">
+        <MoneyInput
+          value={value}
+          onChange={setValue}
+          placeholder="6,000"
+          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+        />
+      </div>
+      <button
+        type="button"
+        onClick={save}
+        disabled={saving}
+        className="rounded-lg bg-indigo-600 px-2 py-1 text-xs font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
+      >
+        {saving ? '…' : '저장'}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setValue(price)
+          setEditing(false)
+        }}
+        className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50"
+      >
+        취소
+      </button>
+    </span>
   )
 }
 

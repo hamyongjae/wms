@@ -80,4 +80,22 @@ export const yardApi = {
     })
     return data.content
   },
+  // [층별 단가] 창고 층별 단가 목록
+  async floorPrices(warehouseId: number): Promise<FloorPrice[]> {
+    const { data } = await api.get<FloorPrice[]>('/api/yard/floor-prices', {
+      params: { warehouseId },
+    })
+    return data
+  },
+  // [층별 단가] 특정 층 단가 설정(upsert)
+  async setFloorPrice(body: { warehouseId: number; tier: number; unitPrice: number }): Promise<FloorPrice> {
+    const { data } = await api.post<FloorPrice>('/api/yard/floor-prices', body)
+    return data
+  },
+}
+
+export interface FloorPrice {
+  warehouseId: number
+  tier: number
+  unitPrice: number
 }

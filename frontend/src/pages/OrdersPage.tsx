@@ -964,6 +964,23 @@ function CreateOrderModal({
     }
   }, [storageStartDate])
 
+  // [층 단가] 선택 창고의 층별 단가 로드 (슬롯 선택 시 보관료 기본값 연동용)
+  const [floorPrices, setFloorPrices] = useState<Map<number, number>>(new Map())
+  useEffect(() => {
+    if (!open || !warehouseId) {
+      setFloorPrices(new Map())
+      return
+    }
+    let alive = true
+    yardApi
+      .floorPrices(Number(warehouseId))
+      .then((fp) => alive && setFloorPrices(new Map(fp.map((p) => [p.tier, p.unitPrice]))))
+      .catch(() => alive && setFloorPrices(new Map()))
+    return () => {
+      alive = false
+    }
+  }, [open, warehouseId])
+
   const periodError = validateContractPeriod(storageStartDate, expectedEndDate)
 
   function validate(): boolean {
@@ -1123,6 +1140,13 @@ function CreateOrderModal({
                   warehouseId={warehouseId ? Number(warehouseId) : null}
                   value={slotId}
                   onChange={setSlotId}
+                  onPickSlot={(s) => {
+                    // [층 단가 연동] 슬롯 선택 시 해당 층 단가를 보관료 기본값으로 자동 로드
+                    if (s) {
+                      const p = floorPrices.get(s.tier)
+                      if (p != null) setMonthlyFee(p)
+                    }
+                  }}
                 />
               </div>
 

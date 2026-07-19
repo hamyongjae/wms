@@ -14,12 +14,14 @@ export default function LocationPickerField({
   warehouseId,
   value,
   onChange,
+  onPickSlot,
   currentSlotId = null,
   disabled = false,
 }: {
   warehouseId: number | null
   value: number | null
   onChange: (slotId: number | null) => void
+  onPickSlot?: (slot: YardSlot | null) => void // 선택된 슬롯 전체(층 단가 연동용)
   currentSlotId?: number | null
   disabled?: boolean
 }) {
@@ -84,7 +86,10 @@ export default function LocationPickerField({
             checked={isUnassigned}
             disabled={disabled}
             onChange={(e) => {
-              if (e.target.checked) onChange(null) // 체크 시 미지정. 해제는 슬롯을 눌러서.
+              if (e.target.checked) {
+                onChange(null) // 체크 시 미지정. 해제는 슬롯을 눌러서.
+                onPickSlot?.(null)
+              }
             }}
             className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
           />
@@ -122,7 +127,11 @@ export default function LocationPickerField({
                         key={s.id}
                         type="button"
                         disabled={!selectable}
-                        onClick={() => onChange(isSelected ? null : s.id)}
+                        onClick={() => {
+                          const next = isSelected ? null : s
+                          onChange(next ? next.id : null)
+                          onPickSlot?.(next)
+                        }}
                         title={s.occupied && !isCurrent ? `사용중 (${s.containerNo ?? '점유'})` : s.locationLabel}
                         className={cn(
                           'relative flex h-10 w-10 items-center justify-center rounded-lg border text-[11px] font-medium transition',
