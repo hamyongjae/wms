@@ -997,6 +997,8 @@ function CreateOrderModal({
   async function doCreate() {
     setSubmitting(true)
     try {
+      // [선불 자동 정산] paymentType=PREPAID면 백엔드가 계약 등록과 한 트랜잭션으로
+      //   청구 원장 생성 → 발행 → 전액 수금까지 원자적으로 완결한다 (부분 실패 없음).
       const order = await orderApi.create({
         customerId: selectedCustomer!.id,
         warehouseId: Number(warehouseId),
@@ -1006,34 +1008,6 @@ function CreateOrderModal({
         paymentType,
         memo: memo || undefined,
       })
-      // [선불 계약] 청구서 자동 생성 + 자동 발행 + 전액 입금 처리
-      if (paymentType === 'PREPAID') {
-        try {
-          // 청구서 생성 (기간은 계약 기간 또는 1개월)
-          const ledgerStart = storageStartDate
-          const ledgerEnd = expectedEndDate || addMonths(storageStartDate, 1)
-          const created = await billingApi.createLedger({
-            storageOrderId: order.id,
-            billingType: 'MONTHLY',
-            settlementType: 'PREPAID',
-            periodStart: ledgerStart,
-            periodEnd: ledgerEnd,
-            baseAmount: monthlyFee!,
-            dueDate: storageStartDate, // 선불이므로 당일이 납기
-          })
-          // 청구서 자동 발행
-          await billingApi.issue(created.id)
-          // 전액 입금 기록 (선불)
-          await billingApi.recordPayment(created.id, {
-            amount: monthlyFee!,
-            method: 'BANK_TRANSFER',
-            paidOn: storageStartDate,
-            memo: '선불 계약 - 자동 처리',
-          })
-        } catch (e) {
-          window.alert(`계약은 등록됐지만 선불 청구 처리에 실패했습니다.\n(${errMsg(e, '원인 미상')})`)
-        }
-      }
       // 위치를 지정했으면 컨테이너 생성·배정·적재까지 이어서 처리(미지정이면 생략)
       if (slotId != null) {
         try {

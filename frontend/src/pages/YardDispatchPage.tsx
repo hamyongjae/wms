@@ -181,6 +181,7 @@ export default function YardDispatchPage() {
     // 화주는 memo 앞 태그로, 입고/출고예정일은 정식 필드로 저장.
     let orderId = body.orderId
     // 기존 계약을 연결하지 않았으면, 이 입고 정보로 새 계약을 만들어 계약 관리에도 뜨게 한다.
+    // [선불 자동 정산] paymentType=PREPAID면 백엔드가 계약 등록과 한 트랜잭션으로 청구·수금까지 완결한다.
     if (orderId == null && body.customerId != null) {
       const order = await orderApi.create({
         customerId: body.customerId,
@@ -192,32 +193,6 @@ export default function YardDispatchPage() {
         memo: body.memo,
       })
       orderId = order.id
-
-      // [선불 계약] 청구서 자동 생성 + 자동 발행 + 전액 입금 처리
-      if (body.paymentType === 'PREPAID' && body.monthlyFee != null && body.monthlyFee > 0) {
-        try {
-          const ledgerStart = body.inboundDate ?? todayStr()
-          const ledgerEnd = body.outboundDate || addDays(ledgerStart, 7)
-          const created = await billingApi.createLedger({
-            storageOrderId: order.id,
-            billingType: 'MONTHLY',
-            settlementType: 'PREPAID',
-            periodStart: ledgerStart,
-            periodEnd: ledgerEnd,
-            baseAmount: body.monthlyFee,
-            dueDate: ledgerStart,
-          })
-          await billingApi.issue(created.id)
-          await billingApi.recordPayment(created.id, {
-            amount: body.monthlyFee,
-            method: 'BANK_TRANSFER',
-            paidOn: ledgerStart,
-            memo: '선불 계약 - 자동 처리',
-          })
-        } catch (e) {
-          window.alert(`계약은 등록됐지만 선불 청구 처리에 실패했습니다.\n(${errMsg(e, '원인 미상')})`)
-        }
-      }
     }
 
     const tag = body.customerName ? `[${body.customerName}]` : ''
