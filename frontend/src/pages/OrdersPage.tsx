@@ -1355,6 +1355,8 @@ function StatusChangeModal({
   const [actualEndDate, setActualEndDate] = useState('')
   const [actualStartDate, setActualStartDate] = useState('')
   const [applySettlement, setApplySettlement] = useState(true)
+  const [dailyRate, setDailyRate] = useState<number | null>(6000) // 하루 보관료 (직접 입력, 기본 6,000원)
+  const [usedAmount, setUsedAmount] = useState<number | null>(null) // 실사용 보관료 (자동계산·수정 가능)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -1365,22 +1367,21 @@ function StatusChangeModal({
     setActualEndDate(today()) // 중도 출고 기본값 = 오늘
     setActualStartDate(target.storageStartDate ?? today())
     setApplySettlement(true)
+    setDailyRate(6000)
     setFormError(null)
   }, [target])
 
-  // [소급 미리보기] 계약 시작일 ~ 실제 출고일까지 실사용 보관료·환급 계산
-  const settlementPreview = useMemo(() => {
-    if (!target || !isRelease || releaseKind !== 'EARLY' || !actualEndDate) return null
-    const start = target.storageStartDate
-    const fullEnd = target.expectedEndDate ?? actualEndDate
-    const fullDays = getDurationDays(start, fullEnd)
-    if (fullDays <= 0) return null
-    const dailyRate = target.monthlyFee / fullDays
-    const usedDays = Math.min(Math.max(getDurationDays(start, actualEndDate), 0), fullDays)
-    const usedAmount = Math.round(dailyRate * usedDays)
-    const refund = Math.max(Math.round(target.monthlyFee) - usedAmount, 0)
-    return { start, dailyRate: Math.round(dailyRate), usedDays, usedAmount, refund }
-  }, [target, isRelease, releaseKind, actualEndDate])
+  // 실사용 일수 = 계약 시작일 ~ 실제 출고일 (당일 포함)
+  const usedDays = useMemo(() => {
+    if (!target || !actualEndDate) return 0
+    return Math.max(getDurationDays(target.storageStartDate, actualEndDate), 0)
+  }, [target, actualEndDate])
+
+  // [자동계산] 하루 보관료·일수가 바뀌면 실사용 보관료 = 일수 × 하루 보관료 (직접 수정도 가능)
+  useEffect(() => {
+    if (releaseKind !== 'EARLY') return
+    setUsedAmount(usedDays * (dailyRate ?? 0))
+  }, [releaseKind, usedDays, dailyRate])
 
   if (!target) return null
 
@@ -1395,6 +1396,8 @@ function StatusChangeModal({
             // 정상 출고: 예정일 그대로 / 중도 출고: 입력한 실제 출고일 + 소급 여부
             actualEndDate: releaseKind === 'EARLY' ? actualEndDate : (target!.expectedEndDate ?? today()),
             applySettlement: releaseKind === 'EARLY' && applySettlement,
+            // 중도출고 + 소급 시 직접 입력한 실사용 보관료를 정산 금액으로 전달
+            settledAmount: releaseKind === 'EARLY' && applySettlement ? (usedAmount ?? undefined) : undefined,
           }
         : {
             targetStatus: 'INBOUND' as const,
@@ -1449,26 +1452,22 @@ function StatusChangeModal({
                   보관료 소급 정산 (실제 사용 기간만큼 차감·환급)
                 </label>
 
-                {settlementPreview && (
-                  <div className="space-y-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs">
-                    <div className="flex justify-between text-slate-500">
-                      <span>실사용 기간</span>
-                      <span className="font-medium text-slate-700">{settlementPreview.start} ~ {actualEndDate} ({settlementPreview.usedDays}일)</span>
-                    </div>
-                    <div className="flex justify-between text-slate-500">
-                      <span>하루 보관료</span>
-                      <span className="font-medium text-slate-700">{won(settlementPreview.dailyRate)}</span>
-                    </div>
-                    <div className="flex justify-between border-t border-slate-100 pt-1.5 text-slate-600">
-                      <span>실사용 보관료</span>
-                      <span className="font-semibold text-indigo-600">{won(settlementPreview.usedAmount)}</span>
-                    </div>
-                    {settlementPreview.refund > 0 && (
-                      <div className="flex justify-between text-[#5C7C6B]">
-                        <span>예상 환급 (차감)</span>
-                        <span className="font-semibold">-{won(settlementPreview.refund)}</span>
+                {applySettlement && (
+                  <div className="space-y-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
+                    <p className="text-xs text-slate-500">
+                      실사용 기간 <span className="font-medium text-slate-700">{target.storageStartDate} ~ {actualEndDate} ({usedDays}일)</span>
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">하루 보관료</label>
+                        <MoneyInput value={dailyRate} onChange={setDailyRate} placeholder="6,000" className={cn(inputCls, 'pr-9')} />
                       </div>
-                    )}
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">실사용 보관료 (일수 × 하루)</label>
+                        <MoneyInput value={usedAmount} onChange={setUsedAmount} placeholder="0" className={cn(inputCls, 'pr-9')} />
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-400">하루 보관료·출고일을 바꾸면 실사용 보관료가 자동 계산됩니다(직접 수정 가능).</p>
                   </div>
                 )}
               </div>
