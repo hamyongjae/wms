@@ -5,6 +5,7 @@ import com.example.wms.common.validation.TemporalValidator;
 import com.example.wms.customer.entity.Customer;
 import com.example.wms.customer.exception.BlacklistedCustomerException;
 import com.example.wms.order.entity.StorageOrder;
+import com.example.wms.order.entity.OrderStatus;
 import com.example.wms.tenant.entity.Tenant;
 import com.example.wms.warehouse.entity.Warehouse;
 import com.example.wms.customer.repository.CustomerRepository;
@@ -129,23 +130,37 @@ public class StorageOrderService {
         return new StorageOrderResponse(order);
     }
 
-    // ===== [상태 토글] 입고 ↔ 출고 단일 전환 =====
+    // ===== [입/출고 유형별 처리] 계약 상태 전환 =====
     /**
-     * 현재 상태의 반대로 토글한다.
-     * - 입고 → 출고: 실제 출고일을 오늘로 기록
-     * - 출고 → 입고: 출고 정보 초기화
+     * 유형(정상/중도출고·정상/지연입고)에 따라 계약 상태를 전환하고, 필요 시 매출을 소급 정산한다.
+     * 상태는 여전히 이진(INBOUND/OUTBOUND) — 정산 원장과의 참조 무결성을 서비스 레이어에서 방어한다.
      */
     @Transactional
-    public StorageOrderResponse toggleStatus(Long id) {
+    public StorageOrderResponse changeStatus(Long id, StorageOrderStatusChangeRequest req) {
         StorageOrder order = findOrderOrThrow(id);
-        LocalDate today = LocalDate.now();
-        if (order.isInbound()) {
-            // 입고 → 출고
-            TemporalValidator.validateContractPeriod(order.getStorageStartDate(), today);
-            order.release(today);
-            syncContainerSchedule(order, order.getStorageStartDate(), today);
+        // targetStatus 미지정 시 현재의 반대로 판정
+        OrderStatus target = req.getTargetStatus() != null
+                ? req.getTargetStatus()
+                : (order.isInbound() ? OrderStatus.OUTBOUND : OrderStatus.INBOUND);
+
+        if (target == OrderStatus.OUTBOUND) {
+            // 정상 출고: 예정일(없으면 오늘) / 중도 출고: 입력받은 실제 출고일
+            LocalDate actualEnd = req.getActualEndDate() != null
+                    ? req.getActualEndDate()
+                    : (order.getExpectedEndDate() != null ? order.getExpectedEndDate() : LocalDate.now());
+            TemporalValidator.validateContractPeriod(order.getStorageStartDate(), actualEnd);
+            order.release(actualEnd);
+            syncContainerSchedule(order, order.getStorageStartDate(), actualEnd);
+            // [매출 소급] 중도출고 + 소급 선택 시 실제 점유 기간으로 원장 정산
+            if (req.isApplySettlement()) {
+                billingService.settleMidReleaseForOrder(order.getId(), actualEnd);
+            }
         } else {
-            // 출고 → 입고
+            // 출고 → 입고(되돌리기). 지연 입고면 실제 입고일로 시작일 조정
+            if (req.getActualStartDate() != null) {
+                TemporalValidator.validateContractPeriod(req.getActualStartDate(), order.getExpectedEndDate());
+                order.setStorageStartDate(req.getActualStartDate());
+            }
             order.unreleased();
             syncContainerSchedule(order, order.getStorageStartDate(), order.getExpectedEndDate());
         }

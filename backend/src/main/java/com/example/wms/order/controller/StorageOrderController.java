@@ -43,10 +43,12 @@ public class StorageOrderController {
         return ResponseEntity.ok(storageOrderService.updateOrder(id, request));
     }
 
-    // [단일 토글] 입고 ↔ 출고 전환 — 유일한 상태 변경 진입점
-    @PatchMapping("/{id}/toggle")
-    public ResponseEntity<StorageOrderResponse> toggleStatus(@PathVariable Long id) {
-        return ResponseEntity.ok(storageOrderService.toggleStatus(id));
+    // [입/출고 유형별 처리] 상태 전환 — 정상/중도출고·정상/지연입고 + 매출 소급 옵션
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<StorageOrderResponse> changeStatus(
+            @PathVariable Long id,
+            @RequestBody StorageOrderStatusChangeRequest request) {
+        return ResponseEntity.ok(storageOrderService.changeStatus(id, request));
     }
 
     // 계약 삭제 — ADMIN만 허용 (STAFF가 호출하면 403)

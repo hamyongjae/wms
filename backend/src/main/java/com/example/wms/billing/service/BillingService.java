@@ -233,9 +233,30 @@ public class BillingService {
     @Transactional
     public MidReleaseSettlementResponse applyMidRelease(Long ledgerId, MidReleaseRequest req) {
         BillingLedger ledger = lockLedger(ledgerId);
-        Long userId = SecurityUtils.getCurrentUser().getUserId();
+        return applyMidReleaseTo(ledger, req.getActualEndDate());
+    }
 
-        MidReleaseResult result = calcMidRelease(ledger, req.getActualEndDate());
+    /**
+     * [계약 출고 연동] 특정 계약의 활성 원장에 중도출고 소급 정산을 적용한다.
+     * 상태 변경(출고 처리)에서 '보관료 소급' 선택 시 호출된다. 적용 대상 원장이 없으면 no-op.
+     */
+    @Transactional
+    public void settleMidReleaseForOrder(Long storageOrderId, LocalDate actualEndDate) {
+        // 취소 아님 + 실제 출고일이 청구 시작일 이후인 원장 중 가장 늦은 회차를 정산 대상으로
+        BillingLedger target = ledgerRepository.findByStorageOrderId(storageOrderId).stream()
+                .filter(l -> l.getStatus() != BillingStatus.CANCELED)
+                .filter(l -> !actualEndDate.isBefore(l.getBillingPeriodStart()))
+                .max(java.util.Comparator.comparing(BillingLedger::getBillingPeriodStart))
+                .orElse(null);
+        if (target == null) return;
+        BillingLedger locked = lockLedger(target.getId());
+        applyMidReleaseTo(locked, actualEndDate);
+    }
+
+    /** 중도출고 정산 코어 — 이미 잠근 원장에 환급(차감)/추가청구(가산)를 반영 */
+    private MidReleaseSettlementResponse applyMidReleaseTo(BillingLedger ledger, LocalDate actualEndDate) {
+        Long userId = SecurityUtils.getCurrentUser().getUserId();
+        MidReleaseResult result = calcMidRelease(ledger, actualEndDate);
 
         if (result.refundAmount().signum() > 0) {
             BigDecimal signed = result.refundAmount().negate();   // 환급 = 차감
