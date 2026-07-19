@@ -115,11 +115,12 @@ export default function Modal({
   }
 
   // ===== 데스크톱: 센터 다이얼로그 =====
+  // 화면보다 큰 폼도 잘리지 않도록 최대 높이 제한 + 헤더 고정 + 본문만 스크롤.
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="animate-scrim-in absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={onClose} />
-      <div className={`animate-dialog-in shadow-soft relative w-full ${widthClass} rounded-2xl bg-white p-6 ring-1 ring-slate-200/70`}>
-        <div className="mb-4 flex items-center justify-between">
+      <div className={`animate-dialog-in shadow-soft relative flex max-h-[90vh] w-full flex-col rounded-2xl bg-white ring-1 ring-slate-200/70 ${widthClass}`}>
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4">
           <h3 className="text-base font-semibold text-slate-800">{title}</h3>
           <button
             type="button"
@@ -129,7 +130,7 @@ export default function Modal({
             <X size={18} />
           </button>
         </div>
-        {children}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
       </div>
     </div>
   )
