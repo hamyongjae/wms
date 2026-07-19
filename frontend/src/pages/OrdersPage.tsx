@@ -1446,10 +1446,29 @@ function StatusChangeModal({
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  // [날짜 기반 옵션 제어] 부모가 가진 계약 기간 + 오늘 날짜만으로 가볍게 판정 (재조회 없음).
+  //  - 출고: 오늘 < 종료일 → 조기 출고이므로 '정상 출고' 불가·'중도 출고' 기본. 만기 도래 시 반대.
+  //  - 입고: 오늘 > 시작일 → 이미 시작일 지남이므로 '정상 입고' 불가·'지연 입고' 기본.
+  const opt = useMemo(() => {
+    const t = today()
+    const end = target?.expectedEndDate ?? null
+    const start = target?.storageStartDate ?? null
+    const beforeExpiry = end != null && t < end // 종료일 미도래
+    const afterStart = start != null && t > start // 시작일 경과
+    return {
+      releaseNormalDisabled: beforeExpiry,
+      releaseEarlyDisabled: end != null && !beforeExpiry,
+      defaultRelease: (beforeExpiry ? 'EARLY' : 'NORMAL') as ReleaseKind,
+      returnNormalDisabled: afterStart,
+      returnLateDisabled: start != null && !afterStart,
+      defaultReturn: (afterStart ? 'LATE' : 'NORMAL') as ReturnKind,
+    }
+  }, [target])
+
   useEffect(() => {
     if (!target) return
-    setReleaseKind('NORMAL')
-    setReturnKind('NORMAL')
+    setReleaseKind(opt.defaultRelease) // 유효 옵션 자동 선선택
+    setReturnKind(opt.defaultReturn)
     setActualEndDate(today()) // 중도 출고 기본값 = 오늘
     setActualStartDate(target.storageStartDate ?? today())
     setApplySettlement(true)
@@ -1511,14 +1530,18 @@ function StatusChangeModal({
             <RadioRow
               checked={releaseKind === 'NORMAL'}
               onSelect={() => setReleaseKind('NORMAL')}
+              disabled={opt.releaseNormalDisabled}
               title="정상 출고"
               desc="예정일 기준으로 출고 완료 처리합니다."
+              hint={opt.releaseNormalDisabled ? '종료일이 도래하지 않아 정상 출고를 선택할 수 없습니다.' : undefined}
             />
             <RadioRow
               checked={releaseKind === 'EARLY'}
               onSelect={() => setReleaseKind('EARLY')}
+              disabled={opt.releaseEarlyDisabled}
               title="중도 출고"
               desc="예정일보다 일찍 출고 — 실제 점유 기간으로 보관료를 정산합니다."
+              hint={opt.releaseEarlyDisabled ? '이미 보관 기간이 만료되어 중도 출고 대상이 아닙니다.' : undefined}
             />
             {releaseKind === 'EARLY' && (
               <div className="space-y-3 rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200/70">
@@ -1564,14 +1587,18 @@ function StatusChangeModal({
             <RadioRow
               checked={returnKind === 'NORMAL'}
               onSelect={() => setReturnKind('NORMAL')}
+              disabled={opt.returnNormalDisabled}
               title="정상 입고"
               desc="출고를 취소하고 보관중 상태로 되돌립니다."
+              hint={opt.returnNormalDisabled ? '보관 시작일이 지나 정상 입고를 선택할 수 없습니다.' : undefined}
             />
             <RadioRow
               checked={returnKind === 'LATE'}
               onSelect={() => setReturnKind('LATE')}
+              disabled={opt.returnLateDisabled}
               title="지연 입고"
               desc="실제 입고일을 조정해 보관 시작일을 다시 맞춥니다."
+              hint={opt.returnLateDisabled ? '아직 시작일이 지나지 않아 지연 입고 대상이 아닙니다.' : undefined}
             />
             {returnKind === 'LATE' && (
               <div className="rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200/70">
@@ -1608,27 +1635,42 @@ function RadioRow({
   onSelect,
   title,
   desc,
+  disabled = false,
+  hint,
 }: {
   checked: boolean
   onSelect: () => void
   title: string
   desc: string
+  disabled?: boolean
+  hint?: string
 }) {
   return (
     <button
       type="button"
-      onClick={onSelect}
+      onClick={() => !disabled && onSelect()}
+      disabled={disabled}
       className={cn(
         'flex w-full items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition',
-        checked ? 'border-indigo-400 bg-indigo-50/50 ring-1 ring-indigo-200' : 'border-slate-200 hover:bg-slate-50',
+        disabled
+          ? 'cursor-not-allowed border-slate-100 bg-slate-50/60 opacity-60'
+          : checked
+            ? 'border-indigo-400 bg-indigo-50/50 ring-1 ring-indigo-200'
+            : 'border-slate-200 hover:bg-slate-50',
       )}
     >
-      <span className={cn('mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', checked ? 'border-indigo-500' : 'border-slate-300')}>
-        {checked && <span className="h-2 w-2 rounded-full bg-indigo-600" />}
+      <span
+        className={cn(
+          'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
+          checked && !disabled ? 'border-indigo-500' : 'border-slate-300',
+        )}
+      >
+        {checked && !disabled && <span className="h-2 w-2 rounded-full bg-indigo-600" />}
       </span>
       <span className="min-w-0">
-        <span className="block text-sm font-medium text-slate-800">{title}</span>
+        <span className={cn('block text-sm font-medium', disabled ? 'text-slate-400' : 'text-slate-800')}>{title}</span>
         <span className="mt-0.5 block text-xs text-slate-500">{desc}</span>
+        {disabled && hint && <span className="mt-1 block text-[11px] text-amber-600">{hint}</span>}
       </span>
     </button>
   )
