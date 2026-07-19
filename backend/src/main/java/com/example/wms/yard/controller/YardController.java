@@ -2,6 +2,7 @@ package com.example.wms.yard.controller;
 
 import com.example.wms.yard.dto.*;
 import com.example.wms.yard.entity.StorageTerm;
+import com.example.wms.yard.service.FloorPriceService;
 import com.example.wms.yard.service.LocationRecommendationService;
 import com.example.wms.yard.service.YardOperationService;
 import com.example.wms.yard.service.YardQueryService;
@@ -27,6 +28,7 @@ public class YardController {
     private final YardOperationService yardOperationService;
     private final YardQueryService yardQueryService;
     private final LocationRecommendationService recommendationService;
+    private final FloorPriceService floorPriceService;
 
     // ===== 슬롯(로케이션) 설계 — ADMIN =====
 
@@ -65,6 +67,21 @@ public class YardController {
             @RequestParam Long warehouseId,
             @RequestParam StorageTerm term) {
         return ResponseEntity.ok(recommendationService.recommend(warehouseId, term));
+    }
+
+    // ===== 층별 보관 단가 =====
+
+    // 창고 층별 단가 목록 — 예: GET /api/yard/floor-prices?warehouseId=1
+    @GetMapping("/floor-prices")
+    public ResponseEntity<java.util.List<FloorPriceResponse>> getFloorPrices(@RequestParam Long warehouseId) {
+        return ResponseEntity.ok(floorPriceService.getFloorPrices(warehouseId));
+    }
+
+    // 층 단가 설정(upsert) — ADMIN
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/floor-prices")
+    public ResponseEntity<FloorPriceResponse> setFloorPrice(@Valid @RequestBody FloorPriceUpsertRequest request) {
+        return ResponseEntity.ok(floorPriceService.setFloorPrice(request));
     }
 
     // ===== 입고 / 이동 / 반출 — 현장(STAFF+) =====
