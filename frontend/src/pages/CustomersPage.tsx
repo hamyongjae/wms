@@ -10,7 +10,7 @@ import {
 } from '@/api/customerApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
-import { formatBusinessNumber } from '@/lib/format'
+import { formatBusinessNumber, formatPhone } from '@/lib/format'
 import Modal from '@/components/ui/Modal'
 
 const inputCls =
@@ -455,7 +455,13 @@ function CustomerModal({
           </div>
           <div className="col-span-2">
             <label className="mb-1 block text-sm font-medium text-slate-700">연락처</label>
-            <input value={phoneNumber} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
+            <input
+              value={phoneNumber}
+              onChange={(e) => setPhone(formatPhone(e.target.value))}
+              inputMode="numeric"
+              placeholder="010-0000-0000"
+              className={inputCls}
+            />
           </div>
           <div className="col-span-2">
             <label className="mb-1 block text-sm font-medium text-slate-700">이메일 (청구·알림용)</label>
