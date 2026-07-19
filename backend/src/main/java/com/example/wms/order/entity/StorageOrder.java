@@ -54,8 +54,9 @@ public class StorageOrder {
     private OrderStatus status = OrderStatus.INBOUND;
 
     // ===== 결제 수단 & 수납 담당(계좌 연동) =====
+    // [스키마] 기존 행 호환을 위해 nullable — 신규 계약은 아래 기본값(계좌이체)으로 저장된다.
     @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method", nullable = false, length = 20)
+    @Column(name = "payment_method", length = 20)
     private com.example.wms.billing.entity.PaymentMethod paymentMethod =
             com.example.wms.billing.entity.PaymentMethod.BANK_TRANSFER;
 
