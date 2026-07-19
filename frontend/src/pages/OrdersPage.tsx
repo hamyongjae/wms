@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { isAxiosError } from 'axios'
 import { Plus, Loader2, Trash2, FileText, ShieldAlert, AlertTriangle, Pencil, X, Wallet, LogOut, LogIn } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
@@ -326,51 +326,17 @@ export default function OrdersPage() {
                     </span>
                   </td>
                   <td className="px-5 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      {/* [작업] 상태별 입/출고 처리 버튼 (수정·삭제와 동일 선상) */}
+                    {/* [작업] 통일된 버튼 그룹 — 동일 높이(h-8)·라운딩·간격, 은은한 톤 호버 */}
+                    <div className="flex items-center justify-end gap-1.5">
                       {o.status === 'INBOUND' ? (
-                        <button
-                          type="button"
-                          onClick={() => setStatusTarget(o)}
-                          title="출고 처리"
-                          className="flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100"
-                        >
-                          <LogOut size={13} /> 출고
-                        </button>
+                        <RowAction icon={<LogOut size={13} />} label="출고" tooltip="출고 처리" tone="amber" onClick={() => setStatusTarget(o)} />
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => setStatusTarget(o)}
-                          title="입고 처리(출고 취소)"
-                          className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100"
-                        >
-                          <LogIn size={13} /> 입고
-                        </button>
+                        <RowAction icon={<LogIn size={13} />} label="입고" tooltip="입고 처리 (출고 취소)" tone="emerald" onClick={() => setStatusTarget(o)} />
                       )}
-                      <button
-                        type="button"
-                        onClick={() => setBillingTarget(o)}
-                        title="정산 이력(회차별 보관료)"
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
-                      >
-                        <Wallet size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditTarget(o)}
-                        className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
-                      >
-                        <Pencil size={14} />
-                      </button>
+                      <RowAction icon={<Wallet size={15} />} tooltip="정산원장 조회" tone="indigo" onClick={() => setBillingTarget(o)} />
+                      <RowAction icon={<Pencil size={14} />} tooltip="계약 수정" tone="slate" onClick={() => setEditTarget(o)} />
                       {isAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(o)}
-                          title="삭제"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        <RowAction icon={<Trash2 size={15} />} tooltip="계약 삭제" tone="red" onClick={() => handleDelete(o)} />
                       )}
                     </div>
                   </td>
@@ -1627,6 +1593,52 @@ function StatusChangeModal({
         </div>
       </form>
     </Modal>
+  )
+}
+
+/* ===== 계약 목록 '작업' 컬럼 공용 액션 버튼 =====
+ * 텍스트형(입/출고)·아이콘형(원장·수정·삭제)을 하나의 규격(h-8·rounded-lg)으로 통일.
+ * tone별 은은한 파스텔 호버 + 미세 리프트 마이크로 인터랙션 + title 툴팁.
+ */
+type ActionTone = 'amber' | 'emerald' | 'indigo' | 'slate' | 'red'
+const ACTION_TONE: Record<ActionTone, { solid: string; ghost: string }> = {
+  amber: { solid: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100', ghost: 'hover:bg-amber-50 hover:text-amber-600' },
+  emerald: { solid: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100', ghost: 'hover:bg-emerald-50 hover:text-emerald-600' },
+  indigo: { solid: 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100', ghost: 'hover:bg-indigo-50 hover:text-indigo-600' },
+  slate: { solid: 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100', ghost: 'hover:bg-slate-100 hover:text-slate-700' },
+  red: { solid: 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100', ghost: 'hover:bg-red-50 hover:text-red-600' },
+}
+
+function RowAction({
+  icon,
+  label,
+  tooltip,
+  tone,
+  onClick,
+}: {
+  icon: ReactNode
+  label?: string
+  tooltip: string
+  tone: ActionTone
+  onClick: () => void
+}) {
+  const t = ACTION_TONE[tone]
+  const base = 'inline-flex h-8 shrink-0 items-center justify-center rounded-lg transition-all duration-150 hover:-translate-y-px active:translate-y-0'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={tooltip}
+      aria-label={tooltip}
+      className={
+        label
+          ? cn(base, 'gap-1 border px-2.5 text-xs font-medium', t.solid)
+          : cn(base, 'w-8 text-slate-400', t.ghost)
+      }
+    >
+      {icon}
+      {label}
+    </button>
   )
 }
 
