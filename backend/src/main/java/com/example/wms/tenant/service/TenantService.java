@@ -32,6 +32,7 @@ public class TenantService {
                 request.getEmail(),
                 request.getAddress()
         );
+        tenant.changeDefaultStoragePeriodDays(request.getDefaultStoragePeriodDays());
         return new TenantResponse(tenant);
     }
 

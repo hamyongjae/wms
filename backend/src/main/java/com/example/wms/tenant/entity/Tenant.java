@@ -43,6 +43,9 @@ public class Tenant {
     @Column(name = "status", nullable = false, length = 20)
     private TenantStatus status = TenantStatus.ACTIVE;   // 운영 상태
 
+    @Column(name = "default_storage_period_days")
+    private Integer defaultStoragePeriodDays = 7;   // [마스터] 기본 계약 유지 기간(일) — 출고예정일 기본값 산정
+
     @OneToMany(mappedBy = "tenant")
     private List<Warehouse> warehouses = new ArrayList<>();
 
@@ -73,5 +76,12 @@ public class Tenant {
         this.phone = phone;
         this.email = email;
         this.address = address;
+    }
+
+    // 기본 계약 유지 기간 설정 (1일 이상만 반영, null·0 이하는 무시)
+    public void changeDefaultStoragePeriodDays(Integer days) {
+        if (days != null && days >= 1) {
+            this.defaultStoragePeriodDays = days;
+        }
     }
 }

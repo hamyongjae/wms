@@ -15,4 +15,7 @@ public class TenantUpdateRequest {
     private String phone;
     private String email;
     private String address;
+
+    // 기본 계약 유지 기간(일) — 출고예정일 기본값 산정용 (미지정 시 기존값 유지)
+    private Integer defaultStoragePeriodDays;
 }
