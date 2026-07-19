@@ -1232,7 +1232,7 @@ function FloorPriceInline({
         disabled={!editable}
         title={editable ? `${tier}층 단가·최소 보관료 설정` : undefined}
         className={cn(
-          'group inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur-sm transition-all duration-200',
+          'group inline-flex min-w-[14.5rem] items-center justify-end gap-2 rounded-lg border px-3 py-1 text-xs font-medium shadow-sm backdrop-blur-sm transition-all duration-200',
           price != null
             ? 'border-indigo-200/70 bg-indigo-50/70 text-indigo-700'
             : 'border-slate-200/70 bg-white/60 text-slate-400',
