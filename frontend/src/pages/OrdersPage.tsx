@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, Trash2, FileText, ShieldAlert, AlertTriangle, Pencil, X, Wallet } from 'lucide-react'
+import { Plus, Loader2, Trash2, FileText, ShieldAlert, AlertTriangle, Pencil, X, Wallet, LogOut, LogIn } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger, type PaymentMethod } from '@/api/billingApi'
@@ -314,22 +314,39 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-5 py-3 text-right text-slate-700">{won(o.monthlyFee)}</td>
                   <td className="px-5 py-3">
-                    {/* [유형별 처리] 배지 클릭 → 입/출고 처리 모달 (정상/중도출고·정상/지연입고) */}
-                    <button
-                      type="button"
-                      onClick={() => setStatusTarget(o)}
-                      title={o.status === 'INBOUND' ? '클릭하여 출고 처리' : '클릭하여 입고로 되돌리기'}
+                    {/* [정적 뷰] 상태는 현재 데이터만 표시 — 처리 버튼은 작업 컬럼으로 분리 */}
+                    <span
                       className={cn(
-                        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition hover:brightness-95',
+                        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1',
                         STATUS_META[o.status].cls,
                       )}
                     >
                       {STATUS_META[o.status].icon && <span>{STATUS_META[o.status].icon}</span>}
                       {STATUS_META[o.status].label}
-                    </button>
+                    </span>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      {/* [작업] 상태별 입/출고 처리 버튼 (수정·삭제와 동일 선상) */}
+                      {o.status === 'INBOUND' ? (
+                        <button
+                          type="button"
+                          onClick={() => setStatusTarget(o)}
+                          title="출고 처리"
+                          className="flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100"
+                        >
+                          <LogOut size={13} /> 출고
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setStatusTarget(o)}
+                          title="입고 처리(출고 취소)"
+                          className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100"
+                        >
+                          <LogIn size={13} /> 입고
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setBillingTarget(o)}
