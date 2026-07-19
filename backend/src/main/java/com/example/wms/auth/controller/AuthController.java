@@ -51,6 +51,15 @@ public class AuthController {
         return ResponseEntity.ok(authService.listStaff());
     }
 
+    // 직원 주거래 계좌 등록·수정 (PATCH /api/auth/staff/{id}/account) — ADMIN 전용
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/staff/{id}/account")
+    public ResponseEntity<UserResponse> updateStaffAccount(
+            @PathVariable Long id,
+            @RequestBody com.example.wms.auth.dto.StaffAccountRequest request) {
+        return ResponseEntity.ok(authService.updateStaffAccount(id, request));
+    }
+
     // 로그인 (POST /api/auth/login) → JWT 반환
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(

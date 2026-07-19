@@ -16,6 +16,9 @@ public class UserResponse {
     private final String name;
     private final UserRole role;
     private final UserStatus status;
+    private final String bankName;
+    private final String accountNumber;
+    private final String accountHolder;
     private final LocalDateTime createdAt;
 
     public UserResponse(User user) {
@@ -25,6 +28,9 @@ public class UserResponse {
         this.name = user.getName();
         this.role = user.getRole();
         this.status = user.getStatus();
+        this.bankName = user.getBankName();
+        this.accountNumber = user.getAccountNumber();
+        this.accountHolder = user.getAccountHolder();
         this.createdAt = user.getCreatedAt();
     }
 }

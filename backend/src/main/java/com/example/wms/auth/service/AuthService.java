@@ -146,6 +146,17 @@ public class AuthService {
                 .toList();
     }
 
+    // [계좌 등록] 직원 주거래 계좌 등록·수정 — ADMIN 전용, 내 업체 소속만
+    @Transactional
+    public UserResponse updateStaffAccount(Long userId, com.example.wms.auth.dto.StaffAccountRequest req) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        User user = userRepository.findById(userId)
+                .filter(u -> u.getTenant() != null && u.getTenant().getId().equals(tenantId))
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 직원입니다. id=" + userId));
+        user.updateAccount(req.getBankName(), req.getAccountNumber(), req.getAccountHolder());
+        return new UserResponse(user);
+    }
+
     // 내 정보 조회 (토큰의 userId 기준)
     @Transactional(readOnly = true)
     public UserResponse getMe(Long userId) {

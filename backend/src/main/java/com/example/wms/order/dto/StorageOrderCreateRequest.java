@@ -30,4 +30,10 @@ public class StorageOrderCreateRequest {
 
     // 결제 방식 — PREPAID(선불)면 계약 등록과 동시에 청구·수금까지 자동 처리. 미지정 시 후불.
     private SettlementType paymentType;
+
+    // 결제 수단 (계좌이체/현금/카드) — 미지정 시 계좌이체
+    private com.example.wms.billing.entity.PaymentMethod paymentMethod;
+
+    // 계좌이체 시 수납 계좌를 참조할 담당 직원 id
+    private Long settlementUserId;
 }

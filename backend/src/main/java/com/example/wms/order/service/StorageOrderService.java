@@ -42,6 +42,7 @@ public class StorageOrderService {
     private final BillingAdjustmentRepository billingAdjustmentRepository;
     private final YardSlotRepository yardSlotRepository;
     private final BillingService billingService;
+    private final com.example.wms.user.repository.UserRepository userRepository;
 
     // 보관 계약 등록
     @Transactional
@@ -79,6 +80,23 @@ public class StorageOrderService {
                 request.getTotalVolume(),
                 request.getMemo()
         );
+
+        // [결제 수단] 미지정 시 계좌이체 기본
+        order.setPaymentMethod(request.getPaymentMethod() != null
+                ? request.getPaymentMethod()
+                : com.example.wms.billing.entity.PaymentMethod.BANK_TRANSFER);
+
+        // [수납 담당·계좌 연동] 계좌이체이고 담당 직원이 지정되면 계좌 보유 직원인지 검증 후 연결
+        if (order.getPaymentMethod() == com.example.wms.billing.entity.PaymentMethod.BANK_TRANSFER
+                && request.getSettlementUserId() != null) {
+            com.example.wms.user.entity.User staff = userRepository.findById(request.getSettlementUserId())
+                    .filter(u -> u.getTenant() != null && u.getTenant().getId().equals(tenantId))
+                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 담당 직원입니다."));
+            if (!staff.hasAccount()) {
+                throw new IllegalArgumentException("담당 직원에게 등록된 수납 계좌가 없습니다. 직원 정보에서 계좌를 먼저 등록하세요.");
+            }
+            order.setSettlementUser(staff);
+        }
 
         StorageOrder saved = storageOrderRepository.save(order);
 

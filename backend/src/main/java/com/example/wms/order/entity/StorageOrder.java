@@ -53,6 +53,17 @@ public class StorageOrder {
     @Column(name = "status", nullable = false, length = 20)
     private OrderStatus status = OrderStatus.INBOUND;
 
+    // ===== 결제 수단 & 수납 담당(계좌 연동) =====
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", nullable = false, length = 20)
+    private com.example.wms.billing.entity.PaymentMethod paymentMethod =
+            com.example.wms.billing.entity.PaymentMethod.BANK_TRANSFER;
+
+    // 계좌이체 시 수납 계좌를 참조할 담당 직원 (Lazy — 목록 조회 시 조인 오버헤드 없음)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "settlement_user_id")
+    private com.example.wms.user.entity.User settlementUser;
+
     // ===== 기간 =====
     @Column(name = "storage_start_date", nullable = false)
     private LocalDate storageStartDate;      // 입고일

@@ -67,6 +67,16 @@ public class User {
     @Column(name = "status", nullable = false, length = 20)
     private UserStatus status = UserStatus.ACTIVE;
 
+    // ===== 주거래 계좌 (수납 계좌 연동용) =====
+    @Column(name = "bank_name", length = 50)
+    private String bankName;             // 은행명
+
+    @Column(name = "account_number", length = 50)
+    private String accountNumber;        // 계좌번호
+
+    @Column(name = "account_holder", length = 50)
+    private String accountHolder;        // 예금주
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -169,5 +179,16 @@ public class User {
 
     public void changeStatus(UserStatus status) {
         this.status = status;
+    }
+
+    /** 주거래 계좌 정보 갱신 (관리자가 직원 계좌 등록·수정) */
+    public void updateAccount(String bankName, String accountNumber, String accountHolder) {
+        this.bankName = bankName;
+        this.accountNumber = accountNumber;
+        this.accountHolder = accountHolder;
+    }
+
+    public boolean hasAccount() {
+        return this.accountNumber != null && !this.accountNumber.isBlank();
     }
 }

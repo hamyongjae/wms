@@ -25,6 +25,14 @@ public class StorageOrderResponse {
     private final Double totalVolume;
     private final String memo;
 
+    // 결제 수단 & 수납 계좌(담당 직원 계좌 스냅샷)
+    private final String paymentMethod;
+    private final Long settlementUserId;
+    private final String settlementUserName;
+    private final String bankName;
+    private final String accountNumber;
+    private final String accountHolder;
+
     public StorageOrderResponse(StorageOrder order) {
         this.id = order.getId();
 
@@ -42,5 +50,13 @@ public class StorageOrderResponse {
         this.monthlyFee = order.getMonthlyFee();
         this.totalVolume = order.getTotalVolume();
         this.memo = order.getMemo();
+
+        this.paymentMethod = order.getPaymentMethod() != null ? order.getPaymentMethod().name() : null;
+        var su = order.getSettlementUser();
+        this.settlementUserId = su != null ? su.getId() : null;
+        this.settlementUserName = su != null ? su.getName() : null;
+        this.bankName = su != null ? su.getBankName() : null;
+        this.accountNumber = su != null ? su.getAccountNumber() : null;
+        this.accountHolder = su != null ? su.getAccountHolder() : null;
     }
 }
