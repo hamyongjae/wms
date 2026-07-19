@@ -980,8 +980,8 @@ function CreateOrderModal({
     }
   }, [open])
 
-  // [층 단가] 선택 창고의 층별 단가 로드 (슬롯 선택 시 보관료 기본값 연동용)
-  const [floorPrices, setFloorPrices] = useState<Map<number, number>>(new Map())
+  // [층 단가] 선택 창고의 층별 단가·최소료 로드 (슬롯 선택 시 보관료 기본값 연동용)
+  const [floorPrices, setFloorPrices] = useState<Map<number, { unitPrice: number; minFee: number }>>(new Map())
   useEffect(() => {
     if (!open || !warehouseId) {
       setFloorPrices(new Map())
@@ -990,7 +990,7 @@ function CreateOrderModal({
     let alive = true
     yardApi
       .floorPrices(Number(warehouseId))
-      .then((fp) => alive && setFloorPrices(new Map(fp.map((p) => [p.tier, p.unitPrice]))))
+      .then((fp) => alive && setFloorPrices(new Map(fp.map((p) => [p.tier, { unitPrice: p.unitPrice, minFee: p.minFee ?? 0 }]))))
       .catch(() => alive && setFloorPrices(new Map()))
     return () => {
       alive = false
@@ -1159,10 +1159,15 @@ function CreateOrderModal({
                   value={slotId}
                   onChange={setSlotId}
                   onPickSlot={(s) => {
-                    // [층 단가 연동] 슬롯 선택 시 해당 층 단가를 보관료 기본값으로 자동 로드
+                    // [층 단가 연동] 슬롯 선택 시 해당 층 단가로 보관료 자동 계산.
+                    //   실제 보관료 = 일 단가 × 보관일수, 단 최소 보관료 미달 시 최소 보관료로 상향(Math.max)
                     if (s) {
                       const p = floorPrices.get(s.tier)
-                      if (p != null) setMonthlyFee(p)
+                      if (p != null) {
+                        const days = expectedEndDate ? getDurationDays(storageStartDate, expectedEndDate) : 1
+                        const base = p.unitPrice * Math.max(days, 1)
+                        setMonthlyFee(Math.max(base, p.minFee))
+                      }
                     }
                   }}
                 />

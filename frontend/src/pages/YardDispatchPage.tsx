@@ -81,7 +81,7 @@ export default function YardDispatchPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [floorPrices, setFloorPrices] = useState<Map<number, number>>(new Map()) // 층(tier) → 단가
+  const [floorPrices, setFloorPrices] = useState<Map<number, { unitPrice: number; minFee: number }>>(new Map()) // 층 → 단가/최소료
 
   const [query, setQuery] = useState('')
   // [화주명 검색] 백엔드가 검증·매칭해 돌려준 하이라이트 대상 컨테이너 id 집합
@@ -129,17 +129,17 @@ export default function YardDispatchPage() {
         setContainersById(new Map(cs.map((c) => [c.id, c])))
         setCustomers(cu)
         setOrders(os)
-        setFloorPrices(new Map(fp.map((p) => [p.tier, p.unitPrice])))
+        setFloorPrices(new Map(fp.map((p) => [p.tier, { unitPrice: p.unitPrice, minFee: p.minFee ?? 0 }])))
       })
       .catch(() => setError('보관창고 현황을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [selectedId, refreshKey])
 
-  // [층별 단가] 저장 → 전체 리로드 없이 해당 층 단가만 즉시 반영
-  async function handleSaveFloorPrice(tier: number, unitPrice: number) {
+  // [층별 단가] 저장 → 전체 리로드 없이 해당 층만 즉시 반영
+  async function handleSaveFloorPrice(tier: number, unitPrice: number, minFee: number) {
     if (selectedId == null) return
-    const saved = await yardApi.setFloorPrice({ warehouseId: selectedId, tier, unitPrice })
-    setFloorPrices((prev) => new Map(prev).set(saved.tier, saved.unitPrice))
+    const saved = await yardApi.setFloorPrice({ warehouseId: selectedId, tier, unitPrice, minFee })
+    setFloorPrices((prev) => new Map(prev).set(saved.tier, { unitPrice: saved.unitPrice, minFee: saved.minFee ?? 0 }))
   }
 
   // [실시간 동기화] 계약관리에서 상태 전환·삭제 시 슬롯/컨테이너를 다시 불러온다.
@@ -431,7 +431,7 @@ export default function YardDispatchPage() {
                         tier={floor.tier}
                         price={floorPrices.get(floor.tier) ?? null}
                         editable={isAdmin}
-                        onSave={(p) => handleSaveFloorPrice(floor.tier, p)}
+                        onSave={(u, m) => handleSaveFloorPrice(floor.tier, u, m)}
                       />
                     </div>
 
@@ -464,7 +464,7 @@ export default function YardDispatchPage() {
                             tier={tier}
                             price={floorPrices.get(tier) ?? null}
                             editable={isAdmin}
-                            onSave={(p) => handleSaveFloorPrice(tier, p)}
+                            onSave={(u, m) => handleSaveFloorPrice(tier, u, m)}
                           />
                         </div>
                       </div>
@@ -1196,21 +1196,25 @@ function FloorPriceInline({
   onSave,
 }: {
   tier: number
-  price: number | null
+  price: { unitPrice: number; minFee: number } | null
   editable: boolean
-  onSave: (unitPrice: number) => Promise<void>
+  onSave: (unitPrice: number, minFee: number) => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState<number | null>(price)
+  const [unit, setUnit] = useState<number | null>(price?.unitPrice ?? null)
+  const [min, setMin] = useState<number | null>(price?.minFee ?? null)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => setValue(price), [price])
+  useEffect(() => {
+    setUnit(price?.unitPrice ?? null)
+    setMin(price?.minFee ?? null)
+  }, [price])
 
   async function save() {
-    if (value == null || value < 0) return
+    if (unit == null || unit < 0) return
     setSaving(true)
     try {
-      await onSave(value)
+      await onSave(unit, min ?? 0)
       setEditing(false)
     } catch {
       // 저장 실패 시 편집 상태 유지
@@ -1220,12 +1224,13 @@ function FloorPriceInline({
   }
 
   if (!editing) {
+    const hasMin = price?.minFee != null && price.minFee > 0
     return (
       <button
         type="button"
         onClick={() => editable && setEditing(true)}
         disabled={!editable}
-        title={editable ? `${tier}층 단가 설정` : undefined}
+        title={editable ? `${tier}층 단가·최소 보관료 설정` : undefined}
         className={cn(
           'group inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur-sm transition-all duration-200',
           price != null
@@ -1235,34 +1240,40 @@ function FloorPriceInline({
         )}
       >
         {price != null ? (
-          <span className="flex items-baseline gap-1">
-            <span className="text-[10px] font-normal uppercase tracking-wide text-indigo-400">기본 단가</span>
-            <span className="tabular-nums font-semibold text-indigo-700">{fmt(price)}원</span>
-            <span className="text-[10px] font-normal text-indigo-400">/ 일</span>
+          <span className="flex items-baseline gap-1.5">
+            <span className="flex items-baseline gap-1">
+              <span className="text-[10px] font-normal uppercase tracking-wide text-indigo-400">기본</span>
+              <span className="tabular-nums font-semibold text-indigo-700">{fmt(price.unitPrice)}원</span>
+              <span className="text-[10px] font-normal text-indigo-400">/ 일</span>
+            </span>
+            {hasMin && (
+              <span className="flex items-baseline gap-1 border-l border-indigo-200 pl-1.5">
+                <span className="text-[10px] font-normal uppercase tracking-wide text-indigo-400">최소</span>
+                <span className="tabular-nums font-semibold text-indigo-700">{fmt(price.minFee)}원</span>
+              </span>
+            )}
           </span>
         ) : (
           <span>단가 미설정</span>
         )}
         {editable && (
-          <Pencil
-            size={11}
-            className="text-slate-300 transition-colors duration-200 group-hover:text-indigo-500"
-          />
+          <Pencil size={11} className="text-slate-300 transition-colors duration-200 group-hover:text-indigo-500" />
         )}
       </button>
     )
   }
 
+  const miniInput = 'w-24 rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
   return (
-    <span className="inline-flex items-center gap-1">
-      <div className="w-28">
-        <MoneyInput
-          value={value}
-          onChange={setValue}
-          placeholder="6,000"
-          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-        />
-      </div>
+    <span className="inline-flex items-center gap-1.5">
+      <label className="flex items-center gap-1 text-[11px] text-slate-500">
+        기본
+        <MoneyInput value={unit} onChange={setUnit} placeholder="6,000" className={miniInput} />
+      </label>
+      <label className="flex items-center gap-1 text-[11px] text-slate-500">
+        최소
+        <MoneyInput value={min} onChange={setMin} placeholder="0" className={miniInput} />
+      </label>
       <button
         type="button"
         onClick={save}
@@ -1274,7 +1285,8 @@ function FloorPriceInline({
       <button
         type="button"
         onClick={() => {
-          setValue(price)
+          setUnit(price?.unitPrice ?? null)
+          setMin(price?.minFee ?? null)
           setEditing(false)
         }}
         className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50"
