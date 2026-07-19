@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
 import { Plus, Loader2, Trash2, FileText, ShieldAlert, AlertTriangle, Pencil, X, Wallet } from 'lucide-react'
-import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod } from '@/api/orderApi'
+import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger, type PaymentMethod } from '@/api/billingApi'
 import { displayStatus, isOpenLedger } from '@/lib/billing'
@@ -926,7 +926,7 @@ function CreateOrderModal({
   const [expectedEndDate, setEndDate] = useState('')
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
   const [paymentType, setPaymentType] = useState<PaymentType>('PREPAID')
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('BANK_TRANSFER') // 결제 수단 기본 계좌이체
+  const [paymentMethod, setPaymentMethod] = useState<OrderPaymentMethod>('BANK_TRANSFER') // 결제 수단 기본 계좌이체
   const [settlementUserId, setSettlementUserId] = useState<number | null>(null)
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [memo, setMemo] = useState('')
@@ -1210,7 +1210,7 @@ function CreateOrderModal({
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">결제 수단 *</label>
-                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)} className={inputCls}>
+                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={inputCls}>
                     <option value="BANK_TRANSFER">계좌이체</option>
                     <option value="CASH">현금</option>
                     <option value="CARD">카드</option>
