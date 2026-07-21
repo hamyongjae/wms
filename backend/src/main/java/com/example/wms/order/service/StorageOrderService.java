@@ -100,16 +100,23 @@ public class StorageOrderService {
 
         StorageOrder saved = storageOrderRepository.save(order);
 
-        // [선불 자동 정산] 결제 방식이 PREPAID이고 요금이 있으면, 같은 트랜잭션에서
-        //   청구 원장 생성 → 발행 → 전액 수금까지 원자적으로 완결한다.
-        //   (실패 시 계약까지 함께 롤백 → "계약은 됐는데 청구 실패" 같은 부분 상태가 사라진다)
-        if (request.getPaymentType() == SettlementType.PREPAID
-                && request.getMonthlyFee() != null && request.getMonthlyFee() > 0) {
+        // [청구서 자동 발행] 결제 방식과 무관하게 계약 등록과 동시에 청구 원장을 만든다.
+        //   (같은 트랜잭션 — 실패 시 계약까지 롤백되어 "계약은 됐는데 청구 없음" 매출 구멍이 사라진다)
+        if (request.getMonthlyFee() != null && request.getMonthlyFee() > 0) {
             LocalDate periodStart = saved.getStorageStartDate();
             LocalDate periodEnd = saved.getExpectedEndDate() != null
                     ? saved.getExpectedEndDate() : periodStart.plusDays(7);
-            billingService.settlePrepaid(saved, periodStart, periodEnd,
-                    java.math.BigDecimal.valueOf(request.getMonthlyFee()));
+            java.math.BigDecimal amount = java.math.BigDecimal.valueOf(request.getMonthlyFee());
+
+            if (request.getPaymentType() == SettlementType.PREPAID) {
+                // 선불: 원장 생성 → 발행 → 전액 수금(완납, 미납 0원). 납기 기본값 = 보관 시작일.
+                LocalDate due = request.getDueDate() != null ? request.getDueDate() : periodStart;
+                billingService.settlePrepaid(saved, periodStart, periodEnd, amount, due, saved.getPaymentMethod());
+            } else {
+                // 후불: 원장 생성 → 발행(입금예정, 미납=전액). 납기 기본값 = 보관 종료일.
+                LocalDate due = request.getDueDate() != null ? request.getDueDate() : periodEnd;
+                billingService.issuePostpaid(saved, periodStart, periodEnd, amount, due);
+            }
         }
 
         return new StorageOrderResponse(saved);

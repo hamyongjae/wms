@@ -47,6 +47,23 @@ public interface BillingLedgerRepository extends JpaRepository<BillingLedger, Lo
     // [배치] 같은 계약·같은 청구기간 원장이 이미 있는지 (월 청구 중복 생성 방지)
     boolean existsByStorageOrderIdAndBillingPeriodStart(Long storageOrderId, LocalDate billingPeriodStart);
 
+    /**
+     * [이중청구 방지] 특정 계약에 대해 [from, to] 기간과 겹치는 '취소 아닌' 원장이 있는지.
+     * 계약 등록 시 자동 발행한 청구서와 월 배치 청구서가 같은 구간을 중복 청구하지 않도록,
+     * 정확한 시작일 일치가 아니라 '기간 겹침'으로 판정한다. (idx_ledger_order 인덱스 활용)
+     */
+    @Query("""
+            select case when count(l) > 0 then true else false end
+            from BillingLedger l
+            where l.storageOrder.id = :orderId
+              and l.status <> com.example.wms.billing.entity.BillingStatus.CANCELED
+              and l.billingPeriodStart <= :to
+              and l.billingPeriodEnd >= :from
+            """)
+    boolean existsActiveLedgerOverlapping(@Param("orderId") Long orderId,
+                                          @Param("from") LocalDate from,
+                                          @Param("to") LocalDate to);
+
     // [계약 삭제] 특정 계약에 연결된 모든 청구 원장 조회 (cascade 삭제용)
     List<BillingLedger> findByStorageOrderId(Long storageOrderId);
 

@@ -35,6 +35,15 @@ public class BillingScheduler {
         log.info("[청구배치] {} 월 청구 원장 자동 생성: {}건", target, created);
     }
 
+    /** 매일 오전 8시 50분 — 청구서 누락 계약(매출 구멍) self-heal (미납 촉구 직전에 결손 보정) */
+    @Scheduled(cron = "0 50 8 * * *")
+    public void backfillMissingLedgers() {
+        int created = billingBatchService.backfillMissingLedgers();
+        if (created > 0) {
+            log.info("[청구배치] 청구서 누락 계약 self-heal: {}건 소급 발행", created);
+        }
+    }
+
     /** 매일 오전 9시 — 미납 촉구 알림 발송 */
     @Scheduled(cron = "0 0 9 * * *")
     public void sendOverdueReminders() {

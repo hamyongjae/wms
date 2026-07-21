@@ -58,8 +58,9 @@ public class BillingBatchService {
         int created = 0;
 
         for (StorageOrder order : activeOrders) {
-            if (ledgerRepository.existsByStorageOrderIdAndBillingPeriodStart(order.getId(), periodStart)) {
-                continue;   // 이미 이번 달 원장이 있음
+            // [이중청구 방지] 이번 달 구간과 겹치는 원장(계약 등록 시 자동 발행분 포함)이 이미 있으면 건너뜀
+            if (ledgerRepository.existsActiveLedgerOverlapping(order.getId(), periodStart, periodEnd)) {
+                continue;
             }
             BigDecimal base = prorationCalculator.prorateMonthly(
                     BigDecimal.valueOf(order.getMonthlyFee()), periodStart, periodEnd);
@@ -69,6 +70,42 @@ public class BillingBatchService {
                     BillingType.MONTHLY, SettlementType.POSTPAID,
                     periodStart, periodEnd, base, MoneyPolicy.ZERO, dueDate);
             ledger.issue(dueDate);   // 자동 생성분은 바로 발행(청구 확정)
+            ledgerRepository.save(ledger);
+            created++;
+        }
+        return created;
+    }
+
+    /**
+     * [매출 구멍 차단 - self-heal] 청구 원장이 하나도 없는 활성(입고) 계약에 후불 청구서를 소급 발행한다.
+     *
+     * 배경: '계약 등록 시 청구서 자동 발행' 도입 전에 만들어진 후불 계약은 원장이 없어
+     *       매출·미수 집계에서 누락된다(매출 구멍). 이 배치가 결손 계약을 찾아 원장을 채운다.
+     *
+     * 효율: NOT EXISTS 단일 쿼리로 결손 계약만 선별(findActiveWithoutLedger) → 전체 스캔 없음.
+     * 멱등: 이미 원장이 있으면 대상에서 빠지므로 반복 실행해도 안전(재실행 시 0건).
+     *
+     * @return 새로 발행한 청구서 수
+     */
+    @Transactional
+    public int backfillMissingLedgers() {
+        List<StorageOrder> missing = storageOrderRepository.findActiveWithoutLedger();
+        int created = 0;
+        for (StorageOrder order : missing) {
+            if (order.getMonthlyFee() == null || order.getMonthlyFee() <= 0) continue;
+            LocalDate periodStart = order.getStorageStartDate();
+            LocalDate periodEnd = order.getExpectedEndDate() != null
+                    ? order.getExpectedEndDate() : periodStart.plusDays(7);
+            LocalDate dueDate = periodEnd;   // 후불 소급분 납기 = 보관 종료일
+
+            BigDecimal base = prorationCalculator.prorateMonthly(
+                    BigDecimal.valueOf(order.getMonthlyFee()), periodStart, periodEnd);
+
+            BillingLedger ledger = new BillingLedger(
+                    order.getTenant(), order, order.getCustomer(), generateLedgerNo(),
+                    BillingType.MONTHLY, SettlementType.POSTPAID,
+                    periodStart, periodEnd, base, MoneyPolicy.ZERO, dueDate);
+            ledger.issue(dueDate);   // 발행(입금예정, 미납=전액)
             ledgerRepository.save(ledger);
             created++;
         }

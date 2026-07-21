@@ -104,23 +104,55 @@ public class BillingService {
      * [선불 계약 자동 정산] 원장 생성 → 발행 → 전액 수금을 한 트랜잭션으로 처리한다.
      * 계약 등록(StorageOrderService.createOrder)에서 호출되어, 부분 실패 없이 원자적으로 완결된다.
      * (호출자의 트랜잭션에 참여 — 계약과 청구가 함께 커밋되거나 함께 롤백된다)
+     *
+     * @param dueDate 납기일 (미지정 시 보관 시작일). 선불은 완납되므로 미수 판정과 무관하지만,
+     *                청구서 표기·감사 목적으로 계약에서 넘어온 값을 그대로 보존한다.
+     * @param method  선택된 결제 수단 (현금/카드/계좌이체) — 즉시 수납 처리된 것으로 기록
      */
     @Transactional
-    public void settlePrepaid(StorageOrder order, LocalDate periodStart, LocalDate periodEnd, BigDecimal amount) {
+    public void settlePrepaid(StorageOrder order, LocalDate periodStart, LocalDate periodEnd,
+                              BigDecimal amount, LocalDate dueDate, PaymentMethod method) {
         BigDecimal base = MoneyPolicy.normalize(amount);
+        LocalDate due = dueDate != null ? dueDate : periodStart;
+        PaymentMethod payMethod = method != null ? method : PaymentMethod.BANK_TRANSFER;
+
         BillingLedger ledger = new BillingLedger(
                 order.getTenant(), order, order.getCustomer(), generateLedgerNo(),
                 BillingType.MONTHLY, SettlementType.PREPAID,
-                periodStart, periodEnd, base, BigDecimal.ZERO, periodStart);
+                periodStart, periodEnd, base, BigDecimal.ZERO, due);
 
-        ledger.issue(periodStart);              // DRAFT → ISSUED (납기 = 입고일)
+        ledger.issue(due);                      // DRAFT → ISSUED (납기 = 납기일)
         ledgerRepository.save(ledger);
 
         Long userId = SecurityUtils.getCurrentUser().getUserId();
         paymentHistoryRepository.save(new PaymentHistory(
-                order.getTenant(), ledger, base, PaymentMethod.BANK_TRANSFER,
+                order.getTenant(), ledger, base, payMethod,
                 periodStart, "선불 계약 - 자동 처리", userId));
-        ledger.applyPayment(base);              // 전액 수금 → PAID
+        ledger.applyPayment(base);              // 전액 수금 → PAID (미납 0원)
+    }
+
+    /**
+     * [후불 계약 청구서 자동 발행] 원장 생성 → 발행(ISSUED)까지만 처리한다.
+     * 수금은 하지 않으므로 미납액 = 전액(입금예정 상태)으로 원장에 남는다.
+     * 납기일 경과 후에도 잔액이 있으면 findOverdue/파생 overdue 로 자연스럽게 연체/미수로 흘러간다.
+     * 계약 등록(StorageOrderService.createOrder)에서 호출되어 매출 구멍을 원천 차단한다.
+     *
+     * @param dueDate 납기일 (미지정 시 보관 종료일, 그마저 없으면 시작일). 이 날짜가 미수 판정의 기준.
+     */
+    @Transactional
+    public void issuePostpaid(StorageOrder order, LocalDate periodStart, LocalDate periodEnd,
+                              BigDecimal amount, LocalDate dueDate) {
+        BigDecimal base = MoneyPolicy.normalize(amount);
+        LocalDate due = dueDate != null ? dueDate
+                : (periodEnd != null ? periodEnd : periodStart);
+
+        BillingLedger ledger = new BillingLedger(
+                order.getTenant(), order, order.getCustomer(), generateLedgerNo(),
+                BillingType.MONTHLY, SettlementType.POSTPAID,
+                periodStart, periodEnd, base, BigDecimal.ZERO, due);
+
+        ledger.issue(due);                      // DRAFT → ISSUED (미납 = 전액 = 입금예정)
+        ledgerRepository.save(ledger);
     }
 
     /** 원장 발행 (DRAFT → ISSUED) */
