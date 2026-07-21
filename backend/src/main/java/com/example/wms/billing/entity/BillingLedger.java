@@ -195,6 +195,18 @@ public class BillingLedger {
         this.status = BillingStatus.CARRIED_OVER;
     }
 
+    /** 납기일 변경 (계약 수정에서 청구 조건 재정렬 시) */
+    public void changeDueDate(LocalDate dueDate) {
+        requireActive();
+        this.dueDate = dueDate;
+    }
+
+    /** 정산 방식(선불/후불) 변경 (계약 수정에서 결제 방식 전환 시). 수금 반영은 서비스에서 별도 처리 */
+    public void changeSettlementType(SettlementType settlementType) {
+        requireActive();
+        this.settlementType = settlementType;
+    }
+
     /** 취소 */
     public void cancel() {
         if (this.status == BillingStatus.PAID || this.status == BillingStatus.CARRIED_OVER) {

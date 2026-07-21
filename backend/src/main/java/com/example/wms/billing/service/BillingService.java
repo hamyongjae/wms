@@ -155,6 +155,60 @@ public class BillingService {
         ledgerRepository.save(ledger);
     }
 
+    /**
+     * [계약 수정 - 청구 조건 재정산] 활성 원장을 계약의 새 결제 방식·납기일에 맞춰 재정렬한다.
+     * 계약 등록과 동일한 정산 논리를 소급 적용해 "계약 화면과 원장"이 항상 일치하도록 한다.
+     *
+     *  · 후불 → 선불 : 남은 미납 잔액을 선택 결제 수단으로 즉시 완납 처리 (미납 0원)
+     *  · 선불 → 후불 : 자동 수납분을 전액 취소 → 입금예정(미납=전액)으로 되돌림
+     *  · 납기일 변경 : 원장 dueDate 갱신 (연체/미수 판정 기준 재설정)
+     *
+     * 대상: 취소/이월되지 않은 가장 늦은 회차 원장. 없으면 no-op(안전).
+     */
+    @Transactional
+    public void resettleForOrder(Long storageOrderId, SettlementType newType,
+                                 LocalDate newDueDate, PaymentMethod method) {
+        BillingLedger target = ledgerRepository.findByStorageOrderId(storageOrderId).stream()
+                .filter(l -> l.getStatus() != BillingStatus.CANCELED
+                        && l.getStatus() != BillingStatus.CARRIED_OVER)
+                .max(java.util.Comparator.comparing(BillingLedger::getBillingPeriodStart))
+                .orElse(null);
+        if (target == null) return;
+
+        BillingLedger locked = lockLedger(target.getId());
+        Long userId = SecurityUtils.getCurrentUser().getUserId();
+
+        // 1) 납기일 재설정
+        if (newDueDate != null && !newDueDate.equals(locked.getDueDate())) {
+            locked.changeDueDate(newDueDate);
+        }
+
+        // 2) 결제 방식 전환 시에만 수금 재정산
+        if (newType != null && locked.getSettlementType() != newType) {
+            if (newType == SettlementType.PREPAID) {
+                // 후불 → 선불: 남은 잔액을 즉시 완납
+                BigDecimal balance = locked.getBalance();
+                if (balance.signum() > 0) {
+                    PaymentMethod payMethod = method != null ? method : PaymentMethod.BANK_TRANSFER;
+                    paymentHistoryRepository.save(new PaymentHistory(
+                            locked.getTenant(), locked, balance, payMethod,
+                            LocalDate.now(), "결제방식 변경(후불→선불) 자동 완납", userId));
+                    locked.applyPayment(balance);
+                }
+            } else {
+                // 선불 → 후불: 자동 수납분 전액 취소 → 입금예정
+                for (PaymentHistory p : paymentHistoryRepository
+                        .findByBillingLedgerIdAndTenantIdOrderByPaidOnAsc(locked.getId(), locked.getTenant().getId())) {
+                    if (!p.isReversed()) {
+                        locked.reversePayment(p.getAmount());
+                        p.markReversed();
+                    }
+                }
+            }
+            locked.changeSettlementType(newType);
+        }
+    }
+
     /** 원장 발행 (DRAFT → ISSUED) */
     @Transactional
     public BillingLedgerResponse issueLedger(Long ledgerId, IssueRequest req) {

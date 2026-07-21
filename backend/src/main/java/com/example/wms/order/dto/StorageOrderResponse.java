@@ -25,6 +25,10 @@ public class StorageOrderResponse {
     private final Double capacityTons;
     private final String memo;
 
+    // 청구 조건 (선불/후불 · 납기일)
+    private final String paymentType;
+    private final LocalDate dueDate;
+
     // 결제 수단 & 수납 계좌(담당 직원 계좌 스냅샷)
     private final String paymentMethod;
     private final Long settlementUserId;
@@ -50,6 +54,9 @@ public class StorageOrderResponse {
         this.monthlyFee = order.getMonthlyFee();
         this.capacityTons = order.getCapacityTons();
         this.memo = order.getMemo();
+
+        this.paymentType = order.getPaymentType() != null ? order.getPaymentType().name() : null;
+        this.dueDate = order.getDueDate();
 
         this.paymentMethod = order.getPaymentMethod() != null ? order.getPaymentMethod().name() : null;
         var su = order.getSettlementUser();

@@ -98,23 +98,29 @@ public class StorageOrderService {
             order.setSettlementUser(staff);
         }
 
+        // [청구 조건] 결제 방식(미지정 시 후불)과 납기일을 계약에 영속화 — 수정 시 재정산의 기준이 된다.
+        LocalDate periodStart = order.getStorageStartDate();
+        LocalDate periodEnd = order.getExpectedEndDate() != null
+                ? order.getExpectedEndDate() : periodStart.plusDays(7);
+        com.example.wms.billing.entity.SettlementType payType =
+                request.getPaymentType() != null ? request.getPaymentType() : SettlementType.POSTPAID;
+        // 납기 기본값: 선불=보관 시작일 / 후불=보관 종료일 (프론트와 동일 규칙, 서버가 이중 방어)
+        LocalDate due = request.getDueDate() != null ? request.getDueDate()
+                : (payType == SettlementType.PREPAID ? periodStart : periodEnd);
+        order.setPaymentType(payType);
+        order.setDueDate(due);
+
         StorageOrder saved = storageOrderRepository.save(order);
 
         // [청구서 자동 발행] 결제 방식과 무관하게 계약 등록과 동시에 청구 원장을 만든다.
         //   (같은 트랜잭션 — 실패 시 계약까지 롤백되어 "계약은 됐는데 청구 없음" 매출 구멍이 사라진다)
         if (request.getMonthlyFee() != null && request.getMonthlyFee() > 0) {
-            LocalDate periodStart = saved.getStorageStartDate();
-            LocalDate periodEnd = saved.getExpectedEndDate() != null
-                    ? saved.getExpectedEndDate() : periodStart.plusDays(7);
             java.math.BigDecimal amount = java.math.BigDecimal.valueOf(request.getMonthlyFee());
-
-            if (request.getPaymentType() == SettlementType.PREPAID) {
-                // 선불: 원장 생성 → 발행 → 전액 수금(완납, 미납 0원). 납기 기본값 = 보관 시작일.
-                LocalDate due = request.getDueDate() != null ? request.getDueDate() : periodStart;
+            if (payType == SettlementType.PREPAID) {
+                // 선불: 원장 생성 → 발행 → 전액 수금(완납, 미납 0원)
                 billingService.settlePrepaid(saved, periodStart, periodEnd, amount, due, saved.getPaymentMethod());
             } else {
-                // 후불: 원장 생성 → 발행(입금예정, 미납=전액). 납기 기본값 = 보관 종료일.
-                LocalDate due = request.getDueDate() != null ? request.getDueDate() : periodEnd;
+                // 후불: 원장 생성 → 발행(입금예정, 미납=전액)
                 billingService.issuePostpaid(saved, periodStart, periodEnd, amount, due);
             }
         }
@@ -149,6 +155,44 @@ public class StorageOrderService {
                 request.getCapacityTons(),
                 request.getMemo()
         );
+
+        // ===== [청구 조건 수정] 결제 수단·입금계좌·결제 방식·납기일 — 등록과 동일 로직으로 연동 =====
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+
+        // 1) 결제 수단 (미지정 시 기존값 유지)
+        if (request.getPaymentMethod() != null) {
+            order.setPaymentMethod(request.getPaymentMethod());
+        }
+        // 2) 입금 계좌(담당 직원) — 계좌이체일 때만 유효. 다른 수단으로 바뀌면 연결 해제.
+        if (order.getPaymentMethod() == com.example.wms.billing.entity.PaymentMethod.BANK_TRANSFER) {
+            if (request.getSettlementUserId() != null) {
+                com.example.wms.user.entity.User staff = userRepository.findById(request.getSettlementUserId())
+                        .filter(u -> u.getTenant() != null && u.getTenant().getId().equals(tenantId))
+                        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 담당 직원입니다."));
+                if (!staff.hasAccount()) {
+                    throw new IllegalArgumentException("담당 직원에게 등록된 수납 계좌가 없습니다. 직원 정보에서 계좌를 먼저 등록하세요.");
+                }
+                order.setSettlementUser(staff);
+            } else {
+                order.setSettlementUser(null);
+            }
+        } else {
+            order.setSettlementUser(null);
+        }
+
+        // 3) 결제 방식(선불/후불)·납기일 — 계약에 반영하고, 활성 원장을 같은 논리로 재정산
+        SettlementType newType = request.getPaymentType() != null
+                ? request.getPaymentType() : order.getPaymentType();
+        // 납기일: 명시값 우선, 없으면 결제 방식별 기본(선불=시작일/후불=종료일)
+        LocalDate periodEnd = order.getExpectedEndDate() != null
+                ? order.getExpectedEndDate() : order.getStorageStartDate();
+        LocalDate newDue = request.getDueDate() != null ? request.getDueDate()
+                : (newType == SettlementType.PREPAID ? order.getStorageStartDate() : periodEnd);
+        order.setPaymentType(newType);
+        order.setDueDate(newDue);
+        // 원장 자동 재정산 (후불→선불 완납 / 선불→후불 수납취소 / 납기 갱신)
+        billingService.resettleForOrder(order.getId(), newType, newDue, order.getPaymentMethod());
+
         // [일정 동기화] 이 계약에 배정된 컨테이너의 입고/출고예정일을 계약 기간과 일치시킨다.
         //   (계약이 단일 소스 — 컨테이너 관리·캘린더에서 계약과 어긋나지 않도록)
         syncContainerSchedule(order, order.getStorageStartDate(), order.getExpectedEndDate());

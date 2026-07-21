@@ -53,6 +53,15 @@ public class StorageOrder {
     @Column(name = "status", nullable = false, length = 20)
     private OrderStatus status = OrderStatus.INBOUND;
 
+    // ===== 청구 조건 (선불/후불 · 납기일) — 계약이 자기 청구 조건을 기억한다 =====
+    // [스키마] 기존 행 호환을 위해 nullable. 수정 시 이 값 기준으로 활성 원장을 재정산한다.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_type", length = 20)
+    private com.example.wms.billing.entity.SettlementType paymentType;   // 선불(PREPAID)/후불(POSTPAID)
+
+    @Column(name = "due_date")
+    private LocalDate dueDate;                // 납기일 (청구 대금 회수 기준일)
+
     // ===== 결제 수단 & 수납 담당(계좌 연동) =====
     // [스키마] 기존 행 호환을 위해 nullable — 신규 계약은 아래 기본값(계좌이체)으로 저장된다.
     @Enumerated(EnumType.STRING)
