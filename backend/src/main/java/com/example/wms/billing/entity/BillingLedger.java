@@ -251,9 +251,18 @@ public class BillingLedger {
         this.status = BillingStatus.CANCELED;
     }
 
-    /** 남은 미수금(이월 대상 금액) */
+    /** 남은 미수금(이월 대상 금액) — 잔액이 양수일 때만. 과오납(음수)은 미수금이 아니다. */
     public BigDecimal outstandingBalance() {
         return this.balance.signum() > 0 ? this.balance : MoneyPolicy.ZERO;
+    }
+
+    /**
+     * [환불 대상 금액 - 계정 과목 분리] 중도출고 등으로 실청구액이 수금액보다 작아져 잔액이 음수가 되면,
+     * 그 절대값을 '환불(선급금 반환) 대상'으로 본다. 미수금(outstandingBalance)과 명확히 분리한다.
+     * (선불 완납 계약의 중도출고 환급, 후불 과오납 환불 모두 부호로 자연스럽게 판별)
+     */
+    public BigDecimal refundDue() {
+        return this.balance.signum() < 0 ? this.balance.negate() : MoneyPolicy.ZERO;
     }
 
     // ===== 내부 =====

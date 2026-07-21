@@ -31,6 +31,9 @@ public class BillingLedgerResponse {
     private final BigDecimal adjustmentTotal;
     private final BigDecimal paidTotal;
     private final BigDecimal balance;
+    // [계정 과목 분리] 미수금(양수 잔액)과 환불 대상(음수 잔액의 절대값)을 명확히 나눠 노출
+    private final BigDecimal outstanding;   // 실제 미수금 (balance>0), 음수면 0
+    private final BigDecimal refundDue;     // 환불(선급금 반환) 대상 (balance<0), 양수면 0
 
     private final BillingStatus status;
     // [파생 연체/미수] 상태 enum을 늘리지 않고(회계 원장 진실 보존 + DDL 마이그레이션 회피),
@@ -60,6 +63,8 @@ public class BillingLedgerResponse {
         this.adjustmentTotal = l.getAdjustmentTotal();
         this.paidTotal = l.getPaidTotal();
         this.balance = l.getBalance();
+        this.outstanding = l.outstandingBalance();
+        this.refundDue = l.refundDue();
         this.status = l.getStatus();
 
         // [연체 파생 계산] 오늘 기준 납기 경과 + 미납 잔액이 있으면 연체/미수로 판정.
