@@ -38,6 +38,7 @@ export interface OrderCreate {
   paymentType?: PaymentType
   paymentMethod?: PaymentMethod
   settlementUserId?: number
+  dueDate?: string // 납기일 — 선불=보관 시작일, 후불=보관 종료일 기본값(수동 변경 가능)
   totalVolume?: number
   memo?: string
 }

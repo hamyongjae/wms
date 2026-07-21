@@ -31,6 +31,8 @@ export interface BillingLedger {
   paidTotal: number
   balance: number
   status: BillingStatus
+  overdue: boolean // [파생] 납기 경과 + 미납 잔액 → 연체/미수
+  daysOverdue: number // 납기 경과 일수 (연체 아니면 0)
   carriedOverToLedgerId: number | null
   taxInvoiceIssued: boolean
   version: number

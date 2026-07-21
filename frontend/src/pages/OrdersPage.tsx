@@ -936,6 +936,9 @@ function CreateOrderModal({
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
   const [paymentType, setPaymentType] = useState<PaymentType>('PREPAID')
   const [paymentMethod, setPaymentMethod] = useState<OrderPaymentMethod>('BANK_TRANSFER') // 결제 수단 기본 계좌이체
+  // [납기일] 선불→보관 시작일 / 후불→보관 종료일이 제로클릭 기본값. 사용자가 만지면(dueTouched) 자동 매핑 중단.
+  const [dueDate, setDueDate] = useState('')
+  const [dueTouched, setDueTouched] = useState(false)
   const [settlementUserId, setSettlementUserId] = useState<number | null>(null)
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [memo, setMemo] = useState('')
@@ -971,12 +974,23 @@ function CreateOrderModal({
       setPaymentType('PREPAID')
       setPaymentMethod('BANK_TRANSFER')
       setSettlementUserId(null)
+      setDueDate(today()) // 선불 기본값 = 보관 시작일(=today)
+      setDueTouched(false)
       setFeeTier(null)
       setMemo('')
       setFormError(null)
       setDormantConfirm(false)
     }
   }, [open, warehouses])
+
+  // [납기일 제로클릭 자동 세팅] 결제 방식/기준 날짜가 바뀌면 납기 기본값을 즉시 매핑한다.
+  //   · 선불: 보관 시작일  · 후불: 보관 종료일(없으면 시작일)
+  //   사용자가 납기일을 직접 만진 뒤(dueTouched)엔 덮어쓰지 않아 수동 변경을 존중한다.
+  useEffect(() => {
+    if (dueTouched) return
+    const mapped = paymentType === 'PREPAID' ? storageStartDate : expectedEndDate || storageStartDate
+    if (mapped) setDueDate(mapped)
+  }, [paymentType, storageStartDate, expectedEndDate, dueTouched])
 
   // [자동 계산] 보관 시작일이 변경되면 출고 예정일을 전역 기본 기간만큼 뒤로 설정
   useEffect(() => {
@@ -1041,6 +1055,7 @@ function CreateOrderModal({
         paymentType,
         paymentMethod,
         settlementUserId: paymentMethod === 'BANK_TRANSFER' ? (settlementUserId ?? undefined) : undefined,
+        dueDate: dueDate || undefined,
         memo: memo || undefined,
       })
       // 위치를 지정했으면 컨테이너 생성·배정·적재까지 이어서 처리(미지정이면 생략)
@@ -1217,6 +1232,34 @@ function CreateOrderModal({
                     <option value="CASH">현금</option>
                     <option value="CARD">카드</option>
                   </select>
+                </div>
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-slate-700">
+                    납기일
+                    {!dueTouched && (
+                      <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600">
+                        {paymentType === 'PREPAID' ? '보관 시작일 자동' : '보관 종료일 자동'}
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => {
+                      setDueDate(e.target.value)
+                      setDueTouched(true)
+                    }}
+                    className={inputCls}
+                  />
+                  {dueTouched && (
+                    <button
+                      type="button"
+                      onClick={() => setDueTouched(false)}
+                      className="mt-1 text-[11px] text-slate-400 underline-offset-2 hover:text-indigo-600 hover:underline"
+                    >
+                      결제 방식 기준으로 되돌리기
+                    </button>
+                  )}
                 </div>
               </div>
 
