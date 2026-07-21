@@ -21,11 +21,6 @@ spring:
           protocol: smtp
     default-encoding: UTF-8
 
-# 발신자 표기 (미지정 시 username 사용)
-app:
-  mail:
-    from: ${MAIL_FROM:${MAIL_USERNAME:}}
-
   # ===== PostgreSQL 연결 =====
   datasource:
     url: jdbc:postgresql://localhost:5432/wms   # 맨 뒤 wms 자리에 본인 DB 이름
@@ -42,6 +37,12 @@ app:
     properties:
       hibernate:
         format_sql: true      # SQL 보기 좋게 정렬
+
+# ===== 앱 커스텀 설정 =====
+app:
+  mail:
+    # 발신자 표기 (미지정 시 username 사용)
+    from: ${MAIL_FROM:${MAIL_USERNAME:}}
 
 # ===== JWT 설정 =====
 jwt:
