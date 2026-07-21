@@ -257,6 +257,18 @@ public class BillingService {
         return new BillingLedgerResponse(ledger);
     }
 
+    /**
+     * [환불 완료 처리] 환불 대상 금액(과오납)을 실제 지급 후 마감한다.
+     * 비관적 락으로 원장을 잠근 뒤 도메인 규칙(completeRefund)으로 잔액을 0원으로 정리하고 상태를 마감한다.
+     * (이미 환불 완료됐거나 환불 대상이 없으면 도메인에서 예외 → 중복 처리 차단)
+     */
+    @Transactional
+    public BillingLedgerResponse completeRefund(Long ledgerId) {
+        BillingLedger ledger = lockLedger(ledgerId);
+        ledger.completeRefund();
+        return new BillingLedgerResponse(ledger);
+    }
+
     // ===================== 조정/할인 =====================
 
     /** 수동 조정/할인 (사유 필수, 오딧 이력 기록) */

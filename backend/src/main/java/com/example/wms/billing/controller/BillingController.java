@@ -92,6 +92,13 @@ public class BillingController {
         return ResponseEntity.ok(billingService.reversePayment(paymentId));
     }
 
+    // ===== 환불 완료 처리 — ADMIN 전용 (환불 대상 금액을 실제 지급 후 마감) =====
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{id}/refund-complete")
+    public ResponseEntity<BillingLedgerResponse> completeRefund(@PathVariable Long id) {
+        return ResponseEntity.ok(billingService.completeRefund(id));
+    }
+
     // ===== 조정/할인 — ADMIN 전용 =====
 
     @PreAuthorize("hasRole('ADMIN')")

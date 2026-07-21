@@ -112,6 +112,10 @@ public class BillingLedger {
     @Column(name = "status", nullable = false, length = 20)
     private BillingStatus status;
 
+    // [환불 완료] 환불 대상 금액을 실제 지급하고 마감한 시각. null이면 '환불 대기'.
+    @Column(name = "refunded_at")
+    private LocalDateTime refundedAt;
+
     // ===== 수금/조정 이력 (읽기용 뷰) =====
     @OneToMany(mappedBy = "billingLedger", fetch = FetchType.LAZY)
     private List<PaymentHistory> payments = new ArrayList<>();
@@ -263,6 +267,34 @@ public class BillingLedger {
      */
     public BigDecimal refundDue() {
         return this.balance.signum() < 0 ? this.balance.negate() : MoneyPolicy.ZERO;
+    }
+
+    /** 환불 완료 여부 (실제 지급 후 마감되었는지) */
+    public boolean isRefundCompleted() {
+        return this.refundedAt != null;
+    }
+
+    /**
+     * [환불 완료 처리] 환불 대상 금액을 실제 지급했음을 확정하고 원장을 마감한다.
+     *  · 과오납분(refundDue)만큼 수금 누계를 차감 → 잔액을 0원으로 정리하고 상태를 완납(정산 마감)으로 전이
+     *  · 환불 완료 시각을 기록해 '환불 대기 → 환불 완료' 상태를 표현
+     *  [이중 방어] 이미 환불 완료됐거나 환불 대상 금액이 없으면 예외 — 중복/무효 처리 차단
+     */
+    public void completeRefund() {
+        if (this.refundedAt != null) {
+            throw new IllegalStateException("이미 환불 완료 처리된 원장입니다.");
+        }
+        if (this.status == BillingStatus.CANCELED || this.status == BillingStatus.CARRIED_OVER) {
+            throw new IllegalStateException("취소/이월된 원장은 환불 처리할 수 없습니다. 현재=" + status);
+        }
+        BigDecimal refund = refundDue();
+        if (refund.signum() <= 0) {
+            throw new IllegalStateException("환불 대상 금액이 없습니다. 현재 잔액=" + balance);
+        }
+        // 과오납분을 실제 환급 → 순수금액에서 차감하여 잔액 0 마감
+        this.paidTotal = MoneyPolicy.normalize(this.paidTotal.subtract(refund));
+        this.refundedAt = LocalDateTime.now();
+        recompute();   // balance → 0, 상태 → PAID(정산 마감)
     }
 
     // ===== 내부 =====
