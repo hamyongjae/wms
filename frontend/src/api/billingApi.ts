@@ -13,6 +13,14 @@ export type SettlementType = 'PREPAID' | 'POSTPAID'
 export type PaymentMethod = 'BANK_TRANSFER' | 'CASH' | 'CARD' | 'OTHER'
 export type AdjustmentType = 'DISCOUNT' | 'SURCHARGE' | 'WRITE_OFF' | 'CORRECTION'
 
+// [차트] 월별 청구·수금 집계 1건 (서버 GROUP BY 결과)
+export interface MonthlyRevenuePoint {
+  yearMonth: string // yyyy-MM
+  label: string // 예: "7월"
+  billed: number // 확정 청구 총액
+  collected: number // 실제 수금액
+}
+
 export interface BillingLedger {
   id: number
   tenantId: number
@@ -114,6 +122,13 @@ export const billingApi = {
   },
   async detail(id: number): Promise<LedgerDetail> {
     const { data } = await api.get<LedgerDetail>(`/api/billing/ledgers/${id}/detail`)
+    return data
+  },
+  // [차트] 월별 청구·수금 추이 — DB GROUP BY 집계 (기본 6개월)
+  async monthlyStats(months = 6): Promise<MonthlyRevenuePoint[]> {
+    const { data } = await api.get<MonthlyRevenuePoint[]>('/api/billing/ledgers/stats/monthly', {
+      params: { months },
+    })
     return data
   },
   // [수동 청구] 특정 계약에 대해 청구 원장 1건 생성 (관리자) — DRAFT 상태로 반환

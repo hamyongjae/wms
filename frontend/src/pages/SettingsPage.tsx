@@ -34,7 +34,7 @@ export default function SettingsPage() {
         setPhone(t.phone ?? '')
         setEmail(t.email ?? '')
         setAddress(t.address ?? '')
-        setDefaultPeriod(String(t.defaultStoragePeriodDays ?? 7))
+        setDefaultPeriod(String(t.defaultStoragePeriodDays ?? 10))
       })
       .catch(() => setError('업체 정보를 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
@@ -126,7 +126,9 @@ export default function SettingsPage() {
                 disabled={!isAdmin}
                 className={inputCls}
               />
-              <p className="mt-1 text-xs text-slate-400">계약 등록 시 출고 예정일이 보관 시작일 + 이 일수로 자동 세팅됩니다.</p>
+              <p className="mt-1 text-xs text-slate-400">
+                당일 포함 보관일수입니다. 예) 10 입력 시 2026.07.21 ~ 2026.07.30 (10일). 계약 등록·즉시 입고의 출고 예정일 기본값에 적용됩니다.
+              </p>
             </Field>
           </div>
 

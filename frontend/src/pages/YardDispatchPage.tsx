@@ -662,8 +662,8 @@ function InboundModal({
   const [staffList, setStaffList] = useState<Staff[]>([])
   const today = new Date().toISOString().slice(0, 10)
   const [inboundDate, setInboundDate] = useState(today)
-  const [outboundDate, setOutboundDate] = useState(addDays(today, 10))
-  const [defaultDays, setDefaultDays] = useState(7) // 전역 기본 계약 유지 기간
+  const [outboundDate, setOutboundDate] = useState(addDays(today, 9)) // 당일 포함 10일
+  const [defaultDays, setDefaultDays] = useState(10) // 전역 기본 계약 유지 기간(당일 포함 보관일수)
   const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -682,13 +682,13 @@ function InboundModal({
 
   // 전역 기본 계약 유지 기간 로드 (출고 예정일 기본값)
   useEffect(() => {
-    tenantApi.me().then((t) => setDefaultDays(t.defaultStoragePeriodDays ?? 7)).catch(() => {})
+    tenantApi.me().then((t) => setDefaultDays(t.defaultStoragePeriodDays ?? 10)).catch(() => {})
   }, [])
 
-  // [자동 계산] 입고일이 변경되면 출고 예정일을 전역 기본 기간만큼 뒤로 설정
+  // [자동 계산] 입고일이 변경되면 출고 예정일을 전역 기본 기간(당일 포함)만큼 뒤로 설정
   useEffect(() => {
     if (inboundDate && !outboundDate) {
-      setOutboundDate(addDays(inboundDate, defaultDays))
+      setOutboundDate(addDays(inboundDate, Math.max(defaultDays - 1, 0)))
     }
   }, [inboundDate])
 

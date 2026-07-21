@@ -1063,11 +1063,11 @@ function CreateOrderModal({
   const [formError, setFormError] = useState<string | null>(null)
   const [custOpen, setCustOpen] = useState(false)
   const [dormantConfirm, setDormantConfirm] = useState(false)
-  // [마스터 기본값] 전역 기본 계약 유지 기간(일) — 출고예정일 = 보관 시작일 + defaultDays.
-  //   기본 9 → 오늘 포함 보관일수 10일(시작일~+9일, 당일 포함). 회사 설정값이 있으면 그 값 우선.
-  const [defaultDays, setDefaultDays] = useState(9)
+  // [마스터 기본값] 전역 기본 계약 유지 기간(일) = '당일 포함 보관일수'.
+  //   출고예정일 = 보관 시작일 + (defaultDays - 1). 예) 10 → 07.21~07.30 (당일 포함 10일). 기본 10.
+  const [defaultDays, setDefaultDays] = useState(10)
   useEffect(() => {
-    tenantApi.me().then((t) => setDefaultDays(t.defaultStoragePeriodDays ?? 9)).catch(() => {})
+    tenantApi.me().then((t) => setDefaultDays(t.defaultStoragePeriodDays ?? 10)).catch(() => {})
   }, [])
 
   // [실시간 계산] 하루 보관료 = 보관료 ÷ (보관시작일~출고예정일 총 일수, 당일 포함).
@@ -1087,7 +1087,7 @@ function CreateOrderModal({
       setWarehouseId(warehouses[0] ? String(warehouses[0].id) : '')
       setSlotId(null)
       setStartDate(today())
-      setEndDate(addDays(today(), defaultDays))
+      setEndDate(addDays(today(), Math.max(defaultDays - 1, 0))) // 당일 포함 defaultDays일
       setMonthlyFee(null)
       setCapacityTons(null)
       setPaymentType('PREPAID')
@@ -1111,10 +1111,10 @@ function CreateOrderModal({
     if (mapped) setDueDate(mapped)
   }, [paymentType, storageStartDate, expectedEndDate, dueTouched])
 
-  // [자동 계산] 보관 시작일이 변경되면 출고 예정일을 전역 기본 기간만큼 뒤로 설정
+  // [자동 계산] 보관 시작일이 변경되면 출고 예정일을 전역 기본 기간(당일 포함)만큼 뒤로 설정
   useEffect(() => {
     if (storageStartDate && !expectedEndDate) {
-      setEndDate(addDays(storageStartDate, defaultDays))
+      setEndDate(addDays(storageStartDate, Math.max(defaultDays - 1, 0)))
     }
   }, [storageStartDate])
 

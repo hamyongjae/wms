@@ -13,13 +13,14 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { orderApi, type StorageOrder } from '@/api/orderApi'
-import { billingApi, type BillingLedger } from '@/api/billingApi'
+import { billingApi, type BillingLedger, type MonthlyRevenuePoint } from '@/api/billingApi'
 import { yardApi, type WarehouseOccupancy, type YardSlot } from '@/api/yardApi'
 import { containerApi, type Container } from '@/api/containerApi'
 import StatCard from '@/components/ui/StatCard'
 import RevenueBarChart, { type RevenuePoint } from '@/components/charts/RevenueBarChart'
 import WarehouseArt from '@/components/brand/WarehouseArt'
 import { authStorage } from '@/lib/auth'
+import { orderSync } from '@/lib/orderEvents'
 
 import { isOverdue, isOpenLedger, daysFromDue } from '@/lib/billing'
 import { today, getDurationDays } from '@/lib/dates'
@@ -65,22 +66,29 @@ export default function DashboardPage() {
   const [occupancy, setOccupancy] = useState<WarehouseOccupancy[]>([])
   const [containers, setContainers] = useState<Container[]>([])
   const [slots, setSlots] = useState<YardSlot[]>([])
+  const [revenueSeries, setRevenueSeries] = useState<MonthlyRevenuePoint[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // [제로 클릭 실시간 동기화] 계약/정산 액션(입출고·수금·환불 완료 등)이 버스로 알리면 즉시 재조회.
+  useEffect(() => orderSync.subscribe(() => setRefreshKey((k) => k + 1)), [])
 
   useEffect(() => {
     let alive = true // 언마운트 후 setState 방지 (메모리 릭 차단)
 
-    // [1차] 핵심 지표 — 병렬 로드 후 즉시 렌더
+    // [1차] 핵심 지표 — 병렬 로드 후 즉시 렌더 (차트 집계는 서버 GROUP BY로 별도 로드)
     Promise.all([
       orderApi.list().catch(() => [] as StorageOrder[]),
       billingApi.list().catch(() => [] as BillingLedger[]),
       yardApi.tenantOccupancy().catch(() => [] as WarehouseOccupancy[]),
+      billingApi.monthlyStats(6).catch(() => [] as MonthlyRevenuePoint[]),
     ])
-      .then(([o, l, occ]) => {
+      .then(([o, l, occ, rev]) => {
         if (!alive) return
         setOrders(o)
         setLedgers(l)
         setOccupancy(occ)
+        setRevenueSeries(rev)
 
         // [2차] 슬롯 위치는 부가 정보 — 컨테이너를 먼저 받아
         //   "최근 5건 계약에 실제 배정된 컨테이너가 있는 창고"만 슬롯을 조회한다.
@@ -112,7 +120,7 @@ export default function DashboardPage() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [refreshKey])
 
   const stats = useMemo(() => {
     const t = today()
@@ -142,32 +150,14 @@ export default function DashboardPage() {
   const recentOrders = useMemo(() => orders.slice(0, 5), [orders])
   const locationByOrder = useMemo(() => buildLocationMap(containers, slots), [containers, slots])
 
-  // 최근 6개월 청구/수금 집계 (원장 청구기간 시작월 기준)
-  const revenueSeries = useMemo<RevenuePoint[]>(() => {
-    const now = new Date()
-    const buckets: Array<{ key: string; label: string; billed: number; collected: number }> = []
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      buckets.push({
-        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-        label: `${d.getMonth() + 1}월`,
-        billed: 0,
-        collected: 0,
-      })
-    }
-    const idx = new Map(buckets.map((b, i) => [b.key, i]))
-    for (const l of ledgers) {
-      if (l.status === 'CANCELED' || !l.periodStart) continue
-      const key = l.periodStart.slice(0, 7)
-      const i = idx.get(key)
-      if (i == null) continue
-      buckets[i].billed += l.baseAmount + l.carriedOverIn + l.adjustmentTotal
-      buckets[i].collected += l.paidTotal
-    }
-    return buckets.map((b) => ({ label: b.label, billed: b.billed, collected: b.collected }))
-  }, [ledgers])
+  // 월별 청구/수금 추이 — 서버 GROUP BY 집계 결과를 그대로 차트 포인트로 사용 (앱단 풀스캔 제거).
+  // orderSync 이벤트로 재조회되므로 정산 액션 후에도 새로고침 없이 최신 확정 금액이 반영된다.
+  const revenueChart = useMemo<RevenuePoint[]>(
+    () => revenueSeries.map((p) => ({ label: p.label, billed: p.billed, collected: p.collected })),
+    [revenueSeries],
+  )
 
-  const hasRevenue = revenueSeries.some((p) => p.billed > 0 || p.collected > 0)
+  const hasRevenue = revenueChart.some((p) => p.billed > 0 || p.collected > 0)
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -225,7 +215,7 @@ export default function DashboardPage() {
             </div>
             {hasRevenue ? (
               <div className="mt-4">
-                <RevenueBarChart data={revenueSeries} />
+                <RevenueBarChart data={revenueChart} />
               </div>
             ) : (
               <p className="py-12 text-center text-sm text-slate-400">

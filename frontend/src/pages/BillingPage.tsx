@@ -29,6 +29,7 @@ import StatCard from '@/components/ui/StatCard'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { isOverdue, daysFromDue, displayStatus } from '@/lib/billing'
+import { orderSync } from '@/lib/orderEvents'
 import { today } from '@/lib/dates'
 
 const inputCls =
@@ -405,6 +406,7 @@ function LedgerDetailPanel({
     setActionError(null)
     setReloadKey((k) => k + 1) // 패널 내 상세 갱신
     onChanged() // 목록 갱신
+    orderSync.emit() // [실시간 동기화] 대시보드 차트·매출 화면이 새로고침 없이 최신 집계로 갱신
   }
 
   const l = detail?.ledger
