@@ -60,8 +60,7 @@ export interface OrderStatusChange {
   targetStatus: OrderStatus
   actualEndDate?: string // 출고 처리 시 실제 출고일 (중도출고)
   actualStartDate?: string // 입고 되돌리기 시 실제 입고일 (지연입고)
-  applySettlement?: boolean // 중도출고 보관료 소급/차감 여부
-  settledAmount?: number // 직접 입력한 실사용 보관료 (있으면 이 값으로 정산)
+  settledAmount?: number // 직접 입력한 실사용 보관료 (있으면 이 값으로 원장 재산정)
 }
 
 export const orderApi = {

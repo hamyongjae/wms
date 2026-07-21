@@ -1653,7 +1653,6 @@ function StatusChangeModal({
             targetStatus: 'OUTBOUND' as const,
             // 정상 출고: 예정일 그대로 / 중도 출고: 입력한 실제 출고일 + 소급 여부
             actualEndDate: releaseKind === 'EARLY' ? actualEndDate : (target!.expectedEndDate ?? today()),
-            applySettlement: releaseKind === 'EARLY' && applySettlement,
             // 중도출고 + 소급 시 실사용 보관료(일수 × 하루 보관료)를 정산 금액으로 전달.
             // 백엔드가 이 금액으로 원장 기본청구액을 재산정하고 보관기간 종료일을 실제 출고일로 마감한다.
             settledAmount: releaseKind === 'EARLY' && applySettlement ? (usedAmount ?? undefined) : undefined,
