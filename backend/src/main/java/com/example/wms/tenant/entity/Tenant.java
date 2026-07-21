@@ -44,7 +44,7 @@ public class Tenant {
     private TenantStatus status = TenantStatus.ACTIVE;   // 운영 상태
 
     @Column(name = "default_storage_period_days")
-    private Integer defaultStoragePeriodDays = 7;   // [마스터] 기본 계약 유지 기간(일) — 출고예정일 기본값 산정
+    private Integer defaultStoragePeriodDays = 9;   // [마스터] 기본 계약 유지 기간(일) — 출고예정일 = 시작일 + 9(당일 포함 10일)
 
     @OneToMany(mappedBy = "tenant")
     private List<Warehouse> warehouses = new ArrayList<>();
