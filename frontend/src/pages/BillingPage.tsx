@@ -74,6 +74,35 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const totalDue = (l: BillingLedger) => l.baseAmount + l.carriedOverIn + l.adjustmentTotal
 
+/* [공용 셀 렌더] 테이블 셀과 모바일 카드가 동일 렌더를 공유(중복 제거) */
+function LedgerReceivable({ l }: { l: BillingLedger }) {
+  if (l.refundCompleted) return <span className="text-xs font-medium text-[#5C7C6B]">환불 완료</span>
+  if (l.balance < 0) return <span className="text-emerald-600">환불 {won(l.refundDue ?? -l.balance)}</span>
+  return <span className={l.balance > 0 ? 'text-slate-800' : 'text-slate-400'}>{won(l.outstanding ?? l.balance)}</span>
+}
+
+function LedgerDue({ l }: { l: BillingLedger }) {
+  if (l.dueDate == null) return <span className="text-xs text-slate-400">—</span>
+  const overdue = isOverdue(l)
+  const d = daysFromDue(l.dueDate)
+  const pending = l.balance > 0 && (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
+  return (
+    <span className={cn('text-xs', overdue ? 'font-semibold text-[#A65B44]' : 'text-slate-500')}>
+      {l.dueDate}
+      {pending && !overdue && d >= -7 && (
+        <span className="ml-1.5 rounded bg-[#E9EEF3] px-1 py-0.5 text-[10px] font-semibold text-[#5A748F]">
+          {d === 0 ? 'D-DAY' : `D${d}`}
+        </span>
+      )}
+    </span>
+  )
+}
+
+function LedgerStatusBadge({ l }: { l: BillingLedger }) {
+  const ds = displayStatus(l)
+  return <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>{ds.label}</span>
+}
+
 const pad2 = (n: number) => String(n).padStart(2, '0')
 /** 해당 연·월(1~12)의 1일~말일 (yyyy-MM-dd) */
 function monthBounds(year: number, month1: number): { from: string; to: string } {
@@ -281,8 +310,9 @@ export default function BillingPage() {
         </div>
       )}
 
+      {/* ===== 데스크톱: 테이블 (md 이상) ===== */}
       {!loading && !error && visible.length > 0 && (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60">
+        <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60 md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
@@ -296,67 +326,67 @@ export default function BillingPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {visible.map((l) => {
-                const overdue = isOverdue(l)
-                return (
-                  <tr
-                    key={l.id}
-                    onClick={() => setSelectedId(l.id)}
-                    className="cursor-pointer transition hover:bg-slate-50"
-                  >
-                    <td className="px-5 py-3 text-slate-600">{l.customerName}</td>
-                    <td className="px-5 py-3 text-slate-500">
-                      {l.periodStart} ~ {l.periodEnd}
-                    </td>
-                    <td className="px-5 py-3 text-right text-slate-700">{won(totalDue(l))}</td>
-                    <td className="px-5 py-3 text-right font-medium">
-                      {l.refundCompleted ? (
-                        <span className="text-xs font-medium text-[#5C7C6B]">환불 완료</span>
-                      ) : l.balance < 0 ? (
-                        // 과오납 → 미수금이 아니라 환불 대상으로 분리 표기
-                        <span className="text-emerald-600">환불 {won(l.refundDue ?? -l.balance)}</span>
-                      ) : (
-                        <span className={l.balance > 0 ? 'text-slate-800' : 'text-slate-400'}>
-                          {won(l.outstanding ?? l.balance)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3">
-                      {(() => {
-                        // 납기 표기: 연체=클레이, 납기 7일 이내=D-n 강조, 그 외=날짜만
-                        if (l.dueDate == null) return <span className="text-xs text-slate-400">—</span>
-                        const d = daysFromDue(l.dueDate)
-                        const pending = l.balance > 0 && (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
-                        return (
-                          <span className={cn('text-xs', overdue ? 'font-semibold text-[#A65B44]' : 'text-slate-500')}>
-                            {l.dueDate}
-                            {pending && !overdue && d >= -7 && (
-                              <span className="ml-1.5 rounded bg-[#E9EEF3] px-1 py-0.5 text-[10px] font-semibold text-[#5A748F]">
-                                {d === 0 ? 'D-DAY' : `D${d}`}
-                              </span>
-                            )}
-                          </span>
-                        )
-                      })()}
-                    </td>
-                    <td className="px-5 py-3">
-                      {(() => {
-                        const ds = displayStatus(l)
-                        return (
-                          <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>
-                            {ds.label}
-                          </span>
-                        )
-                      })()}
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className="text-xs text-slate-600">{l.taxInvoiceIssued ? '발행' : '미발행'}</span>
-                    </td>
-                  </tr>
-                )
-              })}
+              {visible.map((l) => (
+                <tr key={l.id} onClick={() => setSelectedId(l.id)} className="cursor-pointer transition hover:bg-slate-50">
+                  <td className="px-5 py-3 text-slate-600">{l.customerName}</td>
+                  <td className="px-5 py-3 text-slate-500">
+                    {l.periodStart} ~ {l.periodEnd}
+                  </td>
+                  <td className="px-5 py-3 text-right text-slate-700">{won(totalDue(l))}</td>
+                  <td className="px-5 py-3 text-right font-medium">
+                    <LedgerReceivable l={l} />
+                  </td>
+                  <td className="px-5 py-3">
+                    <LedgerDue l={l} />
+                  </td>
+                  <td className="px-5 py-3">
+                    <LedgerStatusBadge l={l} />
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className="text-xs text-slate-600">{l.taxInvoiceIssued ? '발행' : '미발행'}</span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ===== 모바일: 정산 요약 카드 (md 미만) — 탭하면 상세 패널 ===== */}
+      {!loading && !error && visible.length > 0 && (
+        <div className="space-y-3 md:hidden">
+          {visible.map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              onClick={() => setSelectedId(l.id)}
+              className="w-full rounded-2xl bg-white p-4 text-left shadow-soft ring-1 ring-slate-200/60 active:bg-slate-50"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <p className="truncate text-base font-semibold text-slate-800">{l.customerName}</p>
+                <LedgerStatusBadge l={l} />
+              </div>
+              <p className="mt-0.5 text-xs text-slate-500">{l.periodStart} ~ {l.periodEnd}</p>
+              <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                <div>
+                  <dt className="text-[11px] text-slate-400">보관료</dt>
+                  <dd className="mt-0.5 text-slate-700">{won(totalDue(l))}</dd>
+                </div>
+                <div className="text-right">
+                  <dt className="text-[11px] text-slate-400">미수금</dt>
+                  <dd className="mt-0.5 font-medium"><LedgerReceivable l={l} /></dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-slate-400">납기</dt>
+                  <dd className="mt-0.5"><LedgerDue l={l} /></dd>
+                </div>
+                <div className="text-right">
+                  <dt className="text-[11px] text-slate-400">세금계산서</dt>
+                  <dd className="mt-0.5 text-xs text-slate-600">{l.taxInvoiceIssued ? '발행' : '미발행'}</dd>
+                </div>
+              </div>
+            </button>
+          ))}
         </div>
       )}
 

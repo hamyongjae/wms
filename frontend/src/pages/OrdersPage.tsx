@@ -214,6 +214,20 @@ export default function OrdersPage() {
     }
   }
 
+  // [작업 버튼 그룹] 데스크톱 테이블 · 모바일 카드가 동일 로직/규격을 공유 (중복 제거)
+  const renderActions = (o: StorageOrder) => (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {o.status === 'INBOUND' ? (
+        <RowAction label="출고" tooltip="출고 처리" tone="amber" onClick={() => setStatusTarget(o)} />
+      ) : (
+        <RowAction label="출고취소" tooltip="출고 취소 (소급 복구)" tone="amber" onClick={() => handleCancelRelease(o)} />
+      )}
+      <RowAction label="정산" tooltip="정산원장 조회" tone="muted" onClick={() => setBillingTarget(o)} />
+      <RowAction label="수정" tooltip="계약 수정" tone="muted" onClick={() => setEditTarget(o)} />
+      {isAdmin && <RowAction label="삭제" tooltip="계약 삭제" tone="danger" onClick={() => handleDelete(o)} />}
+    </div>
+  )
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -279,8 +293,9 @@ export default function OrdersPage() {
         </div>
       )}
 
+      {/* ===== 데스크톱: 테이블 (md 이상) ===== */}
       {!loading && !error && visible.length > 0 && (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60">
+        <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60 md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
@@ -299,24 +314,7 @@ export default function OrdersPage() {
                   <td className="px-5 py-3 font-medium text-slate-800">{o.customerName}</td>
                   <td className="px-5 py-3 text-slate-500">{o.warehouseName}</td>
                   <td className="px-5 py-3 text-slate-500">
-                    {(() => {
-                      const locs = locationsByOrder.get(o.id) ?? []
-                      // [우아한 미지정] 결함이 아니라 '유연 배정' 상태 — 웜그레이 점선 pill로 표현
-                      if (locs.length === 0)
-                        return (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#E2DCD1] bg-[#EFEBE4]/60 px-2 py-0.5 text-xs font-medium text-[#8A8172]">
-                            위치 미지정
-                          </span>
-                        )
-                      return (
-                        <span title={locs.join(', ')} className="inline-flex items-center gap-1">
-                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">
-                            {locs[0]}
-                          </span>
-                          {locs.length > 1 && <span className="text-xs text-slate-400">외 {locs.length - 1}</span>}
-                        </span>
-                      )
-                    })()}
+                    <OrderLocationBadge locs={locationsByOrder.get(o.id) ?? []} />
                   </td>
                   <td className="px-5 py-3 text-slate-500">
                     {o.storageStartDate}
@@ -325,34 +323,49 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-5 py-3 text-right text-slate-700">{won(o.monthlyFee)}</td>
                   <td className="px-5 py-3">
-                    {/* [정적 뷰] 상태는 현재 데이터만 표시 — 처리 버튼은 작업 컬럼으로 분리 */}
-                    <span
-                      className={cn(
-                        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1',
-                        STATUS_META[o.status].cls,
-                      )}
-                    >
-                      {STATUS_META[o.status].icon && <span>{STATUS_META[o.status].icon}</span>}
-                      {STATUS_META[o.status].label}
-                    </span>
+                    <OrderStatusBadge status={o.status} />
                   </td>
-                  <td className="px-5 py-3">
-                    {/* [작업] 순수 텍스트형 통일 버튼 그룹 — 동일 규격·여유 간격, 무채색 위계 */}
-                    <div className="flex items-center justify-end gap-2">
-                      {o.status === 'INBOUND' ? (
-                        <RowAction label="출고" tooltip="출고 처리" tone="amber" onClick={() => setStatusTarget(o)} />
-                      ) : (
-                        <RowAction label="출고취소" tooltip="출고 취소 (소급 복구)" tone="amber" onClick={() => handleCancelRelease(o)} />
-                      )}
-                      <RowAction label="정산" tooltip="정산원장 조회" tone="muted" onClick={() => setBillingTarget(o)} />
-                      <RowAction label="수정" tooltip="계약 수정" tone="muted" onClick={() => setEditTarget(o)} />
-                      {isAdmin && <RowAction label="삭제" tooltip="계약 삭제" tone="danger" onClick={() => handleDelete(o)} />}
-                    </div>
-                  </td>
+                  <td className="px-5 py-3">{renderActions(o)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ===== 모바일: 요약 카드 뷰 (md 미만) — 가로 스크롤 없이 세로 피드 ===== */}
+      {!loading && !error && visible.length > 0 && (
+        <div className="space-y-3 md:hidden">
+          {visible.map((o) => (
+            <div key={o.id} className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-200/60">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-slate-800">{o.customerName}</p>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">{o.warehouseName}</p>
+                </div>
+                <OrderStatusBadge status={o.status} />
+              </div>
+
+              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                <div className="col-span-2">
+                  <dt className="text-[11px] text-slate-400">위치</dt>
+                  <dd className="mt-0.5"><OrderLocationBadge locs={locationsByOrder.get(o.id) ?? []} /></dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-slate-400">보관료</dt>
+                  <dd className="mt-0.5 font-semibold text-slate-800">{won(o.monthlyFee)}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-slate-400">보관기간</dt>
+                  <dd className="mt-0.5 text-slate-600">
+                    {o.storageStartDate} ~ {o.actualEndDate ?? o.expectedEndDate ?? '미정'}
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="mt-3 border-t border-slate-100 pt-3">{renderActions(o)}</div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -1825,12 +1838,39 @@ function RowAction({
       title={tooltip}
       aria-label={tooltip}
       className={cn(
-        'inline-flex h-8 shrink-0 items-center justify-center rounded-lg border px-3 text-xs font-medium transition-all duration-150 hover:-translate-y-px active:translate-y-0',
+        // [터치 타깃] 모바일은 최소 44px 높이(h-11)로 오클릭 방지, 데스크톱은 컴팩트(h-8).
+        'inline-flex h-11 shrink-0 items-center justify-center rounded-lg border px-4 text-sm font-medium transition-all duration-150 hover:-translate-y-px active:translate-y-0 md:h-8 md:px-3 md:text-xs',
         ACTION_TONE[tone],
       )}
     >
       {label}
     </button>
+  )
+}
+
+/** [공용] 계약 위치 배지 — 테이블 셀과 모바일 카드가 동일 렌더를 공유(중복 제거) */
+function OrderLocationBadge({ locs }: { locs: string[] }) {
+  if (locs.length === 0)
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#E2DCD1] bg-[#EFEBE4]/60 px-2 py-0.5 text-xs font-medium text-[#8A8172]">
+        위치 미지정
+      </span>
+    )
+  return (
+    <span title={locs.join(', ')} className="inline-flex items-center gap-1">
+      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">{locs[0]}</span>
+      {locs.length > 1 && <span className="text-xs text-slate-400">외 {locs.length - 1}</span>}
+    </span>
+  )
+}
+
+/** [공용] 계약 상태 배지 */
+function OrderStatusBadge({ status }: { status: StorageOrder['status'] }) {
+  return (
+    <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1', STATUS_META[status].cls)}>
+      {STATUS_META[status].icon && <span>{STATUS_META[status].icon}</span>}
+      {STATUS_META[status].label}
+    </span>
   )
 }
 
