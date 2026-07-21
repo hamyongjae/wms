@@ -122,10 +122,12 @@ export default function BillingPage() {
 
   const kpi = useMemo(() => {
     const active = ledgers.filter((l) => l.status !== 'CANCELED')
-    const outstanding = active.reduce((s, l) => s + l.balance, 0)
+    // [계정 과목 분리] 미수금은 양수 잔액(outstanding)만 합산 — 음수(과오납)가 미수금을 갉아먹지 않도록.
+    const outstanding = active.reduce((s, l) => s + (l.outstanding ?? Math.max(l.balance, 0)), 0)
+    const refundDue = active.reduce((s, l) => s + (l.refundDue ?? Math.max(-l.balance, 0)), 0)
     const collected = active.reduce((s, l) => s + l.paidTotal, 0)
     const overdueCount = ledgers.filter(isOverdue).length
-    return { outstanding, collected, overdueCount, count: ledgers.length }
+    return { outstanding, refundDue, collected, overdueCount, count: ledgers.length }
   }, [ledgers])
 
   const visible = useMemo(() => {
@@ -222,7 +224,13 @@ export default function BillingPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="미수금 총액" value={won(kpi.outstanding)} icon={Wallet} tone="amber" />
+        <StatCard
+          label="미수금 총액"
+          value={won(kpi.outstanding)}
+          sub={kpi.refundDue > 0 ? `환불 대상 ${won(kpi.refundDue)}` : undefined}
+          icon={Wallet}
+          tone="amber"
+        />
         <StatCard label="누적 수금액" value={won(kpi.collected)} icon={Coins} tone="emerald" />
         <StatCard label="연체 건수" value={`${kpi.overdueCount}건`} icon={AlertTriangle} tone="indigo" />
         <StatCard label="원장 수" value={`${kpi.count}건`} icon={FileText} tone="slate" />
@@ -300,8 +308,15 @@ export default function BillingPage() {
                       {l.periodStart} ~ {l.periodEnd}
                     </td>
                     <td className="px-5 py-3 text-right text-slate-700">{won(totalDue(l))}</td>
-                    <td className={cn('px-5 py-3 text-right font-medium', l.balance > 0 ? 'text-slate-800' : 'text-slate-400')}>
-                      {won(l.balance)}
+                    <td className="px-5 py-3 text-right font-medium">
+                      {l.balance < 0 ? (
+                        // 과오납 → 미수금이 아니라 환불 대상으로 분리 표기
+                        <span className="text-emerald-600">환불 {won(l.refundDue ?? -l.balance)}</span>
+                      ) : (
+                        <span className={l.balance > 0 ? 'text-slate-800' : 'text-slate-400'}>
+                          {won(l.outstanding ?? l.balance)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-3">
                       {(() => {
@@ -456,11 +471,21 @@ function LedgerDetailPanel({
                 <Info label="수금 합계">{won(l.paidTotal)}</Info>
               </dl>
               <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3">
-                <span className="text-sm text-slate-500">미수금 잔액</span>
-                <span className={cn('text-lg font-bold', l.balance > 0 ? 'text-slate-900' : 'text-emerald-600')}>
-                  {won(l.balance)}
+                <span className="text-sm text-slate-500">{l.balance < 0 ? '환불 대상 금액' : '미수금 잔액'}</span>
+                <span
+                  className={cn(
+                    'text-lg font-bold',
+                    l.balance < 0 ? 'text-emerald-600' : l.balance > 0 ? 'text-slate-900' : 'text-slate-400',
+                  )}
+                >
+                  {won(l.balance < 0 ? (l.refundDue ?? -l.balance) : (l.outstanding ?? l.balance))}
                 </span>
               </div>
+              {l.balance < 0 && (
+                <p className="mt-1 text-right text-[11px] text-emerald-600">
+                  중도출고로 실청구액이 수금액보다 작아 환불(선급금 반환) 대상입니다.
+                </p>
+              )}
             </section>
 
             {/* 액션 버튼 */}

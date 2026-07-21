@@ -30,6 +30,8 @@ export interface BillingLedger {
   adjustmentTotal: number
   paidTotal: number
   balance: number
+  outstanding: number // 실제 미수금 (balance>0), 음수면 0
+  refundDue: number // 환불(선급금 반환) 대상 (balance<0의 절대값), 양수면 0
   status: BillingStatus
   overdue: boolean // [파생] 납기 경과 + 미납 잔액 → 연체/미수
   daysOverdue: number // 납기 경과 일수 (연체 아니면 0)
