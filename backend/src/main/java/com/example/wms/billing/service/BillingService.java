@@ -363,17 +363,18 @@ public class BillingService {
     }
 
     /**
-     * [출고 정산 - 원장 재산정] 계약 출고 시 활성 원장의 보관기간 종료일을 실제 출고일로 마감하고,
-     * 기본 청구액(baseAmount)을 실사용분으로 재산정한다. 정산 화면의 보관기간·보관료·미수금이 모두 일치.
+     * [출고 정산 - 원장 재산정] 중도출고 소급 정산 시, 활성 원장의 보관기간 종료일을 실제 출고일로 마감하고
+     * 기본 청구액(baseAmount)을 실사용 보관료로 재산정한다. → 정산 화면의 보관기간·보관료·미수금이 모두 일치.
      *
-     *  · manualAmount 지정 시 : 그 금액을 실사용 보관료로 사용(관리자 수동 override)
-     *  · 미지정 시            : 계약 월 보관료 기준 일할 재계산(prorateMonthly)
-     *  · 정상 출고(실제 출고일 ≥ 기간 종료일)이고 수동 금액도 없으면 변경 없음(no-op)
+     *  · settledAmount(실사용 보관료: 일수 × 하루 보관료)를 그대로 원장 기본청구액으로 반영
+     *  · settledAmount 가 없으면(소급 정산 미선택) 원장을 건드리지 않는다(no-op) — 기존 동작 유지
      *
      * @return 재산정된 실사용 보관료(계약 화면 반영용). 재산정하지 않았으면 null.
      */
     @Transactional
-    public Integer settleReleaseForOrder(Long storageOrderId, LocalDate actualEndDate, BigDecimal manualAmount) {
+    public Integer settleReleaseForOrder(Long storageOrderId, LocalDate actualEndDate, BigDecimal settledAmount) {
+        if (settledAmount == null) return null;   // 소급 정산 미선택 → 원장 변경 없음
+
         BillingLedger target = ledgerRepository.findByStorageOrderId(storageOrderId).stream()
                 .filter(l -> l.getStatus() != BillingStatus.CANCELED
                         && l.getStatus() != BillingStatus.CARRIED_OVER)
@@ -383,19 +384,10 @@ public class BillingService {
         if (target == null) return null;
 
         BillingLedger locked = lockLedger(target.getId());
-        // 실사용 종료일 = min(실제 출고일, 원장 종료일)
+        // 보관기간 종료일 = 실제 출고일(원장 종료일 초과 시 원장 종료일로 클램프)
         LocalDate effectiveEnd = actualEndDate.isAfter(locked.getBillingPeriodEnd())
                 ? locked.getBillingPeriodEnd() : actualEndDate;
-        boolean isMidRelease = effectiveEnd.isBefore(locked.getBillingPeriodEnd());
-        if (!isMidRelease && manualAmount == null) {
-            return null;   // 정상 출고 + 수동금액 없음 → 재산정 불필요
-        }
-
-        BigDecimal newBase = manualAmount != null
-                ? MoneyPolicy.normalize(manualAmount)
-                : prorationCalculator.prorateMonthly(
-                        BigDecimal.valueOf(locked.getStorageOrder().getMonthlyFee()),
-                        locked.getBillingPeriodStart(), effectiveEnd);
+        BigDecimal newBase = MoneyPolicy.normalize(settledAmount);
 
         locked.reviseForMidRelease(effectiveEnd, newBase);
         return newBase.intValue();
