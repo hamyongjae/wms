@@ -1699,6 +1699,12 @@ function StatusChangeModal({
             />
             {releaseKind === 'EARLY' && (
               <div className="space-y-3 rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200/70">
+                {target.expectedEndDate && actualEndDate && actualEndDate < target.expectedEndDate && (
+                  <p className="flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    보관 기간 만료 전 출고이므로 중도 출고 정산이 적용됩니다.
+                  </p>
+                )}
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">실제 출고일</label>
                   <input
@@ -1709,6 +1715,7 @@ function StatusChangeModal({
                     onChange={(e) => setActualEndDate(e.target.value)}
                     className={inputCls}
                   />
+                  <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 종료일 범위 내에서 선택할 수 있습니다.</p>
                 </div>
                 <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
                   <input type="checkbox" checked={applySettlement} onChange={(e) => setApplySettlement(e.target.checked)} className="h-4 w-4 accent-indigo-600" />
