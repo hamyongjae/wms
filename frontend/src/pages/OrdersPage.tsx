@@ -686,6 +686,13 @@ function EditOrderModal({
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
   const [capacityTons, setCapacityTons] = useState('')
   const [memo, setMemo] = useState('')
+  // [청구 조건] 등록 화면과 동일한 필드 — 결제 방식/수단/입금계좌/납기일
+  const [paymentType, setPaymentType] = useState<PaymentType>('POSTPAID')
+  const [paymentMethod, setPaymentMethod] = useState<OrderPaymentMethod>('BANK_TRANSFER')
+  const [settlementUserId, setSettlementUserId] = useState<number | null>(null)
+  const [staffList, setStaffList] = useState<Staff[]>([])
+  const [dueDate, setDueDate] = useState('')
+  const [dueTouched, setDueTouched] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   // 위치: 선택 슬롯 / 현재(원래) 슬롯·컨테이너
@@ -703,10 +710,32 @@ function EditOrderModal({
       setMonthlyFee(target.monthlyFee)
       setCapacityTons(target.capacityTons != null ? String(target.capacityTons) : '')
       setMemo(target.memo ?? '')
+      setPaymentType(target.paymentType ?? 'POSTPAID')
+      setPaymentMethod(target.paymentMethod ?? 'BANK_TRANSFER')
+      setSettlementUserId(target.settlementUserId ?? null)
+      setDueDate(target.dueDate ?? '')
+      setDueTouched(true) // 기존값 보존 — 사용자가 결제 방식을 바꿀 때만 자동 매핑 시작
       setFeeTier(null)
       setFormError(null)
     }
   }, [target])
+
+  // [입금 계좌] 담당 직원 목록 (계좌이체 시 선택용)
+  useEffect(() => {
+    if (!target) return
+    let alive = true
+    staffApi.list().then((s) => alive && setStaffList(s)).catch(() => alive && setStaffList([]))
+    return () => {
+      alive = false
+    }
+  }, [target])
+
+  // [납기일 자동 매핑] 등록 화면과 동일 — 선불=시작일 / 후불=종료일. 사용자가 만지면 중단.
+  useEffect(() => {
+    if (dueTouched) return
+    const mapped = paymentType === 'PREPAID' ? storageStartDate : expectedEndDate || storageStartDate
+    if (mapped) setDueDate(mapped)
+  }, [paymentType, storageStartDate, expectedEndDate, dueTouched])
 
   // 위치(층) 선택 또는 보관 기간 변경 시 층 단가·최소료로 보관료 자동 보정 (공통 엔진)
   useEffect(() => {
@@ -763,6 +792,10 @@ function EditOrderModal({
         expectedEndDate: expectedEndDate || undefined,
         monthlyFee: monthlyFee!,
         capacityTons: capacityTons ? Number(capacityTons) : undefined,
+        paymentType,
+        paymentMethod,
+        settlementUserId: paymentMethod === 'BANK_TRANSFER' ? (settlementUserId ?? undefined) : undefined,
+        dueDate: dueDate || undefined,
         memo: memo || undefined,
       })
       // 위치 변경 반영 (이동 / 신규 배정 / 미지정 해제)
@@ -867,7 +900,53 @@ function EditOrderModal({
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
                 </div>
               </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">결제 방식 *</label>
+                <select
+                  value={paymentType}
+                  onChange={(e) => {
+                    setPaymentType(e.target.value as PaymentType)
+                    setDueTouched(false) // 결제 방식 바꾸면 납기일 자동 매핑 재개
+                  }}
+                  className={inputCls}
+                >
+                  <option value="PREPAID">선불 (완납)</option>
+                  <option value="POSTPAID">후불 (입금예정)</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">결제 수단 *</label>
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={inputCls}>
+                  <option value="BANK_TRANSFER">계좌이체</option>
+                  <option value="CASH">현금</option>
+                  <option value="CARD">카드</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-slate-700">
+                  납기일
+                  {!dueTouched && (
+                    <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600">
+                      {paymentType === 'PREPAID' ? '보관 시작일 자동' : '보관 종료일 자동'}
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => {
+                    setDueDate(e.target.value)
+                    setDueTouched(true)
+                  }}
+                  className={inputCls}
+                />
+              </div>
             </div>
+
+            {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 — 등록 화면과 동일 */}
+            {paymentMethod === 'BANK_TRANSFER' && (
+              <PaymentAccountPicker staffList={staffList} value={settlementUserId} onChange={setSettlementUserId} />
+            )}
 
             {periodError && (
               <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
