@@ -220,10 +220,11 @@ public class StorageOrderService {
                     ? req.getActualEndDate()
                     : (order.getExpectedEndDate() != null ? order.getExpectedEndDate() : today);
             TemporalValidator.validateContractPeriod(order.getStorageStartDate(), actualEnd);
-            // [이중 방어] 실제 출고일은 미래일 수 없다 — '만기 전 정상 출고'(미래 종료일 확정) 모순 차단
-            if (actualEnd.isAfter(today)) {
+            // [출고일 범위 제약] 실제 출고일은 보관 시작일 ~ 종료일 이내여야 한다.
+            //   당일 여부와 무관 — 중도 출고는 보관기간 안이라면 미래일도 허용(예약 출고). 종료일 이후만 차단.
+            if (order.getExpectedEndDate() != null && actualEnd.isAfter(order.getExpectedEndDate())) {
                 throw new IllegalArgumentException(
-                        "보관 종료일이 아직 도래하지 않아 정상 출고할 수 없습니다. 중도 출고로 처리하세요.");
+                        "실제 출고일은 보관 종료일 이내여야 합니다. 기간을 늘리려면 계약 수정으로 처리하세요.");
             }
             order.release(actualEnd);
             // [정산 연동] 출고 시 항상 활성 원장을 실제 출고일로 마감·재산정한다.
