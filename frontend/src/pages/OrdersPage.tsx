@@ -903,21 +903,7 @@ function EditOrderModal({
                 </div>
                 <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">보관 용량 (톤)</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.1"
-                    value={capacityTons}
-                    onChange={(e) => setCapacityTons(e.target.value)}
-                    placeholder="예: 2.5"
-                    className={cn(inputCls, 'pr-10')}
-                  />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
-                </div>
-              </div>
+              
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">결제 방식 *</label>
                 <select
@@ -931,6 +917,21 @@ function EditOrderModal({
                   <option value="PREPAID">선불 (완납)</option>
                   <option value="POSTPAID">후불 (입금예정)</option>
                 </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">보관 용량 (톤)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0}
+                    step="1"
+                    value={capacityTons}
+                    onChange={(e) => setCapacityTons(e.target.value)}
+                    placeholder="예: 2.5"
+                    className={cn(inputCls, 'pr-10')}
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
+                </div>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">결제 수단 *</label>
@@ -1062,10 +1063,11 @@ function CreateOrderModal({
   const [formError, setFormError] = useState<string | null>(null)
   const [custOpen, setCustOpen] = useState(false)
   const [dormantConfirm, setDormantConfirm] = useState(false)
-  // [마스터 기본값] 전역 기본 계약 유지 기간(일) — 출고예정일 기본값 산정
-  const [defaultDays, setDefaultDays] = useState(7)
+  // [마스터 기본값] 전역 기본 계약 유지 기간(일) — 출고예정일 = 보관 시작일 + defaultDays.
+  //   기본 9 → 오늘 포함 보관일수 10일(시작일~+9일, 당일 포함). 회사 설정값이 있으면 그 값 우선.
+  const [defaultDays, setDefaultDays] = useState(9)
   useEffect(() => {
-    tenantApi.me().then((t) => setDefaultDays(t.defaultStoragePeriodDays ?? 7)).catch(() => {})
+    tenantApi.me().then((t) => setDefaultDays(t.defaultStoragePeriodDays ?? 9)).catch(() => {})
   }, [])
 
   // [실시간 계산] 하루 보관료 = 보관료 ÷ (보관시작일~출고예정일 총 일수, 당일 포함).
@@ -1385,7 +1387,7 @@ function CreateOrderModal({
                     <input
                       type="number"
                       min={0}
-                      step="0.1"
+                      step="1"
                       value={capacityTons ?? ''}
                       onChange={(e) => setCapacityTons(e.target.value === '' ? null : Number(e.target.value))}
                       placeholder="예: 2.5"

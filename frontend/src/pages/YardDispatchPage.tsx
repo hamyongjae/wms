@@ -659,7 +659,7 @@ function InboundModal({
   const [staffList, setStaffList] = useState<Staff[]>([])
   const today = new Date().toISOString().slice(0, 10)
   const [inboundDate, setInboundDate] = useState(today)
-  const [outboundDate, setOutboundDate] = useState(addDays(today, 7))
+  const [outboundDate, setOutboundDate] = useState(addDays(today, 10))
   const [defaultDays, setDefaultDays] = useState(7) // 전역 기본 계약 유지 기간
   const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)

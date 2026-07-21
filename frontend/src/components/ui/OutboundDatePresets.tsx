@@ -15,9 +15,9 @@ export default function OutboundDatePresets({
 }) {
   const disabled = !startDate
   const presets: Array<{ label: string; calc: () => string }> = [
-    { label: '+7일', calc: () => addDays(startDate, 7) },
-    { label: '+15일', calc: () => addDays(startDate, 15) },
-    { label: '+30일', calc: () => addDays(startDate, 30) },
+    { label: '+10일', calc: () => addDays(startDate, 9) },
+    { label: '+15일', calc: () => addDays(startDate, 14) },
+    { label: '+30일', calc: () => addDays(startDate, 29) },
     { label: '당월 말일', calc: () => endOfMonth(startDate) },
   ]
   return (
