@@ -12,6 +12,6 @@ public class StorageOrderUpdateRequest {
     private LocalDate storageStartDate;   // 보관 시작일 (편집 허용)
     private LocalDate expectedEndDate;
     private Integer monthlyFee;
-    private Double totalVolume;
+    private Double capacityTons;   // 보관 용량(톤)
     private String memo;
 }

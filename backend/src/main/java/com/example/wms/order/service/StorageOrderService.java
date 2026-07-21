@@ -77,7 +77,7 @@ public class StorageOrderService {
                 request.getStorageStartDate(),
                 request.getExpectedEndDate(),
                 request.getMonthlyFee(),
-                request.getTotalVolume(),
+                request.getCapacityTons(),   // 보관 용량(톤)
                 request.getMemo()
         );
 
@@ -146,7 +146,7 @@ public class StorageOrderService {
                 request.getStorageStartDate(),
                 request.getExpectedEndDate(),
                 request.getMonthlyFee(),
-                request.getTotalVolume(),
+                request.getCapacityTons(),
                 request.getMemo()
         );
         // [일정 동기화] 이 계약에 배정된 컨테이너의 입고/출고예정일을 계약 기간과 일치시킨다.

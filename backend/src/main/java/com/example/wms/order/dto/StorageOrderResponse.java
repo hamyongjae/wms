@@ -22,7 +22,7 @@ public class StorageOrderResponse {
     private final LocalDate expectedEndDate;
     private final LocalDate actualEndDate;
     private final Integer monthlyFee;
-    private final Double totalVolume;
+    private final Double capacityTons;
     private final String memo;
 
     // 결제 수단 & 수납 계좌(담당 직원 계좌 스냅샷)
@@ -48,7 +48,7 @@ public class StorageOrderResponse {
         this.expectedEndDate = order.getExpectedEndDate();
         this.actualEndDate = order.getActualEndDate();
         this.monthlyFee = order.getMonthlyFee();
-        this.totalVolume = order.getTotalVolume();
+        this.capacityTons = order.getCapacityTons();
         this.memo = order.getMemo();
 
         this.paymentMethod = order.getPaymentMethod() != null ? order.getPaymentMethod().name() : null;

@@ -86,8 +86,8 @@ public class StorageOrder {
     @Column(name = "monthly_fee", nullable = false)
     private Integer monthlyFee;              // 월 보관료
 
-    @Column(name = "total_volume")
-    private Double totalVolume;              // 총 부피(㎥)
+    @Column(name = "capacity_tons")
+    private Double capacityTons;             // 보관 용량(톤)
 
     @Column(name = "memo", columnDefinition = "TEXT")
     private String memo;
@@ -104,27 +104,27 @@ public class StorageOrder {
     // ===== 생성자 =====
     public StorageOrder(Tenant tenant, Customer customer, Warehouse warehouse,
                         LocalDate storageStartDate, LocalDate expectedEndDate,
-                        Integer monthlyFee, Double totalVolume, String memo) {
+                        Integer monthlyFee, Double capacityTons, String memo) {
         this.tenant = tenant;
         this.customer = customer;
         this.warehouse = warehouse;
         this.storageStartDate = storageStartDate;
         this.expectedEndDate = expectedEndDate;
         this.monthlyFee = monthlyFee;
-        this.totalVolume = totalVolume;
+        this.capacityTons = capacityTons;
         this.memo = memo;
         this.status = OrderStatus.INBOUND;   // 신규 계약은 입고 상태로 시작
     }
 
     // ===== 정보 수정 (보관 시작일까지 편집 허용) =====
     public void updateInfo(LocalDate storageStartDate, LocalDate expectedEndDate, Integer monthlyFee,
-                           Double totalVolume, String memo) {
+                           Double capacityTons, String memo) {
         if (storageStartDate != null) {
             this.storageStartDate = storageStartDate;
         }
         this.expectedEndDate = expectedEndDate;
         this.monthlyFee = monthlyFee;
-        this.totalVolume = totalVolume;
+        this.capacityTons = capacityTons;
         this.memo = memo;
     }
 

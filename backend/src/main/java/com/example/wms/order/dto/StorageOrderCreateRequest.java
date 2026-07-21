@@ -25,7 +25,7 @@ public class StorageOrderCreateRequest {
     @NotNull(message = "월 보관료는 필수입니다")
     private Integer monthlyFee;
 
-    private Double totalVolume;
+    private Double capacityTons;   // 보관 용량(톤)
     private String memo;
 
     // 결제 방식 — PREPAID(선불)면 계약 등록과 동시에 청구·수금까지 자동 처리. 미지정 시 후불.
