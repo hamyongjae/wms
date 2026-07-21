@@ -95,6 +95,51 @@ export default function CustomersPage() {
     }
   }
 
+  // [공용] 상태 셀렉트 · 작업 버튼 — 테이블과 모바일 카드가 동일 렌더 공유(중복 제거)
+  const renderStatusSelect = (c: Customer) => (
+    <>
+      <select
+        value={c.status}
+        onChange={(e) => handleStatus(c, e.target.value as CustomerStatus)}
+        title={c.status === 'BLACKLISTED' && c.blacklistReason ? `사유: ${c.blacklistReason}` : undefined}
+        className={cn('cursor-pointer rounded-full px-2 py-0.5 text-xs font-medium ring-1 outline-none', STATUS_META[c.status].cls)}
+      >
+        {STATUS_OPTIONS.map((s) => (
+          <option key={s} value={s}>
+            {STATUS_META[s].label}
+          </option>
+        ))}
+      </select>
+      {c.status === 'BLACKLISTED' && c.blacklistReason && (
+        <p className="mt-1 max-w-[180px] truncate text-[11px] text-red-500" title={c.blacklistReason}>
+          {c.blacklistReason}
+        </p>
+      )}
+    </>
+  )
+  const renderCustomerActions = (c: Customer) => (
+    <div className="flex items-center justify-end gap-1">
+      <button
+        type="button"
+        onClick={() => setEditTarget(c)}
+        title="수정"
+        className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 md:h-8 md:w-8"
+      >
+        <Pencil size={15} />
+      </button>
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={() => handleDelete(c)}
+          title="삭제"
+          className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 md:h-8 md:w-8"
+        >
+          <Trash2 size={15} />
+        </button>
+      )}
+    </div>
+  )
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -168,8 +213,9 @@ export default function CustomersPage() {
         </div>
       )}
 
+      {/* ===== 데스크톱: 테이블 (md 이상) ===== */}
       {!loading && !error && visible.length > 0 && (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60">
+        <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60 md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
@@ -210,54 +256,60 @@ export default function CustomersPage() {
                       {c.memo || '—'}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={c.status}
-                      onChange={(e) => handleStatus(c, e.target.value as CustomerStatus)}
-                      title={c.status === 'BLACKLISTED' && c.blacklistReason ? `사유: ${c.blacklistReason}` : undefined}
-                      className={cn(
-                        'cursor-pointer rounded-full px-2 py-0.5 text-xs font-medium ring-1 outline-none',
-                        STATUS_META[c.status].cls,
-                      )}
-                    >
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s} value={s}>
-                          {STATUS_META[s].label}
-                        </option>
-                      ))}
-                    </select>
-                    {c.status === 'BLACKLISTED' && c.blacklistReason && (
-                      <p className="mt-1 max-w-[180px] truncate text-[11px] text-red-500" title={c.blacklistReason}>
-                        {c.blacklistReason}
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setEditTarget(c)}
-                        title="수정"
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                      >
-                        <Pencil size={15} />
-                      </button>
-                      {isAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(c)}
-                          title="삭제"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
+                  <td className="px-4 py-3">{renderStatusSelect(c)}</td>
+                  <td className="px-3 py-3">{renderCustomerActions(c)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ===== 모바일: 고객 카드 뷰 (md 미만) ===== */}
+      {!loading && !error && visible.length > 0 && (
+        <div className="space-y-3 md:hidden">
+          {visible.map((c) => (
+            <div
+              key={c.id}
+              className={cn(
+                'rounded-2xl p-4 shadow-soft ring-1',
+                c.status === 'BLACKLISTED' ? 'bg-red-50/60 ring-red-200/70' : 'bg-white ring-slate-200/60',
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 truncate text-base font-semibold text-slate-800">
+                    {c.status === 'BLACKLISTED' && <ShieldAlert size={15} className="shrink-0 text-red-500" />}
+                    {c.name}
+                  </p>
+                  <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-slate-500">
+                    {c.customerType === 'CORPORATE' ? <Building2 size={13} /> : <UserIcon size={13} />}
+                    {c.customerType === 'CORPORATE' ? '기업' : '개인'}
+                  </p>
+                </div>
+                {renderCustomerActions(c)}
+              </div>
+
+              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                <div>
+                  <dt className="text-[11px] text-slate-400">사업자번호</dt>
+                  <dd className="mt-0.5 tabular-nums text-slate-600">{c.businessNumber || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-slate-400">연락처</dt>
+                  <dd className="mt-0.5 text-slate-600">{c.phoneNumber || '—'}</dd>
+                </div>
+                {c.memo && (
+                  <div className="col-span-2">
+                    <dt className="text-[11px] text-slate-400">메모</dt>
+                    <dd className="mt-0.5 text-xs text-slate-500">{c.memo}</dd>
+                  </div>
+                )}
+              </dl>
+
+              <div className="mt-3 border-t border-slate-100 pt-3">{renderStatusSelect(c)}</div>
+            </div>
+          ))}
         </div>
       )}
 

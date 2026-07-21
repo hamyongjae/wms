@@ -55,6 +55,38 @@ export default function StaffPage() {
     )
   }
 
+  // [공용] 권한·상태 배지, 계좌 버튼 — 테이블과 모바일 카드가 동일 렌더 공유(중복 제거)
+  const roleBadge = (s: Staff) => (
+    <span
+      className={cn(
+        'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1',
+        s.role === 'ADMIN' ? 'bg-indigo-50 text-indigo-700 ring-indigo-200' : 'bg-slate-100 text-slate-600 ring-slate-200',
+      )}
+    >
+      {s.role === 'ADMIN' ? '관리자' : '직원'}
+    </span>
+  )
+  const statusBadge = (s: Staff) => (
+    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', STATUS_META[s.status].cls)}>
+      {STATUS_META[s.status].label}
+    </span>
+  )
+  const accountBtn = (s: Staff) => (
+    <button
+      type="button"
+      onClick={() => setAccountTarget(s)}
+      className={cn(
+        'group inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition md:min-h-0',
+        s.accountNumber ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-100',
+      )}
+      title="수납 계좌 등록/수정"
+    >
+      <CreditCard size={13} />
+      {s.accountNumber ? <span className="tabular-nums">{s.bankName} {s.accountNumber}</span> : '계좌 등록'}
+      <Pencil size={11} className="opacity-0 transition group-hover:opacity-100" />
+    </button>
+  )
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -90,8 +122,9 @@ export default function StaffPage() {
         </div>
       )}
 
+      {/* ===== 데스크톱: 테이블 (md 이상) ===== */}
       {!loading && !error && items.length > 0 && (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60">
+        <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60 md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
@@ -118,54 +151,46 @@ export default function StaffPage() {
                     </span>
                   </td>
                   <td className="px-5 py-3 text-slate-500">{s.username}</td>
-                  <td className="px-5 py-3">
-                    <span
-                      className={cn(
-                        'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1',
-                        s.role === 'ADMIN'
-                          ? 'bg-indigo-50 text-indigo-700 ring-indigo-200'
-                          : 'bg-slate-100 text-slate-600 ring-slate-200',
-                      )}
-                    >
-                      {s.role === 'ADMIN' ? '관리자' : '직원'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setAccountTarget(s)}
-                      className={cn(
-                        'group inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition',
-                        s.accountNumber
-                          ? 'text-slate-600 hover:bg-slate-100'
-                          : 'text-slate-400 hover:bg-slate-100',
-                      )}
-                      title="수납 계좌 등록/수정"
-                    >
-                      <CreditCard size={13} />
-                      {s.accountNumber ? (
-                        <span className="tabular-nums">{s.bankName} {s.accountNumber}</span>
-                      ) : (
-                        '계좌 등록'
-                      )}
-                      <Pencil size={11} className="opacity-0 transition group-hover:opacity-100" />
-                    </button>
-                  </td>
-                  <td className="px-5 py-3">
-                    <span
-                      className={cn(
-                        'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1',
-                        STATUS_META[s.status].cls,
-                      )}
-                    >
-                      {STATUS_META[s.status].label}
-                    </span>
-                  </td>
+                  <td className="px-5 py-3">{roleBadge(s)}</td>
+                  <td className="px-5 py-3">{accountBtn(s)}</td>
+                  <td className="px-5 py-3">{statusBadge(s)}</td>
                   <td className="px-5 py-3 text-slate-400">{s.createdAt?.slice(0, 10)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ===== 모바일: 직원 카드 뷰 (md 미만) ===== */}
+      {!loading && !error && items.length > 0 && (
+        <div className="space-y-3 md:hidden">
+          {items.map((s) => (
+            <div key={s.id} className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-200/60">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 truncate text-base font-semibold text-slate-800">
+                    {s.role === 'ADMIN' ? (
+                      <ShieldCheck size={15} className="shrink-0 text-indigo-500" />
+                    ) : (
+                      <UserIcon size={15} className="shrink-0 text-slate-400" />
+                    )}
+                    {s.name}
+                    {s.id === me?.userId && <span className="text-xs text-slate-400">(나)</span>}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">{s.username}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {roleBadge(s)}
+                  {statusBadge(s)}
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+                {accountBtn(s)}
+                <span className="text-xs text-slate-400">{s.createdAt?.slice(0, 10)}</span>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

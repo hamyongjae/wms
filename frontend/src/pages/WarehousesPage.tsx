@@ -85,6 +85,28 @@ export default function WarehousesPage() {
     }
   }
 
+  // [공용] 작업 버튼 — 테이블과 모바일 카드가 동일 렌더 공유(모바일 44px 터치타깃)
+  const whActions = (w: (typeof items)[number]) => (
+    <div className="flex items-center justify-end gap-1">
+      <button
+        type="button"
+        onClick={() => openEdit(w)}
+        title="수정"
+        className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 md:h-8 md:w-8"
+      >
+        <Pencil size={15} />
+      </button>
+      <button
+        type="button"
+        onClick={() => handleDelete(w)}
+        title="삭제"
+        className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 md:h-8 md:w-8"
+      >
+        <Trash2 size={15} />
+      </button>
+    </div>
+  )
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
@@ -125,8 +147,9 @@ export default function WarehousesPage() {
         </div>
       )}
 
+      {/* ===== 데스크톱: 테이블 (md 이상) ===== */}
       {!loading && !error && items.length > 0 && (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60">
+        <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60 md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
@@ -142,32 +165,35 @@ export default function WarehousesPage() {
                   <td className="px-5 py-3 font-medium text-slate-800">{w.name}</td>
                   <td className="px-5 py-3 text-slate-500">{w.address || '—'}</td>
                   <td className="px-5 py-3 text-slate-500">{w.phone || '—'}</td>
-                  {isAdmin && (
-                    <td className="px-5 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(w)}
-                          title="수정"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(w)}
-                          title="삭제"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  )}
+                  {isAdmin && <td className="px-5 py-3">{whActions(w)}</td>}
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ===== 모바일: 창고 카드 뷰 (md 미만) ===== */}
+      {!loading && !error && items.length > 0 && (
+        <div className="space-y-3 md:hidden">
+          {items.map((w) => (
+            <div key={w.id} className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-200/60">
+              <div className="flex items-start justify-between gap-2">
+                <p className="truncate text-base font-semibold text-slate-800">{w.name}</p>
+                {isAdmin && whActions(w)}
+              </div>
+              <dl className="mt-2 space-y-1.5 text-sm">
+                <div className="flex gap-2">
+                  <dt className="shrink-0 text-[11px] text-slate-400">주소</dt>
+                  <dd className="text-slate-600">{w.address || '—'}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="shrink-0 text-[11px] text-slate-400">연락처</dt>
+                  <dd className="text-slate-600">{w.phone || '—'}</dd>
+                </div>
+              </dl>
+            </div>
+          ))}
         </div>
       )}
 
