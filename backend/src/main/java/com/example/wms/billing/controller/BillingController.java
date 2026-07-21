@@ -62,6 +62,13 @@ public class BillingController {
         return ResponseEntity.ok(billingService.getLedger(id));
     }
 
+    // [차트] 월별 청구·수금 추이 집계 (기본 6개월) — DB GROUP BY로 계산
+    @GetMapping("/stats/monthly")
+    public ResponseEntity<List<MonthlyRevenueResponse>> monthlyRevenue(
+            @RequestParam(defaultValue = "6") int months) {
+        return ResponseEntity.ok(billingService.getMonthlyRevenue(months));
+    }
+
     @GetMapping("/{id}/detail")
     public ResponseEntity<BillingLedgerDetailResponse> getLedgerDetail(@PathVariable Long id) {
         return ResponseEntity.ok(billingService.getLedgerDetail(id));

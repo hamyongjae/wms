@@ -88,6 +88,29 @@ public interface BillingLedgerRepository extends JpaRepository<BillingLedger, Lo
     List<BillingLedger> findOverdue(@Param("tenantId") Long tenantId,
                                     @Param("baseDate") LocalDate baseDate);
 
+    /**
+     * [차트 집계] 월별 청구·수금 합계 — 원장 필드를 DB에서 직접 GROUP BY 합산(런타임 풀스캔·앱단 집계 제거).
+     *   billed    = base_amount + carried_over_in + adjustment_total (중도출고 차감·환불 조정 반영)
+     *   collected = paid_total (환불 완료 시 차감분까지 반영)
+     * 청구기간 시작월(period_start) 기준으로 묶으며, idx_ledger_tenant_period 인덱스를 탄다.
+     * 반환: [ String yyyyMM, Number billed, Number collected ]
+     */
+    @Query(value = """
+            select to_char(date_trunc('month', l.period_start), 'YYYY-MM') as ym,
+                   coalesce(sum(l.base_amount + l.carried_over_in + l.adjustment_total), 0) as billed,
+                   coalesce(sum(l.paid_total), 0) as collected
+            from billing_ledgers l
+            where l.tenant_id = :tenantId
+              and l.status <> 'CANCELED'
+              and l.period_start >= :from
+              and l.period_start <= :to
+            group by date_trunc('month', l.period_start)
+            order by date_trunc('month', l.period_start)
+            """, nativeQuery = true)
+    List<Object[]> aggregateMonthlyRevenue(@Param("tenantId") Long tenantId,
+                                           @Param("from") LocalDate from,
+                                           @Param("to") LocalDate to);
+
     /** [배치] 전 테넌트 대상 미납 원장 — 스케줄러 미납 촉구용 */
     @Query("""
             select l from BillingLedger l

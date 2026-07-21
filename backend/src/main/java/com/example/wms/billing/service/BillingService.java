@@ -25,8 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 청구/미수금 정산 서비스.
@@ -509,6 +513,37 @@ public class BillingService {
                 ? ledgerRepository.findByTenantIdAndPeriodOverlap(tenantId, from, to, pageable)
                 : ledgerRepository.findByTenantId(tenantId, pageable);
         return page.map(BillingLedgerResponse::new);
+    }
+
+    /**
+     * [월별 청구·수금 추이] 최근 N개월(기본 6, 최대 24) 집계를 연속 시리즈로 반환한다.
+     * DB에서 GROUP BY로 합산하고(앱단 풀스캔 제거), 데이터 없는 달은 0으로 채워 차트가 끊기지 않게 한다.
+     */
+    @Transactional(readOnly = true)
+    public List<MonthlyRevenueResponse> getMonthlyRevenue(int months) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        int m = Math.max(1, Math.min(months, 24));
+        YearMonth end = YearMonth.now();
+        YearMonth start = end.minusMonths(m - 1L);
+        LocalDate from = start.atDay(1);
+        LocalDate to = end.atEndOfMonth();
+
+        // 빈 달까지 0으로 미리 채워 연속 시리즈 보장 (yyyy-MM → 응답)
+        Map<String, MonthlyRevenueResponse> series = new LinkedHashMap<>();
+        for (int i = 0; i < m; i++) {
+            YearMonth ym = start.plusMonths(i);
+            series.put(ym.toString(),
+                    new MonthlyRevenueResponse(ym.toString(), ym.getMonthValue() + "월",
+                            MoneyPolicy.ZERO, MoneyPolicy.ZERO));
+        }
+        for (Object[] row : ledgerRepository.aggregateMonthlyRevenue(tenantId, from, to)) {
+            String ym = (String) row[0];
+            MonthlyRevenueResponse r = series.get(ym);
+            if (r == null) continue;
+            r.setBilled(MoneyPolicy.normalize(new BigDecimal(row[1].toString())));
+            r.setCollected(MoneyPolicy.normalize(new BigDecimal(row[2].toString())));
+        }
+        return new ArrayList<>(series.values());
     }
 
     @Transactional(readOnly = true)
