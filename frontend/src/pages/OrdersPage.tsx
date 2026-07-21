@@ -699,8 +699,10 @@ function EditOrderModal({
   const [slotId, setSlotId] = useState<number | null>(null)
   const [currentSlotId, setCurrentSlotId] = useState<number | null>(null)
   const [currentContainerId, setCurrentContainerId] = useState<number | null>(null)
-  // [층 단가 연동] 사용자가 위치를 바꾼 뒤부터 자동 보정 (초기 로드값은 보존)
+  // [층 단가 연동] feeTier = 보관료 계산 기준 층(현재 배정된 컨테이너의 층 또는 사용자가 새로 고른 층).
+  //   feeAuto = 사용자가 날짜/위치를 실제로 건드린 뒤에만 true → 그 전까지는 저장된 보관료를 보존한다.
   const [feeTier, setFeeTier] = useState<number | null>(null)
+  const [feeAuto, setFeeAuto] = useState(false)
   const floorPrices = useFloorPricing(target?.warehouseId ?? null, target != null)
 
   useEffect(() => {
@@ -716,6 +718,7 @@ function EditOrderModal({
       setDueDate(target.dueDate ?? '')
       setDueTouched(true) // 기존값 보존 — 사용자가 결제 방식을 바꿀 때만 자동 매핑 시작
       setFeeTier(null)
+      setFeeAuto(false) // 저장된 보관료 보존 — 날짜/위치를 실제로 바꾼 뒤에만 자동 재계산
       setFormError(null)
     }
   }, [target])
@@ -738,11 +741,12 @@ function EditOrderModal({
   }, [paymentType, storageStartDate, expectedEndDate, dueTouched])
 
   // 위치(층) 선택 또는 보관 기간 변경 시 층 단가·최소료로 보관료 자동 보정 (공통 엔진)
+  //   feeAuto=false(초기 로드)면 저장된 보관료를 그대로 두고, 사용자가 날짜/위치를 바꾼 뒤에만 재계산한다.
   useEffect(() => {
-    if (feeTier == null) return
+    if (!feeAuto || feeTier == null) return
     const rate = floorPrices.get(feeTier)
     if (rate) setMonthlyFee(calcFloorFee(rate, storageStartDate, expectedEndDate))
-  }, [feeTier, floorPrices, storageStartDate, expectedEndDate])
+  }, [feeAuto, feeTier, floorPrices, storageStartDate, expectedEndDate])
 
   // 이 계약에 배정·적재된 컨테이너의 현재 자리를 조회 (수정 모드 강조/이동 기준)
   useEffect(() => {
@@ -761,6 +765,7 @@ function EditOrderModal({
         if (slot) {
           setCurrentSlotId(slot.id)
           setSlotId(slot.id)
+          setFeeTier(slot.tier ?? null) // 현재 배정된 층을 보관료 재계산 기준으로 (feeAuto 전까진 미적용)
         }
       })
       .catch(() => undefined)
@@ -852,7 +857,10 @@ function EditOrderModal({
                   type="date"
                   value={storageStartDate}
                   max={expectedEndDate || undefined}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => {
+                    setStartDate(e.target.value)
+                    setFeeAuto(true) // 날짜 변경 → 층 단가 기준 보관료 자동 재계산 시작
+                  }}
                   required
                   className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
                 />
@@ -863,10 +871,20 @@ function EditOrderModal({
                   type="date"
                   value={expectedEndDate}
                   min={storageStartDate || undefined}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={(e) => {
+                    setEndDate(e.target.value)
+                    setFeeAuto(true) // 날짜 변경 → 층 단가 기준 보관료 자동 재계산 시작
+                  }}
                   className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
                 />
-                <OutboundDatePresets startDate={storageStartDate} onPick={setEndDate} className="mt-1.5" />
+                <OutboundDatePresets
+                  startDate={storageStartDate}
+                  onPick={(d) => {
+                    setEndDate(d)
+                    setFeeAuto(true)
+                  }}
+                  className="mt-1.5"
+                />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">보관료 *</label>
@@ -985,7 +1003,10 @@ function EditOrderModal({
               warehouseId={target.warehouseId}
               value={slotId}
               onChange={setSlotId}
-              onPickSlot={(s) => setFeeTier(s?.tier ?? null)}
+              onPickSlot={(s) => {
+                setFeeTier(s?.tier ?? null)
+                setFeeAuto(true) // 위치(층) 변경 → 새 층 단가로 보관료 자동 재계산
+              }}
               currentSlotId={currentSlotId}
             />
           </div>

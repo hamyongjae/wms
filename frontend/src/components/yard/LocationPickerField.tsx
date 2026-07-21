@@ -93,7 +93,7 @@ export default function LocationPickerField({
             }}
             className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
           />
-          위치 미지정 (추후 지정)
+          위치 미지정(추후 지정)
         </label>
       </div>
 
