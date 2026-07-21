@@ -26,6 +26,36 @@ export function calcDailyFee(fee: number | null, startStr: string, endStr: strin
   return Math.round(fee / days)
 }
 
+/**
+ * [월 보관료 일할 계산] 백엔드 ProrationCalculator.prorateMonthly 와 동일한 규칙.
+ * 달마다 (월 보관료 ÷ 그 달의 총일수) × 그 달 사용일수 를 누적한다(달별 일수 차이 반영).
+ * 기간은 당일 포함(inclusive). 중도출고 실사용 보관료 프리뷰를 서버 계산과 일치시키기 위해 사용.
+ *
+ * @returns 반올림 정수(원). 값/기간이 유효하지 않으면 null.
+ */
+export function prorateMonthly(monthlyFee: number | null, startStr: string, endStr: string): number | null {
+  if (monthlyFee == null || monthlyFee <= 0) return null
+  if (!startStr || !endStr) return null
+  const start = new Date(`${startStr}T00:00:00Z`)
+  const end = new Date(`${endStr}T00:00:00Z`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null
+  if (end < start) return null
+
+  let total = 0
+  let cursor = start
+  while (cursor <= end) {
+    const year = cursor.getUTCFullYear()
+    const month = cursor.getUTCMonth() // 0-based
+    const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+    const monthEnd = new Date(Date.UTC(year, month, daysInMonth))
+    const segmentEnd = monthEnd < end ? monthEnd : end
+    const usedDays = Math.floor((segmentEnd.getTime() - cursor.getTime()) / 86_400_000) + 1
+    total += (monthlyFee / daysInMonth) * usedDays
+    cursor = new Date(segmentEnd.getTime() + 86_400_000) // 다음 세그먼트 시작 = segmentEnd + 1일
+  }
+  return Math.round(total)
+}
+
 /** 층별 단가 정보 (일 단가 + 최소 보관료) */
 export interface FloorRate {
   unitPrice: number // 일 단가(원/일)

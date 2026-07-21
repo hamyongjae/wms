@@ -14,7 +14,7 @@ import { yardApi } from '@/api/yardApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { validateContractPeriod } from '@/lib/dateValidation'
-import { calcDailyFee, calcFloorFee, type FloorRate } from '@/lib/fee'
+import { calcDailyFee, calcFloorFee, prorateMonthly, type FloorRate } from '@/lib/fee'
 import { useFloorPricing } from '@/hooks/useFloorPricing'
 import { extractOwner } from '@/lib/owner'
 import { nextContainerNo } from '@/lib/containerNo'
@@ -1591,9 +1591,9 @@ function StatusChangeModal({
   const [returnKind, setReturnKind] = useState<ReturnKind>('NORMAL')
   const [actualEndDate, setActualEndDate] = useState('')
   const [actualStartDate, setActualStartDate] = useState('')
-  const [applySettlement, setApplySettlement] = useState(true)
-  const [dailyRate, setDailyRate] = useState<number | null>(6000) // 하루 보관료 (직접 입력, 기본 6,000원)
-  const [usedAmount, setUsedAmount] = useState<number | null>(null) // 실사용 보관료 (자동계산·수정 가능)
+  // 중도출고 실사용 보관료: 기본은 계약 보관료 기준 일할 자동정산. manualFee=true면 관리자가 직접 입력한 금액으로 override.
+  const [manualFee, setManualFee] = useState(false)
+  const [usedAmount, setUsedAmount] = useState<number | null>(null) // 수동 override 금액
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -1622,8 +1622,8 @@ function StatusChangeModal({
     setReturnKind(opt.defaultReturn)
     setActualEndDate(today()) // 중도 출고 기본값 = 오늘
     setActualStartDate(target.storageStartDate ?? today())
-    setApplySettlement(true)
-    setDailyRate(6000)
+    setManualFee(false)
+    setUsedAmount(null)
     setFormError(null)
   }, [target])
 
@@ -1633,11 +1633,16 @@ function StatusChangeModal({
     return Math.max(getDurationDays(target.storageStartDate, actualEndDate), 0)
   }, [target, actualEndDate])
 
-  // [자동계산] 하루 보관료·일수가 바뀌면 실사용 보관료 = 일수 × 하루 보관료 (직접 수정도 가능)
+  // [실사용 보관료 자동 계산] 계약 월 보관료 기준 일할(백엔드와 동일 규칙) — 정산 화면과 일치하는 프리뷰
+  const autoUsage = useMemo(() => {
+    if (!target || !actualEndDate) return null
+    return prorateMonthly(target.monthlyFee, target.storageStartDate, actualEndDate)
+  }, [target, actualEndDate])
+
+  // 수동 override 모드로 켜는 순간 자동 계산값을 초기값으로 채워 준다.
   useEffect(() => {
-    if (releaseKind !== 'EARLY') return
-    setUsedAmount(usedDays * (dailyRate ?? 0))
-  }, [releaseKind, usedDays, dailyRate])
+    if (manualFee && usedAmount == null) setUsedAmount(autoUsage)
+  }, [manualFee, autoUsage, usedAmount])
 
   if (!target) return null
 
@@ -1649,11 +1654,11 @@ function StatusChangeModal({
       const body = isRelease
         ? {
             targetStatus: 'OUTBOUND' as const,
-            // 정상 출고: 예정일 그대로 / 중도 출고: 입력한 실제 출고일 + 소급 여부
+            // 정상 출고: 예정일 그대로 / 중도 출고: 입력한 실제 출고일
             actualEndDate: releaseKind === 'EARLY' ? actualEndDate : (target!.expectedEndDate ?? today()),
-            applySettlement: releaseKind === 'EARLY' && applySettlement,
-            // 중도출고 + 소급 시 직접 입력한 실사용 보관료를 정산 금액으로 전달
-            settledAmount: releaseKind === 'EARLY' && applySettlement ? (usedAmount ?? undefined) : undefined,
+            // 중도출고면 백엔드가 실제 출고일로 보관기간을 마감하고 실사용분으로 자동 재산정한다.
+            // 관리자가 '직접 입력'을 켰을 때만 그 금액을 override로 전달.
+            settledAmount: releaseKind === 'EARLY' && manualFee ? (usedAmount ?? undefined) : undefined,
           }
         : {
             targetStatus: 'INBOUND' as const,
@@ -1707,29 +1712,25 @@ function StatusChangeModal({
                     className={inputCls}
                   />
                 </div>
-                <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
-                  <input type="checkbox" checked={applySettlement} onChange={(e) => setApplySettlement(e.target.checked)} className="h-4 w-4 accent-indigo-600" />
-                  보관료 소급 정산 (실제 사용 기간만큼 차감·환급)
-                </label>
-
-                {applySettlement && (
-                  <div className="space-y-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
-                    <p className="text-xs text-slate-500">
-                      실사용 기간 <span className="font-medium text-slate-700">{target.storageStartDate} ~ {actualEndDate} ({usedDays}일)</span>
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">하루 보관료</label>
-                        <MoneyInput value={dailyRate} onChange={setDailyRate} placeholder="6,000" className={cn(inputCls, 'pr-9')} />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">실사용 보관료 (일수 × 하루)</label>
-                        <MoneyInput value={usedAmount} onChange={setUsedAmount} placeholder="0" className={cn(inputCls, 'pr-9')} />
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-slate-400">하루 보관료·출고일을 바꾸면 실사용 보관료가 자동 계산됩니다(직접 수정 가능).</p>
+                <div className="space-y-2 rounded-lg border border-slate-200 bg-white px-3 py-3">
+                  <p className="text-xs text-slate-500">
+                    실사용 기간 <span className="font-medium text-slate-700">{target.storageStartDate} ~ {actualEndDate} ({usedDays}일)</span>
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-600">실사용 보관료 (자동 정산)</span>
+                    <span className="text-sm font-semibold text-indigo-600">{autoUsage != null ? won(autoUsage) : '—'}</span>
                   </div>
-                )}
+                  <p className="text-[11px] text-slate-400">
+                    출고 시 보관기간 종료일이 실제 출고일로 마감되고, 미수금이 이 실사용 보관료로 자동 재계산됩니다.
+                  </p>
+                  <label className="flex cursor-pointer items-center gap-2 border-t border-slate-100 pt-2 text-xs text-slate-600">
+                    <input type="checkbox" checked={manualFee} onChange={(e) => setManualFee(e.target.checked)} className="h-4 w-4 accent-indigo-600" />
+                    실사용 보관료 직접 입력 (자동 계산값 대신 지정)
+                  </label>
+                  {manualFee && (
+                    <MoneyInput value={usedAmount} onChange={setUsedAmount} placeholder="0" className={cn(inputCls, 'pr-9')} />
+                  )}
+                </div>
               </div>
             )}
           </>
