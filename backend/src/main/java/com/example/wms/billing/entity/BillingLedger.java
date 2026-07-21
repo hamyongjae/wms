@@ -95,6 +95,13 @@ public class BillingLedger {
     @Column(name = "balance", nullable = false, precision = 19, scale = 2)
     private BigDecimal balance;            // 잔액(미수금). 파생값이지만 조회 성능 위해 저장
 
+    // ===== 중도출고 재산정용 스냅샷 (출고취소 시 원복) =====
+    @Column(name = "original_period_end")
+    private LocalDate originalPeriodEnd;         // 중도출고 전 보관기간 종료일
+
+    @Column(name = "original_base_amount", precision = 19, scale = 2)
+    private BigDecimal originalBaseAmount;       // 중도출고 전 기본 청구액
+
     // ===== 이월 링크 =====
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "carried_over_to_ledger_id")
@@ -193,6 +200,35 @@ public class BillingLedger {
         requireActive();
         this.carriedOverToLedger = nextLedger;
         this.status = BillingStatus.CARRIED_OVER;
+    }
+
+    /**
+     * [중도출고 재산정] 보관기간 종료일을 실제 출고일로 앞당기고, 기본 청구액을 실사용분으로 재산정한다.
+     * 출고취소 롤백을 위해 최초 1회 원래 종료일·기본액을 스냅샷으로 보존한다.
+     * (기간·기본액이 함께 실사용 기준으로 바뀌므로 정산 화면의 보관기간·보관료·미수금이 모두 일치)
+     */
+    public void reviseForMidRelease(LocalDate effectiveEnd, BigDecimal proratedBase) {
+        requireActive();
+        if (effectiveEnd == null || effectiveEnd.isBefore(billingPeriodStart)) {
+            throw new IllegalArgumentException("실사용 종료일이 청구 시작일보다 앞설 수 없습니다.");
+        }
+        if (this.originalPeriodEnd == null) {           // 최초 재산정 시에만 스냅샷
+            this.originalPeriodEnd = this.billingPeriodEnd;
+            this.originalBaseAmount = this.baseAmount;
+        }
+        this.billingPeriodEnd = effectiveEnd;
+        this.baseAmount = MoneyPolicy.normalize(proratedBase);
+        recompute();
+    }
+
+    /** [출고취소] 중도출고 재산정 전 보관기간·기본액으로 원복 */
+    public void restoreFromMidRelease() {
+        if (this.originalPeriodEnd == null) return;     // 재산정된 적 없음
+        this.billingPeriodEnd = this.originalPeriodEnd;
+        this.baseAmount = this.originalBaseAmount;
+        this.originalPeriodEnd = null;
+        this.originalBaseAmount = null;
+        recompute();
     }
 
     /** 납기일 변경 (계약 수정에서 청구 조건 재정렬 시) */

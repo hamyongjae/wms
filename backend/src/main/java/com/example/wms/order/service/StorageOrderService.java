@@ -226,14 +226,13 @@ public class StorageOrderService {
                         "보관 종료일이 아직 도래하지 않아 정상 출고할 수 없습니다. 중도 출고로 처리하세요.");
             }
             order.release(actualEnd);
-            // [매출 소급] 중도출고 + 소급 선택 시 원장 정산.
-            if (req.isApplySettlement()) {
-                if (req.getSettledAmount() != null) {
-                    billingService.settleManualForOrder(order.getId(), req.getSettledAmount());
-                    order.applySettledFee(req.getSettledAmount().intValue()); // 계약 보관료도 실사용 금액으로
-                } else {
-                    billingService.settleMidReleaseForOrder(order.getId(), actualEnd);
-                }
+            // [정산 연동] 출고 시 항상 활성 원장을 실제 출고일로 마감·재산정한다.
+            //   중도출고면 보관기간 종료일=출고일, 기본청구액=실사용분으로 재계산(정상출고면 no-op).
+            //   settledAmount가 오면 그 금액을 실사용 보관료로 사용(관리자 수동 override).
+            Integer actualUse = billingService.settleReleaseForOrder(
+                    order.getId(), actualEnd, req.getSettledAmount());
+            if (actualUse != null) {
+                order.applySettledFee(actualUse);   // 계약관리 화면 보관료도 실사용 금액으로
             }
             // [자원 동기화] 점유하던 슬롯을 즉시 공실 처리 (원자리는 컨테이너에 기억 → 출고취소 복구용)
             for (Container c : containerRepository.findByTenantIdAndCurrentOrderId(tenantId, order.getId())) {
