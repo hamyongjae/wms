@@ -246,16 +246,37 @@ public class StorageOrderService {
             syncContainerSchedule(order, order.getStorageStartDate(), actualEnd);
         } else {
             // ===== [출고 취소] 마감 전 상태로 소급 복구 =====
-            // 정산 취소 → 보관 종료일·보관료 롤백(unreleased) → 컨테이너 원자리 복구
+            java.util.List<Container> containers =
+                    containerRepository.findByTenantIdAndCurrentOrderId(tenantId, order.getId());
+
+            // [모순 방어 - 선검증] 원래 자리가 그 사이 '다른 컨테이너'로 점유됐거나 사라졌으면 출고취소 불가.
+            //   상태/정산을 건드리기 전에 먼저 막아, 컨테이너가 자리 없이 떠도는 모순 상태를 원천 차단한다.
+            for (Container c : containers) {
+                Long sid = c.getReleasedSlotId();
+                if (sid == null) continue;
+                var slot = yardSlotRepository.findById(sid)
+                        .filter(s -> s.getTenant().getId().equals(tenantId))
+                        .orElseThrow(() -> new IllegalStateException(
+                                "원래 보관 자리를 찾을 수 없어 출고 취소할 수 없습니다. 창고 배치가 변경되었을 수 있습니다."));
+                boolean takenByOther = slot.isOccupied()
+                        && (slot.getContainer() == null || !slot.getContainer().getId().equals(c.getId()));
+                if (takenByOther) {
+                    throw new IllegalStateException(
+                            "원래 보관 자리(" + slot.getLocationLabel() + ")가 이미 다른 컨테이너로 사용 중이라 출고 취소할 수 없습니다. "
+                                    + "해당 자리를 비운 뒤 다시 시도하세요.");
+                }
+            }
+
+            // 검증 통과 → 정산 취소 → 보관 종료일·보관료 롤백(unreleased) → 컨테이너 원자리 복구
             billingService.reverseMidReleaseForOrder(order.getId());
             order.unreleased();
-            for (Container c : containerRepository.findByTenantIdAndCurrentOrderId(tenantId, order.getId())) {
+            for (Container c : containers) {
                 Long sid = c.getReleasedSlotId();
                 if (sid == null) continue;
                 yardSlotRepository.findById(sid)
-                        .filter(s -> s.getTenant().getId().equals(tenantId) && !s.isOccupied())
+                        .filter(s -> s.getTenant().getId().equals(tenantId))
                         .ifPresent(slot -> {
-                            slot.place(c);        // 원자리 재적재
+                            if (!slot.isOccupied()) slot.place(c);   // 이미 이 컨테이너면 멱등, 아니면 원자리 재적재
                             c.restoredToSlot();
                         });
             }

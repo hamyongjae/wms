@@ -4,6 +4,7 @@ import com.example.wms.order.entity.OrderStatus;
 import com.example.wms.order.entity.StorageOrder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -16,9 +17,12 @@ public interface StorageOrderRepository extends JpaRepository<StorageOrder, Long
     // [테넌트 격리] id로 찾되 반드시 해당 tenant 소유여야만 반환
     Optional<StorageOrder> findByIdAndTenantId(Long id, Long tenantId);
 
+    // [N+1 제거] 목록 응답이 참조하는 to-one 연관을 한 번의 조인으로 가져온다(고객·창고·테넌트·수납담당).
+    @EntityGraph(attributePaths = {"customer", "warehouse", "tenant", "settlementUser"})
     Page<StorageOrder> findByTenantId(Long tenantId, Pageable pageable);
 
     // [캘린더] 해당 테넌트의 전체 계약 (입고/출고 이벤트 파생용)
+    @EntityGraph(attributePaths = {"customer", "warehouse", "tenant"})
     List<StorageOrder> findAllByTenantId(Long tenantId);
 
     // [배치] 전 테넌트 대상 활성 계약 조회 (스케줄러 월 청구 생성용)

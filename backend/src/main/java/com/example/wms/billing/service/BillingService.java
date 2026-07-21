@@ -339,46 +339,6 @@ public class BillingService {
     }
 
     /**
-     * [계약 출고 연동] 특정 계약의 활성 원장에 중도출고 소급 정산을 적용한다.
-     * 상태 변경(출고 처리)에서 '보관료 소급' 선택 시 호출된다. 적용 대상 원장이 없으면 no-op.
-     */
-    @Transactional
-    public void settleMidReleaseForOrder(Long storageOrderId, LocalDate actualEndDate) {
-        // 취소 아님 + 실제 출고일이 청구 시작일 이후인 원장 중 가장 늦은 회차를 정산 대상으로
-        BillingLedger target = ledgerRepository.findByStorageOrderId(storageOrderId).stream()
-                .filter(l -> l.getStatus() != BillingStatus.CANCELED)
-                .filter(l -> !actualEndDate.isBefore(l.getBillingPeriodStart()))
-                .max(java.util.Comparator.comparing(BillingLedger::getBillingPeriodStart))
-                .orElse(null);
-        if (target == null) return;
-        BillingLedger locked = lockLedger(target.getId());
-        applyMidReleaseTo(locked, actualEndDate);
-    }
-
-    /**
-     * [수동 정산] 사용자가 입력한 실사용 보관료로 원장을 정산한다.
-     * 대상 원장의 기본 보관료(baseAmount)를 settledAmount가 되도록 CORRECTION 조정을 반영.
-     */
-    @Transactional
-    public void settleManualForOrder(Long storageOrderId, BigDecimal settledAmount) {
-        if (settledAmount == null) return;
-        BillingLedger target = ledgerRepository.findByStorageOrderId(storageOrderId).stream()
-                .filter(l -> l.getStatus() != BillingStatus.CANCELED)
-                .max(java.util.Comparator.comparing(BillingLedger::getBillingPeriodStart))
-                .orElse(null);
-        if (target == null) return;
-        BillingLedger locked = lockLedger(target.getId());
-        BigDecimal settled = MoneyPolicy.normalize(settledAmount);
-        BigDecimal diff = settled.subtract(locked.getBaseAmount());
-        if (diff.signum() == 0) return;
-        Long userId = SecurityUtils.getCurrentUser().getUserId();
-        String reason = "중도출고 실사용 보관료 정산 (" + settled.toBigInteger() + "원)";
-        adjustmentRepository.save(new BillingAdjustment(
-                locked.getTenant(), locked, AdjustmentType.CORRECTION, diff, reason, userId));
-        locked.applyAdjustment(diff);
-    }
-
-    /**
      * [출고 정산 - 원장 재산정] 중도출고 소급 정산 시, 활성 원장의 보관기간 종료일을 실제 출고일로 마감하고
      * 기본 청구액(baseAmount)을 실사용 보관료로 재산정한다. → 정산 화면의 보관기간·보관료·미수금이 모두 일치.
      *
