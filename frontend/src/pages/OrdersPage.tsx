@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, Trash2, FileText, ShieldAlert, AlertTriangle, Pencil, X, Wallet, LogOut, Undo2 } from 'lucide-react'
+import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger, type PaymentMethod } from '@/api/billingApi'
@@ -337,18 +337,16 @@ export default function OrdersPage() {
                     </span>
                   </td>
                   <td className="px-5 py-3">
-                    {/* [작업] 통일된 버튼 그룹 — 동일 높이(h-8)·라운딩·간격, 은은한 톤 호버 */}
-                    <div className="flex items-center justify-end gap-1.5">
+                    {/* [작업] 순수 텍스트형 통일 버튼 그룹 — 동일 규격·여유 간격, 무채색 위계 */}
+                    <div className="flex items-center justify-end gap-2">
                       {o.status === 'INBOUND' ? (
-                        <RowAction icon={<LogOut size={13} />} label="출고" tooltip="출고 처리" tone="amber" onClick={() => setStatusTarget(o)} />
+                        <RowAction label="출고" tooltip="출고 처리" tone="amber" onClick={() => setStatusTarget(o)} />
                       ) : (
-                        <RowAction icon={<Undo2 size={13} />} label="출고취소" tooltip="출고 취소 (소급 복구)" tone="slate" onClick={() => handleCancelRelease(o)} />
+                        <RowAction label="출고취소" tooltip="출고 취소 (소급 복구)" tone="amber" onClick={() => handleCancelRelease(o)} />
                       )}
-                      <RowAction icon={<Wallet size={15} />} tooltip="정산원장 조회" tone="indigo" onClick={() => setBillingTarget(o)} />
-                      <RowAction icon={<Pencil size={14} />} tooltip="계약 수정" tone="slate" onClick={() => setEditTarget(o)} />
-                      {isAdmin && (
-                        <RowAction icon={<Trash2 size={15} />} tooltip="계약 삭제" tone="red" onClick={() => handleDelete(o)} />
-                      )}
+                      <RowAction label="정산" tooltip="정산원장 조회" tone="muted" onClick={() => setBillingTarget(o)} />
+                      <RowAction label="수정" tooltip="계약 수정" tone="muted" onClick={() => setEditTarget(o)} />
+                      {isAdmin && <RowAction label="삭제" tooltip="계약 삭제" tone="danger" onClick={() => handleDelete(o)} />}
                     </div>
                   </td>
                 </tr>
@@ -1611,43 +1609,41 @@ function StatusChangeModal({
  * 텍스트형(입/출고)·아이콘형(원장·수정·삭제)을 하나의 규격(h-8·rounded-lg)으로 통일.
  * tone별 은은한 파스텔 호버 + 미세 리프트 마이크로 인터랙션 + title 툴팁.
  */
-type ActionTone = 'amber' | 'emerald' | 'indigo' | 'slate' | 'red'
-const ACTION_TONE: Record<ActionTone, { solid: string; ghost: string }> = {
-  amber: { solid: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100', ghost: 'hover:bg-amber-50 hover:text-amber-600' },
-  emerald: { solid: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100', ghost: 'hover:bg-emerald-50 hover:text-emerald-600' },
-  indigo: { solid: 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100', ghost: 'hover:bg-indigo-50 hover:text-indigo-600' },
-  slate: { solid: 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100', ghost: 'hover:bg-slate-100 hover:text-slate-700' },
-  red: { solid: 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100', ghost: 'hover:bg-red-50 hover:text-red-600' },
+// [작업 버튼 톤] 순수 텍스트형 — 규격은 공통, 톤만 위계를 만든다.
+//  · amber  : 입/출고 등 가장 중요도 높은 상태 전환 버튼 (강조 유지)
+//  · muted  : 정산·수정 등 보조 액션 (무채색, 시각적 소음 최소화)
+//  · danger : 삭제 (평상시 무채색, 호버 시에만 위험색으로 각성)
+type ActionTone = 'amber' | 'muted' | 'danger'
+const ACTION_TONE: Record<ActionTone, string> = {
+  amber: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
+  muted: 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800',
+  danger: 'border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600',
 }
 
+// [공통 작업 버튼] 아이콘 없는 순수 텍스트형. 모든 버튼이 동일한 높이(h-8)·라운딩·폰트를 공유하고,
+// 톤(ActionTone)만 달라져 시각적 위계를 만든다. 규격이 한 곳에 모여 유지보수가 쉽다.
 function RowAction({
-  icon,
   label,
   tooltip,
   tone,
   onClick,
 }: {
-  icon: ReactNode
-  label?: string
+  label: string
   tooltip: string
   tone: ActionTone
   onClick: () => void
 }) {
-  const t = ACTION_TONE[tone]
-  const base = 'inline-flex h-8 shrink-0 items-center justify-center rounded-lg transition-all duration-150 hover:-translate-y-px active:translate-y-0'
   return (
     <button
       type="button"
       onClick={onClick}
       title={tooltip}
       aria-label={tooltip}
-      className={
-        label
-          ? cn(base, 'gap-1 border px-2.5 text-xs font-medium', t.solid)
-          : cn(base, 'w-8 text-slate-400', t.ghost)
-      }
+      className={cn(
+        'inline-flex h-8 shrink-0 items-center justify-center rounded-lg border px-3 text-xs font-medium transition-all duration-150 hover:-translate-y-px active:translate-y-0',
+        ACTION_TONE[tone],
+      )}
     >
-      {icon}
       {label}
     </button>
   )

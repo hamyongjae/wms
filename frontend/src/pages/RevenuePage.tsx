@@ -177,7 +177,7 @@ export default function RevenuePage() {
           <section className="rounded-2xl bg-white p-6 shadow-soft ring-1 ring-slate-200/60">
             <div className="flex items-center justify-between">
               <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                <PieChart size={15} className="text-slate-400" /> 고객사별 매출 비중
+                <PieChart size={15} className="text-slate-400" /> 고객별 매출 비중
               </h3>
               <span className="text-xs text-slate-400">{fm != null ? `${fm}월 기준` : `${dot(range.from)} ~ ${dot(range.to)}`}</span>
             </div>
