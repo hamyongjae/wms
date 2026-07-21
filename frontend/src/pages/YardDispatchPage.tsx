@@ -49,6 +49,7 @@ export interface QuickInboundDto {
   targetSlotId: number
   containerNo: string
   capacityTon: number
+  capacityTons?: number // 새 계약 생성 시 보관 용량(톤)
   customerId?: number // 새 계약 자동 생성용
   customerName?: string
   orderId?: number // 선택 시 해당 계약에 배정 / 없으면 새 계약 생성
@@ -206,6 +207,7 @@ export default function YardDispatchPage() {
         storageStartDate: body.inboundDate ?? todayStr(),
         expectedEndDate: body.outboundDate,
         monthlyFee: body.monthlyFee ?? 0,
+        capacityTons: body.capacityTons,
         paymentType: body.paymentType,
         memo: body.memo,
       })
@@ -220,7 +222,7 @@ export default function YardDispatchPage() {
     const created = await containerApi.create({
       warehouseId: body.warehouseId,
       containerNo,
-      capacityTon: body.capacityTon,
+      capacityTon: body.capacityTon,   // 물리 컨테이너 용량 (보관 용량 입력값과 동기화, 기본 5톤)
       memo: composedMemo,
       inboundDate: body.inboundDate,
       expectedOutboundDate: body.outboundDate,
@@ -653,6 +655,7 @@ function InboundModal({
   const [customerId, setCustomerId] = useState('')
   const [orderId, setOrderId] = useState('') // 선택 계약(빈 값이면 배정 안 함)
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
+  const [capacityTons, setCapacityTons] = useState<number | null>(null) // 보관 용량(톤)
   const [paymentType, setPaymentType] = useState<PaymentType>('PREPAID')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('BANK_TRANSFER')
   const [settlementUserId, setSettlementUserId] = useState<number | null>(null)
@@ -744,7 +747,8 @@ function InboundModal({
         warehouseId,
         targetSlotId: slot.id,
         containerNo: autoNo,
-        capacityTon: 5, // 기본 5톤 임대 단위(용량 입력칸 제거)
+        capacityTon: capacityTons ?? 5, // 보관 용량 입력값(없으면 기본 5톤)을 컨테이너 용량으로도 반영
+        capacityTons: !orderId ? (capacityTons ?? undefined) : undefined, // 새 계약 생성 시에만 보관 용량 전달
         customerId: Number(customerId),
         customerName: selectedCustomer?.name,
         orderId: orderId ? Number(orderId) : undefined,
@@ -838,6 +842,21 @@ function InboundModal({
                   {dailyFee != null ? `${fmt(dailyFee)}원` : ''}
                 </div>
                 <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">보관 용량 (톤)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={capacityTons ?? ''}
+                    onChange={(e) => setCapacityTons(e.target.value === '' ? null : Number(e.target.value))}
+                    placeholder="예: 5"
+                    className={cn(inputCls, 'pr-10')}
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

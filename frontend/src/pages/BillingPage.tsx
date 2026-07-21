@@ -309,7 +309,9 @@ export default function BillingPage() {
                     </td>
                     <td className="px-5 py-3 text-right text-slate-700">{won(totalDue(l))}</td>
                     <td className="px-5 py-3 text-right font-medium">
-                      {l.balance < 0 ? (
+                      {l.refundCompleted ? (
+                        <span className="text-xs font-medium text-[#5C7C6B]">환불 완료</span>
+                      ) : l.balance < 0 ? (
                         // 과오납 → 미수금이 아니라 환불 대상으로 분리 표기
                         <span className="text-emerald-600">환불 {won(l.refundDue ?? -l.balance)}</span>
                       ) : (
@@ -410,6 +412,8 @@ function LedgerDetailPanel({
   const canPay = l != null && l.balance > 0 && (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
   const canAdjust = l != null && (l.status === 'DRAFT' || l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
   const canCarry = l != null && l.balance > 0 && (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
+  // [환불 완료] 환불 대상 금액이 있고 아직 미완료일 때만 (이중 방어 — 백엔드에서도 재검증)
+  const canRefund = l != null && (l.refundDue ?? Math.max(-l.balance, 0)) > 0 && !l.refundCompleted
 
   async function handleIssue() {
     try {
@@ -417,6 +421,16 @@ function LedgerDetailPanel({
       afterAction()
     } catch (err) {
       setActionError(errMsg(err, '발행에 실패했습니다.'))
+    }
+  }
+
+  async function handleCompleteRefund() {
+    if (!window.confirm('환불 완료 처리하시겠습니까?\n환불 대상 금액을 지급 완료로 마감하고 잔액을 0원으로 정리합니다.')) return
+    try {
+      await billingApi.completeRefund(ledgerId)
+      afterAction() // 상세·목록 비동기 재조회 (전체 새로고침 없음)
+    } catch (err) {
+      setActionError(errMsg(err, '환불 완료 처리에 실패했습니다.'))
     }
   }
 
@@ -447,14 +461,25 @@ function LedgerDetailPanel({
             {/* 요약 */}
             <section className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
               <div className="mb-3 flex items-center justify-between">
-                <span
-                  className={cn(
-                    'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1',
-                    STATUS_META[l.status].cls,
-                  )}
-                >
-                  {STATUS_META[l.status].label}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1',
+                      STATUS_META[l.status].cls,
+                    )}
+                  >
+                    {STATUS_META[l.status].label}
+                  </span>
+                  {l.refundCompleted ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#E9EFEA] px-2 py-0.5 text-xs font-medium text-[#5C7C6B] ring-1 ring-[#D3DFD6]">
+                      <BadgeCheck size={12} /> 환불 완료
+                    </span>
+                  ) : (l.refundDue ?? Math.max(-l.balance, 0)) > 0 ? (
+                    <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+                      환불 대기
+                    </span>
+                  ) : null}
+                </div>
                 <span className="text-xs text-slate-400">
                   {l.billingType === 'MONTHLY' ? '월 단위' : '일 단위'} ·{' '}
                   {l.settlementType === 'PREPAID' ? '선납' : '후납'}
@@ -481,9 +506,14 @@ function LedgerDetailPanel({
                   {won(l.balance < 0 ? (l.refundDue ?? -l.balance) : (l.outstanding ?? l.balance))}
                 </span>
               </div>
-              {l.balance < 0 && (
+              {l.balance < 0 && !l.refundCompleted && (
                 <p className="mt-1 text-right text-[11px] text-emerald-600">
                   중도출고로 실청구액이 수금액보다 작아 환불(선급금 반환) 대상입니다.
+                </p>
+              )}
+              {l.refundCompleted && l.refundedAt && (
+                <p className="mt-1 text-right text-[11px] text-slate-400">
+                  {l.refundedAt.slice(0, 10)} 환불 지급 완료 · 정산 마감
                 </p>
               )}
             </section>
@@ -512,6 +542,11 @@ function LedgerDetailPanel({
               {canCarry && isAdmin && (
                 <ActionBtn onClick={() => setMode(mode === 'carry' ? null : 'carry')} icon={<ArrowRightCircle size={15} />} tone="violet">
                   미수금 이월
+                </ActionBtn>
+              )}
+              {canRefund && isAdmin && (
+                <ActionBtn onClick={handleCompleteRefund} icon={<BadgeCheck size={15} />} tone="emerald">
+                  환불 완료
                 </ActionBtn>
               )}
             </div>

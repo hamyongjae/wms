@@ -117,12 +117,15 @@ export default function DashboardPage() {
   const stats = useMemo(() => {
     const t = today()
     const activeContracts = orders.filter((o) => isActive(o.status)).length
-    const outstanding = ledgers.filter((l) => l.status !== 'CANCELED').reduce((s, l) => s + l.balance, 0)
+    // [정산관리와 동기화] 미수금은 양수 잔액(outstanding)만 합산 — 과오납(음수/환불 대상)이 총액을 갉지 않도록.
+    const outstanding = ledgers
+      .filter((l) => l.status !== 'CANCELED')
+      .reduce((s, l) => s + (l.outstanding ?? Math.max(l.balance, 0)), 0)
     const overdue = ledgers.filter(isOverdue).length
     // 이번 주 납기 도래 — 연체가 되기 전에 잡는 선행 지표
     const dueSoonList = ledgers.filter(isDueSoon)
     const dueSoon = dueSoonList.length
-    const dueSoonAmount = dueSoonList.reduce((s, l) => s + l.balance, 0)
+    const dueSoonAmount = dueSoonList.reduce((s, l) => s + (l.outstanding ?? Math.max(l.balance, 0)), 0)
 
     const totalSlots = occupancy.reduce((s, w) => s + w.totalSlots, 0)
     const occupiedSlots = occupancy.reduce((s, w) => s + w.occupiedSlots, 0)

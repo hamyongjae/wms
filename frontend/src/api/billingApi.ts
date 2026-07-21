@@ -32,6 +32,8 @@ export interface BillingLedger {
   balance: number
   outstanding: number // 실제 미수금 (balance>0), 음수면 0
   refundDue: number // 환불(선급금 반환) 대상 (balance<0의 절대값), 양수면 0
+  refundCompleted: boolean // 환불 완료(지급 후 마감) 여부
+  refundedAt: string | null // 환불 완료 시각 (미완료면 null)
   status: BillingStatus
   overdue: boolean // [파생] 납기 경과 + 미납 잔액 → 연체/미수
   daysOverdue: number // 납기 경과 일수 (연체 아니면 0)
@@ -131,6 +133,11 @@ export const billingApi = {
   },
   async reversePayment(paymentId: number): Promise<BillingLedger> {
     const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/payments/${paymentId}/reverse`, {})
+    return data
+  },
+  // 환불 완료 처리 — 환불 대상 금액을 실제 지급 후 마감(잔액 0·정산 마감)
+  async completeRefund(id: number): Promise<BillingLedger> {
+    const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/${id}/refund-complete`, {})
     return data
   },
   async applyAdjustment(id: number, body: AdjustmentRequest): Promise<BillingLedger> {
