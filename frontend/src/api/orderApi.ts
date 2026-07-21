@@ -18,7 +18,7 @@ export interface StorageOrder {
   expectedEndDate: string | null
   actualEndDate: string | null
   monthlyFee: number
-  totalVolume: number | null
+  capacityTons: number | null
   paymentType: PaymentType
   memo: string | null
   paymentMethod: PaymentMethod
@@ -39,7 +39,7 @@ export interface OrderCreate {
   paymentMethod?: PaymentMethod
   settlementUserId?: number
   dueDate?: string // 납기일 — 선불=보관 시작일, 후불=보관 종료일 기본값(수동 변경 가능)
-  totalVolume?: number
+  capacityTons?: number // 보관 용량(톤)
   memo?: string
 }
 
@@ -47,7 +47,7 @@ export interface OrderUpdate {
   storageStartDate?: string
   expectedEndDate?: string
   monthlyFee?: number
-  totalVolume?: number
+  capacityTons?: number // 보관 용량(톤)
   memo?: string
 }
 

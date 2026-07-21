@@ -671,7 +671,7 @@ function OrderBillingModal({ target, isAdmin, onClose }: { target: StorageOrder 
   )
 }
 
-/* ===== 계약 수정 (출고예정일·월보관료·총부피·메모) ===== */
+/* ===== 계약 수정 (출고예정일·월보관료·보관용량(톤)·메모) ===== */
 function EditOrderModal({
   target,
   onClose,
@@ -684,7 +684,7 @@ function EditOrderModal({
   const [storageStartDate, setStartDate] = useState('')
   const [expectedEndDate, setEndDate] = useState('')
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
-  const [totalVolume, setVolume] = useState('')
+  const [capacityTons, setCapacityTons] = useState('')
   const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -701,7 +701,7 @@ function EditOrderModal({
       setStartDate(target.storageStartDate ?? '')
       setEndDate(target.expectedEndDate ?? '')
       setMonthlyFee(target.monthlyFee)
-      setVolume(target.totalVolume != null ? String(target.totalVolume) : '')
+      setCapacityTons(target.capacityTons != null ? String(target.capacityTons) : '')
       setMemo(target.memo ?? '')
       setFeeTier(null)
       setFormError(null)
@@ -762,7 +762,7 @@ function EditOrderModal({
         storageStartDate: storageStartDate || undefined,
         expectedEndDate: expectedEndDate || undefined,
         monthlyFee: monthlyFee!,
-        totalVolume: totalVolume ? Number(totalVolume) : undefined,
+        capacityTons: capacityTons ? Number(capacityTons) : undefined,
         memo: memo || undefined,
       })
       // 위치 변경 반영 (이동 / 신규 배정 / 미지정 해제)
@@ -852,6 +852,21 @@ function EditOrderModal({
                 </div>
                 <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
               </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">보관 용량 (톤)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={capacityTons}
+                    onChange={(e) => setCapacityTons(e.target.value)}
+                    placeholder="예: 2.5"
+                    className={cn(inputCls, 'pr-10')}
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
+                </div>
+              </div>
             </div>
 
             {periodError && (
@@ -934,6 +949,7 @@ function CreateOrderModal({
   const [storageStartDate, setStartDate] = useState(today())
   const [expectedEndDate, setEndDate] = useState('')
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
+  const [capacityTons, setCapacityTons] = useState<number | null>(null) // 보관 용량(톤)
   const [paymentType, setPaymentType] = useState<PaymentType>('PREPAID')
   const [paymentMethod, setPaymentMethod] = useState<OrderPaymentMethod>('BANK_TRANSFER') // 결제 수단 기본 계좌이체
   // [납기일] 선불→보관 시작일 / 후불→보관 종료일이 제로클릭 기본값. 사용자가 만지면(dueTouched) 자동 매핑 중단.
@@ -971,6 +987,7 @@ function CreateOrderModal({
       setStartDate(today())
       setEndDate(addDays(today(), defaultDays))
       setMonthlyFee(null)
+      setCapacityTons(null)
       setPaymentType('PREPAID')
       setPaymentMethod('BANK_TRANSFER')
       setSettlementUserId(null)
@@ -1056,6 +1073,7 @@ function CreateOrderModal({
         paymentMethod,
         settlementUserId: paymentMethod === 'BANK_TRANSFER' ? (settlementUserId ?? undefined) : undefined,
         dueDate: dueDate || undefined,
+        capacityTons: capacityTons ?? undefined,
         memo: memo || undefined,
       })
       // 위치를 지정했으면 컨테이너 생성·배정·적재까지 이어서 처리(미지정이면 생략)
@@ -1222,7 +1240,7 @@ function CreateOrderModal({
                   <label className="mb-1 block text-sm font-medium text-slate-700">결제 방식 *</label>
                   <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={inputCls}>
                     <option value="PREPAID">선불 (당일 완납)</option>
-                    <option value="POSTPAID">후불 (매월 청구)</option>
+                    <option value="POSTPAID">후불</option>
                   </select>
                 </div>
                 <div>
@@ -1260,6 +1278,21 @@ function CreateOrderModal({
                       결제 방식 기준으로 되돌리기
                     </button>
                   )}
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">보관 용량 (톤)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.1"
+                      value={capacityTons ?? ''}
+                      onChange={(e) => setCapacityTons(e.target.value === '' ? null : Number(e.target.value))}
+                      placeholder="예: 2.5"
+                      className={cn(inputCls, 'pr-10')}
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
+                  </div>
                 </div>
               </div>
 

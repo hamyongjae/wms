@@ -411,8 +411,7 @@ function LedgerDetailPanel({
       <div className="relative flex h-full w-full max-w-xl flex-col overflow-y-auto bg-white shadow-xl">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/90 px-6 py-4 backdrop-blur">
           <div>
-            <h3 className="text-base font-semibold text-slate-800">{l?.ledgerNo ?? '청구 원장'}</h3>
-            {l && <p className="text-xs text-slate-500">{l.customerName}</p>}
+            <h3 className="text-base font-semibold text-slate-800">{l?.customerName ?? '청구 원장'} 정산서 </h3>
           </div>
           <button
             type="button"

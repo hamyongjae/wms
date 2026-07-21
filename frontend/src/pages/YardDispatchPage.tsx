@@ -854,7 +854,7 @@ function InboundModal({
                 <label className="mb-1 block text-sm font-medium text-slate-700">결제 방식 (신규 계약 시)</label>
                 <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={inputCls}>
                   <option value="PREPAID">선불 (당일 완납)</option>
-                  <option value="POSTPAID">후불 (매월 청구)</option>
+                  <option value="POSTPAID">후불</option>
                 </select>
               </div>
               <div>
