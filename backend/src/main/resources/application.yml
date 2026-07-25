@@ -22,10 +22,11 @@ spring:
     default-encoding: UTF-8
 
   # ===== PostgreSQL 연결 =====
+  # [운영] 값은 환경변수로 주입(DB_URL/DB_USERNAME/DB_PASSWORD). 없으면 아래 개발 기본값 사용.
   datasource:
-    url: jdbc:postgresql://localhost:5432/wms   # 맨 뒤 wms 자리에 본인 DB 이름
-    username: postgres
-    password: 1234
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/wms}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:1234}
 
   # ===== JPA / Hibernate =====
   jpa:
@@ -40,6 +41,12 @@ spring:
 
 # ===== 앱 커스텀 설정 =====
 app:
+  # [운영] 비밀번호 재설정 링크에 쓰는 프론트 주소. 운영에선 실제 도메인으로 주입.
+  frontend-base-url: ${APP_FRONTEND_BASE_URL:http://localhost:5173}
+  # [운영] 추가 CORS 허용 출처(콤마 구분). 예: https://wms.example.com
+  #   프론트+API를 같은 도메인(Nginx)에서 서빙하면 same-origin이라 비워둬도 된다.
+  cors:
+    allowed-origins: ${APP_CORS_ORIGINS:}
   mail:
     # 발신자 표기 (미지정 시 username 사용)
     from: ${MAIL_FROM:${MAIL_USERNAME:}}

@@ -1,11 +1,14 @@
 package com.example.wms.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -20,6 +23,10 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
 
+    // [운영] 실제 도메인을 콤마로 주입(APP_CORS_ORIGINS). 예: https://wms.example.com,https://www.wms.example.com
+    @Value("${app.cors.allowed-origins:}")
+    private String extraOrigins;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
@@ -28,7 +35,7 @@ public class CorsConfig {
         //   - 192.168.x.x / 10.x.x.x / 172.16~31.x.x: 공유기 사설망(모바일 테스트)
         //   - *.trycloudflare.com / *.ngrok-free.app: 터널링(HTTPS) 접속
         //   운영 배포 시 실제 도메인을 여기에 추가한다.
-        config.setAllowedOriginPatterns(List.of(
+        List<String> patterns = new ArrayList<>(List.of(
                 "http://localhost:*",
                 "http://127.0.0.1:*",
                 "http://192.168.*.*:*",
@@ -40,6 +47,13 @@ public class CorsConfig {
                 "https://*.trycloudflare.com",
                 "https://*.ngrok-free.app"
         ));
+        // [운영] 환경변수로 주입한 실제 도메인들을 추가
+        if (extraOrigins != null && !extraOrigins.isBlank()) {
+            for (String o : Arrays.asList(extraOrigins.split(","))) {
+                if (!o.isBlank()) patterns.add(o.trim());
+            }
+        }
+        config.setAllowedOriginPatterns(patterns);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));      // Authorization, Content-Type 등 모두 허용
         config.setExposedHeaders(List.of("Authorization"));
