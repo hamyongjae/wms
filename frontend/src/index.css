@@ -1,0 +1,216 @@
+@import "tailwindcss";
+
+/*
+   ===== WMS 브랜드 테마 시스템 =====
+   인디고·바이올렛 유틸리티가 참조하는 색 변수를 data-theme 별로 덮어써
+   앱 전역 포인트 컬러를 실시간으로 교체한다. (각 페이지 클래스는 손대지 않음)
+   주의: 이 주석 안에 별표+슬래시 조합을 쓰지 말 것 — 주석이 조기 종료되어 빌드가 깨진다.
+   @theme 은 정적 값만 허용하므로 기본(틸) 팔레트를 하드코딩한다. */
+@theme {
+  --color-indigo-50: #ecfdfb;
+  --color-indigo-100: #cff8f4;
+  --color-indigo-200: #a1f0ea;
+  --color-indigo-300: #6ce1db;
+  --color-indigo-400: #34c8c3;
+  --color-indigo-500: #16aaa7;
+  --color-indigo-600: #0d8a89;
+  --color-indigo-700: #106e6e;
+  --color-indigo-800: #135859;
+  --color-indigo-900: #14494a;
+  --color-indigo-950: #052b2c;
+
+  --color-violet-50: #ecfdfb;
+  --color-violet-100: #cff8f4;
+  --color-violet-200: #a1f0ea;
+  --color-violet-300: #6ce1db;
+  --color-violet-400: #34c8c3;
+  --color-violet-500: #16aaa7;
+  --color-violet-600: #0d8a89;
+  --color-violet-700: #106e6e;
+  --color-violet-800: #135859;
+  --color-violet-900: #14494a;
+  --color-violet-950: #052b2c;
+}
+
+/* 기본(틸) 히어로 그라디언트 변수 */
+:root,
+[data-theme='teal'] {
+  --hero-from: #0f6e6e; --hero-via: #0d8a89; --hero-to: #16aaa7; --hero-glow: 52, 200, 195;
+}
+
+/* ===== 테마별 팔레트 오버라이드 (indigo=violet 동기화) ===== */
+[data-theme='blue'] {
+  --color-indigo-50: #eff6ff;  --color-indigo-100: #dbeafe; --color-indigo-200: #bfdbfe;
+  --color-indigo-300: #93c5fd; --color-indigo-400: #60a5fa; --color-indigo-500: #3b82f6;
+  --color-indigo-600: #2563eb; --color-indigo-700: #1d4ed8; --color-indigo-800: #1e40af;
+  --color-indigo-900: #1e3a8a; --color-indigo-950: #172554;
+  --color-violet-50: #eff6ff;  --color-violet-100: #dbeafe; --color-violet-200: #bfdbfe;
+  --color-violet-300: #93c5fd; --color-violet-400: #60a5fa; --color-violet-500: #3b82f6;
+  --color-violet-600: #2563eb; --color-violet-700: #1d4ed8; --color-violet-800: #1e40af;
+  --color-violet-900: #1e3a8a; --color-violet-950: #172554;
+  --hero-from: #1e3a8a; --hero-via: #2563eb; --hero-to: #3b82f6; --hero-glow: 96, 165, 250;
+}
+[data-theme='violet'] {
+  --color-indigo-50: #f5f3ff;  --color-indigo-100: #ede9fe; --color-indigo-200: #ddd6fe;
+  --color-indigo-300: #c4b5fd; --color-indigo-400: #a78bfa; --color-indigo-500: #8b5cf6;
+  --color-indigo-600: #7c3aed; --color-indigo-700: #6d28d9; --color-indigo-800: #5b21b6;
+  --color-indigo-900: #4c1d95; --color-indigo-950: #2e1065;
+  --color-violet-50: #f5f3ff;  --color-violet-100: #ede9fe; --color-violet-200: #ddd6fe;
+  --color-violet-300: #c4b5fd; --color-violet-400: #a78bfa; --color-violet-500: #8b5cf6;
+  --color-violet-600: #7c3aed; --color-violet-700: #6d28d9; --color-violet-800: #5b21b6;
+  --color-violet-900: #4c1d95; --color-violet-950: #2e1065;
+  --hero-from: #4c1d95; --hero-via: #7c3aed; --hero-to: #8b5cf6; --hero-glow: 167, 139, 250;
+}
+[data-theme='emerald'] {
+  --color-indigo-50: #ecfdf5;  --color-indigo-100: #d1fae5; --color-indigo-200: #a7f3d0;
+  --color-indigo-300: #6ee7b7; --color-indigo-400: #34d399; --color-indigo-500: #10b981;
+  --color-indigo-600: #059669; --color-indigo-700: #047857; --color-indigo-800: #065f46;
+  --color-indigo-900: #064e3b; --color-indigo-950: #022c22;
+  --color-violet-50: #ecfdf5;  --color-violet-100: #d1fae5; --color-violet-200: #a7f3d0;
+  --color-violet-300: #6ee7b7; --color-violet-400: #34d399; --color-violet-500: #10b981;
+  --color-violet-600: #059669; --color-violet-700: #047857; --color-violet-800: #065f46;
+  --color-violet-900: #064e3b; --color-violet-950: #022c22;
+  --hero-from: #065f46; --hero-via: #059669; --hero-to: #10b981; --hero-glow: 52, 211, 153;
+}
+[data-theme='rose'] {
+  --color-indigo-50: #fff1f2;  --color-indigo-100: #ffe4e6; --color-indigo-200: #fecdd3;
+  --color-indigo-300: #fda4af; --color-indigo-400: #fb7185; --color-indigo-500: #f43f5e;
+  --color-indigo-600: #e11d48; --color-indigo-700: #be123c; --color-indigo-800: #9f1239;
+  --color-indigo-900: #881337; --color-indigo-950: #4c0519;
+  --color-violet-50: #fff1f2;  --color-violet-100: #ffe4e6; --color-violet-200: #fecdd3;
+  --color-violet-300: #fda4af; --color-violet-400: #fb7185; --color-violet-500: #f43f5e;
+  --color-violet-600: #e11d48; --color-violet-700: #be123c; --color-violet-800: #9f1239;
+  --color-violet-900: #881337; --color-violet-950: #4c0519;
+  --hero-from: #881337; --hero-via: #e11d48; --hero-to: #f43f5e; --hero-glow: 251, 113, 133;
+}
+
+/* 앱 전체가 화면 높이를 채우도록 */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* [프리미엄 타이포] 숫자는 항상 고정폭 — 금액·수량이 세로 정렬돼 장부의 신뢰감을 준다 */
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * ===== Quiet Precision — 프리미엄 모바일 유틸 =====
+ * 마스터플랜(docs/mobile-premium-uiux-masterplan.md)의 시각 규격 구현.
+ */
+
+/* 넓고 옅은 한 겹 그림자 — 진한 드롭섀도 대신 "종이 한 장 떠 있는" 부양감 */
+.shadow-soft {
+  box-shadow: 0 6px 24px rgba(43, 51, 63, 0.07);
+}
+
+/* 카드 촉감 — 누르는 순간 살짝 눌리고, 떼면 부드럽게 복귀 */
+.card-press {
+  transition: transform 160ms ease-out, box-shadow 160ms ease-out;
+}
+.card-press:active {
+  transform: scale(0.98);
+}
+
+/* PC 다이얼로그 등장 — 살짝 아래에서 확대되며 페이드 인(부드러운 감속) */
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-dialog-in {
+  animation: dialog-in 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* 카드 호버 리프트 — 마우스를 올리면 1px 떠오르며 그림자가 깊어진다(데스크톱 촉감) */
+.card-hover {
+  transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+}
+@media (hover: hover) {
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 32px rgba(43, 51, 63, 0.10);
+  }
+}
+
+/* 바텀 시트 등장 — 부드러운 감속(iOS풍 이징)으로 하단에서 올라온다 */
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-sheet-up {
+  animation: sheet-up 340ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.animate-scrim-in {
+  animation: scrim-in 240ms ease-out;
+}
+
+/* 노치·홈 인디케이터 세이프 에어리어 */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 접근성 — OS "동작 줄이기" 설정 시 애니메이션 제거 */
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-up,
+  .animate-scrim-in,
+  .animate-dialog-in {
+    animation: none;
+  }
+  .card-hover,
+  .card-hover:hover {
+    transition: none;
+    transform: none;
+  }
+  .card-press,
+  .card-press:active {
+    transition: none;
+    transform: none;
+  }
+}
+
+/*
+ * ===== 창고/보관창고 컨셉 배경 유틸 (테마 변수 연동) =====
+ */
+
+/* 히어로 그라디언트 — 선택된 테마 색을 따른다 */
+.bg-brand-hero {
+  background:
+    radial-gradient(1200px 500px at 85% -10%, rgba(var(--hero-glow), 0.40), transparent 60%),
+    radial-gradient(900px 600px at 0% 110%, rgba(var(--hero-glow), 0.22), transparent 55%),
+    linear-gradient(135deg, var(--hero-from) 0%, var(--hero-via) 48%, var(--hero-to) 100%);
+}
+
+/* 보관창고 격자 패턴 — 순백 대신 미색(Off-white) 베이스: 카드가 종이처럼 떠 보인다 */
+.bg-yard-grid {
+  background-color: #f5f4f0;
+  background-image:
+    linear-gradient(rgba(120, 113, 108, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 113, 108, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* 히어로 위에 얹는 옅은 도트(스마트/센서 노드 느낌) */
+.bg-node-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1.5px);
+  background-size: 22px 22px;
+}
+
+/* 딥 네이비 표면 위 격자 (사이드바/히어로 내부용) */
+.bg-navy-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
