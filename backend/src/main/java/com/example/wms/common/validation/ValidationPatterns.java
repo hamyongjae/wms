@@ -27,7 +27,14 @@ public final class ValidationPatterns {
     public static final String PASSWORD =
             "^(?=.*[a-zA-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]).{8,20}$";
 
+    /**
+     * 이메일: 로그인 식별자(아이디)로 사용. 공백 없는 local@domain.tld 형태.
+     * (자바 문자열 이스케이프 반영)
+     */
+    public static final String EMAIL = "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$";
+
     // 사용자에게 보여줄 표준 안내 메시지
     public static final String USERNAME_MESSAGE = "아이디는 영문 소문자와 숫자만으로 4~20자여야 합니다.";
+    public static final String EMAIL_MESSAGE = "이메일 형식이 올바르지 않습니다.";
     public static final String PASSWORD_MESSAGE = "비밀번호는 영문, 숫자, 특수문자를 포함해 8~20자여야 합니다.";
 }

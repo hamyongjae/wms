@@ -1,6 +1,7 @@
 package com.example.wms.auth.dto;
 
 import com.example.wms.common.validation.ValidationPatterns;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
@@ -25,13 +26,13 @@ public class CompanyRegisterRequest {
 
     private String ceoName;
     private String phone;
-    private String email;
     private String address;
 
     // ===== 첫 관리자 계정 =====
-    @NotBlank(message = "관리자 아이디는 필수입니다")
-    @Pattern(regexp = ValidationPatterns.USERNAME, message = ValidationPatterns.USERNAME_MESSAGE)
-    private String adminUsername;
+    // [이메일 ID] 로그인 아이디 = 이메일. 전역 유일 식별자로 사용.
+    @NotBlank(message = "이메일은 필수입니다")
+    @Email(message = ValidationPatterns.EMAIL_MESSAGE)
+    private String email;
 
     @NotBlank(message = "비밀번호는 필수입니다")
     @Pattern(regexp = ValidationPatterns.PASSWORD, message = ValidationPatterns.PASSWORD_MESSAGE)

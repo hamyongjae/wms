@@ -13,17 +13,26 @@ import java.util.regex.Pattern;
 public final class CredentialValidator {
 
     private static final Pattern USERNAME = Pattern.compile(ValidationPatterns.USERNAME);
+    private static final Pattern EMAIL = Pattern.compile(ValidationPatterns.EMAIL);
     private static final Pattern PASSWORD = Pattern.compile(ValidationPatterns.PASSWORD);
 
     private CredentialValidator() {
     }
 
-    /** 아이디·비밀번호를 함께 검증. 하나라도 어기면 예외. */
-    public static void validate(String username, String password) {
-        validateUsername(username);
+    /** [이메일 ID] 이메일·비밀번호를 함께 검증. 하나라도 어기면 예외. */
+    public static void validate(String email, String password) {
+        validateEmail(email);
         validatePassword(password);
     }
 
+    /** 로그인 식별자(이메일) 형식 검증. */
+    public static void validateEmail(String email) {
+        if (email == null || !EMAIL.matcher(email).matches()) {
+            throw new InvalidInputException(ValidationPatterns.EMAIL_MESSAGE);
+        }
+    }
+
+    /** (레거시) 아이디 규칙 검증 — 소셜 합성 아이디 등에서만 참조. */
     public static void validateUsername(String username) {
         if (username == null || !USERNAME.matcher(username).matches()) {
             throw new InvalidInputException(ValidationPatterns.USERNAME_MESSAGE);

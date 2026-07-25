@@ -38,7 +38,7 @@ public class AccountRecoveryController {
     @PostMapping("/password/request")
     public ResponseEntity<Map<String, String>> requestReset(
             @Valid @RequestBody PasswordResetRequest request) {
-        recoveryService.requestPasswordReset(request.getUsername(), request.getEmail());
+        recoveryService.requestPasswordReset(request.getEmail());
         return ResponseEntity.ok(Map.of(
                 "message", "입력하신 정보가 일치하면 등록된 이메일로 재설정 링크를 보냈습니다."));
     }

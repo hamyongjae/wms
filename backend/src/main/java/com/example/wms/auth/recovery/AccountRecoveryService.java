@@ -54,13 +54,13 @@ public class AccountRecoveryService {
     // ===================== 비밀번호 재설정 요청 =====================
 
     /**
-     * 아이디+이메일 일치 시 재설정 토큰을 만들어 메일 발송.
+     * [이메일 ID] 이메일(=로그인 아이디)로 계정을 찾아 재설정 토큰을 만들어 메일 발송.
      * [보안] 존재 여부와 무관하게 호출부는 동일 응답을 반환하므로,
      *   여기서는 조용히 처리하고 일치할 때만 실제 메일을 보낸다.
      */
     @Transactional
-    public void requestPasswordReset(String username, String email) {
-        Optional<User> match = userRepository.findByUsernameAndEmail(username, email)
+    public void requestPasswordReset(String email) {
+        Optional<User> match = userRepository.findByEmail(email)
                 .filter(u -> u.getProvider() == LoginProvider.LOCAL);
 
         if (match.isEmpty()) {
