@@ -254,6 +254,9 @@ export default function BillingPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        
+        <StatCard label="누적 수금액" value={won(kpi.collected)} icon={Coins} tone="emerald" />
+        <StatCard label="정산 건수" value={`${kpi.count}건`} icon={FileText} tone="slate" />
         <StatCard
           label="미수금 총액"
           value={won(kpi.outstanding)}
@@ -261,9 +264,7 @@ export default function BillingPage() {
           icon={Wallet}
           tone="amber"
         />
-        <StatCard label="누적 수금액" value={won(kpi.collected)} icon={Coins} tone="emerald" />
         <StatCard label="연체 건수" value={`${kpi.overdueCount}건`} icon={AlertTriangle} tone="indigo" />
-        <StatCard label="원장 수" value={`${kpi.count}건`} icon={FileText} tone="slate" />
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">

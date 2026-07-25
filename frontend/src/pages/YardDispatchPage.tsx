@@ -706,14 +706,16 @@ function InboundModal({
     [customers, customerId],
   )
 
-  // 선택된 화주 + 이 창고의 '보관중/입고완료' 계약만 연결 대상으로 노출
+  // 선택된 화주 + 이 창고의 '입고(활성)' 계약만 연결 대상으로 노출.
+  //   [상태 모델] 계약 상태는 INBOUND/OUTBOUND 이진 — 예전 RECEIVED/IN_STORAGE 값은 폐기됨.
+  //   컨테이너 미지정으로 등록된 활성 계약을 이 입고 컨테이너에 연결할 수 있게 한다.
   const contractOptions = useMemo(() => {
     if (!selectedCustomer) return []
     return orders.filter(
       (o) =>
         o.customerId === selectedCustomer.id &&
         o.warehouseId === warehouseId &&
-        (o.status === 'RECEIVED' || o.status === 'IN_STORAGE'),
+        o.status === 'INBOUND',
     )
   }, [orders, selectedCustomer, warehouseId])
 

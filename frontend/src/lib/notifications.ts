@@ -13,7 +13,8 @@ export interface AppNotification {
 
 const today = () => new Date().toISOString().slice(0, 10)
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
-const isActive = (s: StorageOrder['status']) => s === 'RECEIVED' || s === 'IN_STORAGE'
+// 상태 모델은 INBOUND/OUTBOUND 이진 — 예전 RECEIVED/IN_STORAGE 값은 폐기됨. 활성=아직 출고 안 됨(INBOUND).
+const isActive = (s: StorageOrder['status']) => s === 'INBOUND'
 const isOverdue = (l: BillingLedger) =>
   l.balance > 0 &&
   (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID') &&

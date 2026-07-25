@@ -188,7 +188,7 @@ export default function DashboardPage() {
           {/* KPI */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <StatCard label="진행중 계약" value={`${stats.activeContracts}건`} icon={FileText} tone="indigo" />
-            <StatCard label="미수금 총액" value={won(stats.outstanding)} icon={Wallet} tone="amber" />
+            
             <StatCard
               label="보관비율"
               value={`${stats.usage}%`}
@@ -205,6 +205,7 @@ export default function DashboardPage() {
               tone="indigo"
             />
             <StatCard label="연체 청구" value={`${stats.overdue}건`} icon={AlertTriangle} tone="slate" />
+            <StatCard label="미수금 총액" value={won(stats.outstanding)} icon={Wallet} tone="amber" />
           </div>
 
           {/* 월별 청구·수금 추이 */}
