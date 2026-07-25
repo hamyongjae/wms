@@ -22,8 +22,6 @@ import { formatBusinessNumber, formatPhone, isValidBusinessNumber } from '@/lib/
 import { useCredentialValidation } from '@/hooks/useFormValidation'
 import { cn } from '@/lib/cn'
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
 const inputBase =
   'w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition placeholder:text-slate-400'
 const inputOk = 'border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
@@ -39,10 +37,9 @@ export default function SignupPage({ isSocialSignup: isSocialProp }: { isSocialS
   const [step, setStep] = useState<1 | 2>(isSocialSignup ? 2 : 1)
 
   // ===== Step 1: 마스터(ADMIN) 계정 =====
-  // 아이디/비밀번호/확인은 실시간 정규식 검증 훅으로 관리
+  // 이메일(=아이디)/비밀번호/확인은 실시간 정규식 검증 훅으로 관리
   const cred = useCredentialValidation()
   const [adminName, setAdminName] = useState('')
-  const [email, setEmail] = useState('')
   const [showPw, setShowPw] = useState(false)
 
   // ===== Step 2: 업체(Tenant) =====
@@ -58,11 +55,10 @@ export default function SignupPage({ isSocialSignup: isSocialProp }: { isSocialS
   // 소셜 모드인데 토큰이 없으면(=소셜 로그인 없이 직접 진입) 안내
   const socialTokenMissing = isSocialSignup && !authStorage.getToken()
 
-  // ---- Step 1 이름/이메일 검증 (아이디·비번은 cred 훅이 담당) ----
+  // ---- Step 1 이름 검증 (이메일·비번·확인은 cred 훅이 담당) ----
   const nameError = adminName.trim().length === 0 ? '이름을 입력하세요.' : undefined
-  const emailError = email.length > 0 && !EMAIL_RE.test(email) ? '이메일 형식이 올바르지 않습니다.' : undefined
-  // 가입 버튼 활성화 기준: 정규식 통과 + 이름 입력 + (이메일은 입력 시에만 형식 검사)
-  const canProceedStep1 = cred.allValid && !nameError && !emailError
+  // 가입 버튼 활성화 기준: 이메일/비번/확인 정규식 통과 + 이름 입력
+  const canProceedStep1 = cred.allValid && !nameError
 
   const step2Errors = useMemo(() => {
     const e: Record<string, string> = {}
@@ -119,14 +115,13 @@ export default function SignupPage({ isSocialSignup: isSocialProp }: { isSocialS
   // ---- 백엔드 DTO로 매핑 (필드명 정확히 일치) ----
   function buildRegisterPayload(): RegisterCompanyRequestDto {
     return {
-      adminUsername: cred.username,
+      email: cred.email,                // 로그인 아이디 = 이메일
       adminPassword: cred.password,
       adminName: adminName.trim(),
       ceoName: adminName.trim(),        // 마스터 계정 = 대표자
       companyName: companyName.trim(),
       businessNumber: formatBusinessNumber(businessNumber),
       phone: phone || undefined,
-      email: email || undefined,
       address: address.trim() || undefined,
     }
   }
@@ -163,13 +158,18 @@ export default function SignupPage({ isSocialSignup: isSocialProp }: { isSocialS
               {/* ===== Step 1 ===== */}
               {step === 1 && (
                 <>
-                  <Field label="아이디" error={cred.usernameError ?? undefined} required>
+                  <Field label="이메일 (로그인 아이디)" error={cred.emailError ?? undefined} required>
                     <input
-                      value={cred.username}
-                      onChange={(e) => cred.setUsername(e.target.value)}
-                      placeholder="영문 소문자·숫자 4~20자"
+                      type="email"
+                      value={cred.email}
+                      onChange={(e) => cred.setEmail(e.target.value.trim())}
+                      placeholder="example@company.com"
                       autoFocus
-                      className={cn(inputBase, cred.usernameError ? inputErr : inputOk)}
+                      inputMode="email"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      className={cn(inputBase, cred.emailError ? inputErr : inputOk)}
                     />
                   </Field>
 
@@ -223,16 +223,6 @@ export default function SignupPage({ isSocialSignup: isSocialProp }: { isSocialS
                       onChange={(e) => setAdminName(e.target.value)}
                       placeholder="예: 함용재"
                       className={cn(inputBase, touched && nameError ? inputErr : inputOk)}
-                    />
-                  </Field>
-
-                  <Field label="이메일" error={emailError}>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value.trim())}
-                      placeholder="example@company.com"
-                      className={cn(inputBase, emailError ? inputErr : inputOk)}
                     />
                   </Field>
 

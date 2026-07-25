@@ -4,7 +4,7 @@ import { Plus, Loader2, ShieldCheck, User as UserIcon, Users, CreditCard, Pencil
 import { staffApi, type Staff, type StaffCreate, type StaffAccount } from '@/api/staffApi'
 import type { UserRole } from '@/lib/auth'
 import { authStorage } from '@/lib/auth'
-import { validateUsername, validatePassword, USERNAME_REGEX, PASSWORD_REGEX } from '@/hooks/useFormValidation'
+import { validateEmail, validatePassword, EMAIL_REGEX, PASSWORD_REGEX } from '@/hooks/useFormValidation'
 import { cn } from '@/lib/cn'
 import Modal from '@/components/ui/Modal'
 
@@ -308,7 +308,7 @@ function CreateStaffModal({
   onClose: () => void
   onDone: () => void
 }) {
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [role, setRole] = useState<UserRole>('STAFF')
@@ -317,7 +317,7 @@ function CreateStaffModal({
 
   useEffect(() => {
     if (open) {
-      setUsername('')
+      setEmail('')
       setPassword('')
       setName('')
       setRole('STAFF')
@@ -325,17 +325,17 @@ function CreateStaffModal({
     }
   }, [open])
 
-  const usernameError = validateUsername(username)
+  const emailError = validateEmail(email)
   const passwordError = validatePassword(password)
   const canSubmit =
-    USERNAME_REGEX.test(username) && PASSWORD_REGEX.test(password) && name.trim().length > 0
+    EMAIL_REGEX.test(email) && PASSWORD_REGEX.test(password) && name.trim().length > 0
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!canSubmit) return
     setFormError(null)
     setSubmitting(true)
-    const body: StaffCreate = { username, password, name, role }
+    const body: StaffCreate = { email, password, name, role }
     try {
       await staffApi.create(body)
       onDone()
@@ -350,16 +350,21 @@ function CreateStaffModal({
     <Modal open={open} onClose={onClose} title="직원 계정 추가">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">아이디 *</label>
+          <label className="mb-1 block text-sm font-medium text-slate-700">이메일 (로그인 아이디) *</label>
           <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value.trim())}
             required
             autoFocus
-            placeholder="영문 소문자·숫자 4~20자"
-            className={cn(inputCls, usernameError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="staff@company.com"
+            className={cn(inputCls, emailError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
           />
-          {usernameError && <p className="mt-1 text-xs text-red-600">{usernameError}</p>}
+          {emailError && <p className="mt-1 text-xs text-red-600">{emailError}</p>}
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">비밀번호 *</label>

@@ -1,7 +1,8 @@
 import { api } from '@/lib/api'
 import type { UserRole } from '@/lib/auth'
 
-// [방식 1] 아이디/비밀번호만 전송 — 소속 업체는 서버가 자동 해석
+// [이메일 ID] 이메일/비밀번호만 전송 — 소속 업체는 서버가 자동 해석
+// (하위호환: 요청 필드명은 username을 유지하되 값에는 이메일을 담는다)
 export interface LoginRequest {
   username: string
   password: string
@@ -24,8 +25,8 @@ export interface LoginResponse {
  * 백엔드 CompanyRegisterRequest 와 필드명이 정확히 일치해야 한다.
  */
 export interface RegisterCompanyRequestDto {
-  // 마스터(ADMIN) 계정
-  adminUsername: string
+  // 마스터(ADMIN) 계정 — 로그인 아이디 = 이메일
+  email: string
   adminPassword: string
   adminName: string
   // 창고업체(Tenant)
@@ -33,7 +34,6 @@ export interface RegisterCompanyRequestDto {
   businessNumber: string
   ceoName?: string
   phone?: string
-  email?: string
   address?: string
 }
 

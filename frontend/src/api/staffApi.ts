@@ -24,7 +24,7 @@ export interface StaffAccount {
 }
 
 export interface StaffCreate {
-  username: string
+  email: string // 로그인 아이디 = 이메일
   password: string
   name: string
   role?: UserRole
