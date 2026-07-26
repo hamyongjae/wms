@@ -941,7 +941,6 @@ function ActionPanel({
   container,
   onClose,
   onOutbound,
-  onMove,
   onEdit,
 }: {
   slot: YardSlot

@@ -8,8 +8,9 @@
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 
-    /* 경로 별칭 @/* → src/* */
+    /* 경로 별칭 @/* ??src/* */
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@/*": ["./src/*"]
     },

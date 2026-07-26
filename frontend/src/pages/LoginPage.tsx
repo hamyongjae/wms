@@ -32,7 +32,7 @@ export default function LoginPage() {
           username: res.username,
           name: res.name,
           role: res.role,
-          tenantId: res.tenantId,
+          tenantId: res.tenantId!,
         },
         rememberMe,
       )
