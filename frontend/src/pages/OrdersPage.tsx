@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Truck, Wallet } from 'lucide-react'
+import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Truck, Wallet, Search } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger, type PaymentMethod } from '@/api/billingApi'
@@ -122,6 +122,7 @@ export default function OrdersPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [filter, setFilter] = useState<FilterKey>('ALL')
+  const [query, setQuery] = useState('') // 조회어(고객명·창고명)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -220,9 +221,13 @@ export default function OrdersPage() {
   }
 
   const visible = useMemo(() => {
-    if (filter === 'ALL') return orders
-    return orders.filter((o) => o.status === filter)
-  }, [orders, filter])
+    const q = query.trim().toLowerCase()
+    return orders.filter((o) => {
+      if (filter !== 'ALL' && o.status !== filter) return false
+      if (q && !`${o.customerName} ${o.warehouseName}`.toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [orders, filter, query])
 
   // [상태 처리 완료] 모달에서 처리된 결과를 해당 행만 즉시 반영 (새로고침 없음)
   function handleStatusChanged(updated: StorageOrder) {
@@ -288,6 +293,27 @@ export default function OrdersPage() {
 
       <Fab actions={[{ label: '계약 등록', icon: Plus, onClick: () => setCreateOpen(true) }]} />
 
+      {/* 조회 — 고객명 또는 창고 이름 (상태 탭과 함께 동작) */}
+      <div className="relative">
+        <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="고객명 또는 창고 이름으로 조회"
+          className="w-full rounded-2xl border border-slate-300 bg-white py-3 pl-11 pr-11 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 md:py-2 md:text-sm"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery('')}
+            aria-label="조회어 지우기"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition active:text-slate-600"
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
+
       {/* 데스크톱: 작은 필터 칩 */}
       <div className="hidden flex-wrap items-center gap-1.5 md:flex">
         {FILTERS.map((f) => {
@@ -352,8 +378,12 @@ export default function OrdersPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
             <FileText size={22} />
           </div>
-          <p className="mt-4 text-base font-semibold text-slate-700">계약이 없습니다</p>
-          <p className="mt-1 text-sm text-slate-400">"계약 등록"으로 첫 보관 계약을 추가하세요.</p>
+          <p className="mt-4 text-base font-semibold text-slate-700">
+            {query.trim() || filter !== 'ALL' ? '조회 결과가 없습니다' : '계약이 없습니다'}
+          </p>
+          <p className="mt-1 text-sm text-slate-400">
+            {query.trim() || filter !== 'ALL' ? '다른 조건으로 다시 조회해 보세요.' : '"계약 등록"으로 첫 보관 계약을 추가하세요.'}
+          </p>
         </div>
       )}
 
