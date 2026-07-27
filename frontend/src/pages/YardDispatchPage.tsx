@@ -28,7 +28,6 @@ import { orderSync } from '@/lib/orderEvents'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
 import Fab from '@/components/ui/Fab'
-import PinchZoom from '@/components/ui/PinchZoom'
 import MoneyInput from '@/components/ui/MoneyInput'
 import CustomerListPicker from '@/components/customer/CustomerListPicker'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -406,33 +405,42 @@ export default function YardDispatchPage() {
                 </div>
               )
 
-              // ===== 모바일: 한 층씩 + 좌우 스와이프 전환 + 핀치 줌 =====
+              // ===== 모바일: 블록/카드 뷰 (층 선택 → 큰 카드 + 원터치) =====
               if (isMobile) {
                 const idx = Math.min(floorIdx, floors.length - 1)
                 const floor = floors[idx]
                 return (
                   <div>
-                    {/* 층 세그먼트 인디케이터 */}
-                    <div className="mb-3 flex items-center gap-1.5 overflow-x-auto">
-                      {floors.map((f, i) => (
-                        <button
-                          key={f.tier}
-                          type="button"
-                          onClick={() => setFloorIdx(i)}
-                          className={cn(
-                            'card-press shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition',
-                            i === idx
-                              ? 'bg-slate-800 text-white'
-                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
-                          )}
-                        >
-                          {f.tier}층 <span className="opacity-60">{f.cells.length}</span>
-                        </button>
-                      ))}
+                    {/* 이동 모드 안내 — 빈 자리를 누르면 그 자리로 이동 */}
+                    {dragging && (
+                      <div className="mb-3 flex items-center justify-between gap-2 rounded-xl bg-amber-100 px-4 py-3 text-sm font-bold text-amber-800">
+                        <span className="min-w-0 truncate">「{dragging.label}」 이동 중 · 빈 자리를 누르세요</span>
+                        <button type="button" onClick={() => setDragging(null)} className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-600">취소</button>
+                      </div>
+                    )}
+
+                    {/* 층 선택 (크게) */}
+                    <div className="mb-3 flex items-center gap-2 overflow-x-auto pb-1">
+                      {floors.map((f, i) => {
+                        const used = f.cells.filter((c) => c.occupied).length
+                        return (
+                          <button
+                            key={f.tier}
+                            type="button"
+                            onClick={() => setFloorIdx(i)}
+                            className={cn(
+                              'shrink-0 rounded-2xl px-4 py-2.5 text-base font-bold transition active:scale-[0.98]',
+                              i === idx ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500',
+                            )}
+                          >
+                            {f.tier}층 <span className="text-sm opacity-70">{used}/{f.cells.length}</span>
+                          </button>
+                        )
+                      })}
                     </div>
 
-                    {/* 현재 층 단가 인라인 설정 */}
-                    <div className="mb-2">
+                    {/* 현재 층 단가 */}
+                    <div className="mb-3">
                       <FloorPriceInline
                         tier={floor.tier}
                         price={floorPrices.get(floor.tier) ?? null}
@@ -441,17 +449,63 @@ export default function YardDispatchPage() {
                       />
                     </div>
 
-                    <PinchZoom
-                      className="rounded-xl"
-                      onSwipeLeft={() => setFloorIdx((i) => Math.min(floors.length - 1, i + 1))}
-                      onSwipeRight={() => setFloorIdx((i) => Math.max(0, i - 1))}
-                    >
-                      {renderCells(floor.cells)}
-                    </PinchZoom>
-
-                    <p className="mt-3 text-center text-[11px] text-slate-400">
-                      좌우 스와이프로 층 전환 · 핀치로 확대 · 더블 탭으로 원배율
-                    </p>
+                    {/* 카드 리스트 — 사용중(초록)·비어있음(회색) 색상 구분 */}
+                    <div className="space-y-2.5">
+                      {floor.cells.map((s) => {
+                        const c = s.containerId != null ? containersById.get(s.containerId) : undefined
+                        const owner = extractOwner(c?.memo)
+                        const matched = matchSlot(s)
+                        if (s.occupied) {
+                          return (
+                            <div
+                              key={s.id}
+                              className={cn(
+                                'rounded-2xl border-l-4 border-emerald-500 bg-white p-4 shadow-soft ring-1 ring-slate-200/60',
+                                matched && 'ring-2 ring-amber-400',
+                              )}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">● 사용중</span>
+                                <span className="text-sm font-medium text-slate-400">{s.locationLabel}</span>
+                              </div>
+                              <p className="mt-1.5 truncate text-xl font-bold text-slate-800">{owner ?? s.containerNo ?? '컨테이너'}</p>
+                              <p className="mt-0.5 text-sm text-slate-500">
+                                번호 {s.containerNo}
+                                {c ? ` · 용량 ${c.capacityTon}톤` : ''}
+                                {c?.expectedOutboundDate ? ` · 출고예정 ${c.expectedOutboundDate}` : ''}
+                              </p>
+                              <div className="mt-3 grid grid-cols-3 gap-2">
+                                <button type="button" onClick={() => handleOutbound(s)} className="rounded-xl bg-amber-500 py-3 text-base font-bold text-white transition active:scale-[0.99]">출고</button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (s.containerId != null) setDragging({ containerId: s.containerId, fromSlotId: s.id, label: owner ?? s.containerNo ?? '컨테이너' })
+                                  }}
+                                  className="rounded-xl bg-slate-100 py-3 text-base font-bold text-slate-700 transition active:bg-slate-200"
+                                >
+                                  이동
+                                </button>
+                                <button type="button" onClick={() => setEditSlot(s)} className="rounded-xl bg-slate-100 py-3 text-base font-bold text-slate-700 transition active:bg-slate-200">수정</button>
+                              </div>
+                            </div>
+                          )
+                        }
+                        // 빈 자리
+                        return (
+                          <div key={s.id} className="flex items-center justify-between gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 p-4">
+                            <div className="min-w-0">
+                              <span className="inline-flex items-center rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-bold text-slate-500">비어 있음</span>
+                              <p className="mt-1.5 truncate text-base font-semibold text-slate-500">{s.locationLabel}</p>
+                            </div>
+                            {dragging ? (
+                              <button type="button" onClick={() => handleDropMove(s)} className="shrink-0 rounded-xl bg-indigo-600 px-4 py-3 text-base font-bold text-white transition active:scale-[0.99]">여기로 이동</button>
+                            ) : (
+                              <button type="button" onClick={() => setInboundSlot(s)} className="shrink-0 rounded-xl bg-indigo-600 px-4 py-3 text-base font-bold text-white transition active:scale-[0.99]">입고 배치</button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 )
               }

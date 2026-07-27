@@ -23,3 +23,16 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {})
   })
 }
+
+// [모바일 화면 확대 방어] 뷰포트(user-scalable=no)만으로 안 막히는 iOS 사파리 등을 대비해
+//   두 손가락 제스처를 이벤트 레벨에서 무력화한다. 한 손가락 세로 스크롤은 영향받지 않는다.
+for (const evt of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(evt, (e) => e.preventDefault(), { passive: false })
+}
+document.addEventListener(
+  'touchmove',
+  (e) => {
+    if (e.touches.length > 1) e.preventDefault() // 두 손가락 이상 = 핀치 → 차단
+  },
+  { passive: false },
+)

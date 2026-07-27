@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* ===== 모바일 화면 확대(핀치 줌) 차단 · 부드러운 스크롤은 유지 ===== */
+html {
+  touch-action: manipulation; /* 더블탭 확대·탭 300ms 지연 제거 (수직/수평 스크롤은 그대로) */
+  -webkit-text-size-adjust: 100%; /* 회전 시 글자 크기 자동 확대 방지 */
+  text-size-adjust: 100%;
+}
+body {
+  -webkit-overflow-scrolling: touch; /* iOS 관성 스크롤 부드럽게 */
+  overscroll-behavior-y: contain;
+}
+
 /*
    ===== WMS 브랜드 테마 시스템 =====
    인디고·바이올렛 유틸리티가 참조하는 색 변수를 data-theme 별로 덮어써
