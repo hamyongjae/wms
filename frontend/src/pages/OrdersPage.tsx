@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X } from 'lucide-react'
+import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Truck, Wallet } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger, type PaymentMethod } from '@/api/billingApi'
@@ -57,6 +57,38 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 ]
 
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
+// 모바일 카드용 짧은 날짜(MM.DD) — 큰 글씨에서도 줄바꿈 없이 들어가도록
+const md = (s?: string | null) => (s ? s.slice(5).replace('-', '.') : '미정')
+
+/* 모바일 카드: 라벨-값 한 줄 */
+function InfoRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="shrink-0 text-sm font-medium text-slate-400">{label}</span>
+      <span className={cn('truncate text-right', strong ? 'text-lg font-bold text-slate-800' : 'text-base text-slate-600')}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+/* 모바일 카드: 보조 액션 버튼(큰 터치 영역) */
+function MobileBtn({ label, onClick, tone = 'default' }: { label: string; onClick: () => void; tone?: 'default' | 'danger' }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'rounded-2xl py-3.5 text-base font-bold transition active:scale-[0.99]',
+        tone === 'danger'
+          ? 'bg-red-50 text-red-600 active:bg-red-100'
+          : 'bg-slate-100 text-slate-700 active:bg-slate-200',
+      )}
+    >
+      {label}
+    </button>
+  )
+}
 
 /**
  * 특정 계약(주문)에 컨테이너를 만들어 지정 슬롯에 적재·배정하는 파이프라인.
@@ -119,6 +151,14 @@ export default function OrdersPage() {
 
   // [실시간 동기화] 컨테이너 관리에서 출고 등 상태 변경 시 계약 목록도 갱신
   useEffect(() => orderSync.subscribe(reload), [])
+
+  // [현장 자동 갱신] 수동 새로고침 없이 60초마다 최신화 (탭이 화면에 보일 때만)
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') setRefreshKey((k) => k + 1)
+    }, 60000)
+    return () => clearInterval(id)
+  }, [])
 
   /**
    * 계약별 배치 위치 계산 (부가 정보 — 실패해도 목록은 정상 표시).
@@ -248,7 +288,8 @@ export default function OrdersPage() {
 
       <Fab actions={[{ label: '계약 등록', icon: Plus, onClick: () => setCreateOpen(true) }]} />
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      {/* 데스크톱: 작은 필터 칩 */}
+      <div className="hidden flex-wrap items-center gap-1.5 md:flex">
         {FILTERS.map((f) => {
           const count =
             f.key === 'ALL'
@@ -267,6 +308,29 @@ export default function OrdersPage() {
               )}
             >
               {f.label} <span className="ml-0.5 opacity-70">{count}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* 모바일: 큰 상태 퀵탭 — 한 번 터치로 원하는 상태만 보기 */}
+      <div className="grid grid-cols-3 gap-2 md:hidden">
+        {FILTERS.map((f) => {
+          const count =
+            f.key === 'ALL' ? orders.length : orders.filter((o) => o.status === f.key).length
+          const active = filter === f.key
+          return (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFilter(f.key)}
+              className={cn(
+                'flex flex-col items-center rounded-2xl py-3 text-base font-bold transition active:scale-[0.98]',
+                active ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-500 ring-1 ring-slate-200',
+              )}
+            >
+              {f.label}
+              <span className={cn('mt-0.5 text-sm font-semibold', active ? 'text-white/80' : 'text-slate-400')}>{count}</span>
             </button>
           )
         })}
@@ -333,39 +397,73 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* ===== 모바일: 요약 카드 뷰 (md 미만) — 가로 스크롤 없이 세로 피드 ===== */}
+      {/* ===== 모바일: 큰 요약 카드 + 원터치 액션 (md 미만) ===== */}
       {!loading && !error && visible.length > 0 && (
         <div className="space-y-3 md:hidden">
-          {visible.map((o) => (
-            <div key={o.id} className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-200/60">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-slate-800">{o.customerName}</p>
-                  <p className="mt-0.5 truncate text-xs text-slate-500">{o.warehouseName}</p>
+          {visible.map((o) => {
+            // [방어적 표시] 출고 예정일이 지났는데 아직 보관 중 → '출고 지연' 경고
+            const delayed = o.status === 'INBOUND' && o.expectedEndDate != null && o.expectedEndDate < today()
+            const locs = locationsByOrder.get(o.id) ?? []
+            return (
+              <div key={o.id} className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-200/60">
+                {/* 헤더: 고객 + 상태 */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-xl font-bold text-slate-800">{o.customerName}</p>
+                    <p className="mt-0.5 truncate text-sm text-slate-500">{o.warehouseName}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <OrderStatusBadge status={o.status} />
+                    {delayed && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
+                        <AlertTriangle size={12} /> 출고 지연
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <OrderStatusBadge status={o.status} />
+
+                {/* 핵심 정보 */}
+                <div className="mt-4 space-y-2.5">
+                  <InfoRow label="보관료" value={won(o.monthlyFee)} strong />
+                  <InfoRow label="보관기간" value={`${md(o.storageStartDate)} ~ ${md(o.actualEndDate ?? o.expectedEndDate)}`} />
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="shrink-0 text-sm font-medium text-slate-400">위치</span>
+                    <OrderLocationBadge locs={locs} />
+                  </div>
+                </div>
+
+                {/* 원터치 액션 */}
+                <div className="mt-4 space-y-2">
+                  {o.status === 'INBOUND' ? (
+                    <button
+                      type="button"
+                      onClick={() => setStatusTarget(o)}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 py-4 text-lg font-bold text-white shadow-sm transition active:scale-[0.99]"
+                    >
+                      <Truck size={20} /> 출고 처리
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setBillingTarget(o)}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 text-lg font-bold text-white shadow-sm transition active:scale-[0.99]"
+                    >
+                      <Wallet size={20} /> 정산 보기
+                    </button>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    {o.status === 'INBOUND' ? (
+                      <MobileBtn label="정산" onClick={() => setBillingTarget(o)} />
+                    ) : (
+                      <MobileBtn label="출고 취소" onClick={() => handleCancelRelease(o)} />
+                    )}
+                    <MobileBtn label="수정" onClick={() => setEditTarget(o)} />
+                  </div>
+                  {isAdmin && <MobileBtn label="계약 삭제" tone="danger" onClick={() => handleDelete(o)} />}
+                </div>
               </div>
-
-              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-                <div className="col-span-2">
-                  <dt className="text-[11px] text-slate-400">위치</dt>
-                  <dd className="mt-0.5"><OrderLocationBadge locs={locationsByOrder.get(o.id) ?? []} /></dd>
-                </div>
-                <div>
-                  <dt className="text-[11px] text-slate-400">보관료</dt>
-                  <dd className="mt-0.5 font-semibold text-slate-800">{won(o.monthlyFee)}</dd>
-                </div>
-                <div>
-                  <dt className="text-[11px] text-slate-400">보관기간</dt>
-                  <dd className="mt-0.5 text-slate-600">
-                    {o.storageStartDate} ~ {o.actualEndDate ?? o.expectedEndDate ?? '미정'}
-                  </dd>
-                </div>
-              </dl>
-
-              <div className="mt-3 border-t border-slate-100 pt-3">{renderActions(o)}</div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
