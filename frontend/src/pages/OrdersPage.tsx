@@ -451,15 +451,15 @@ export default function OrdersPage() {
                       <Wallet size={20} /> 정산 보기
                     </button>
                   )}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={cn('grid gap-2', isAdmin ? 'grid-cols-3' : 'grid-cols-2')}>
                     {o.status === 'INBOUND' ? (
                       <MobileBtn label="정산" onClick={() => setBillingTarget(o)} />
                     ) : (
-                      <MobileBtn label="출고 취소" onClick={() => handleCancelRelease(o)} />
+                      <MobileBtn label="출고취소" onClick={() => handleCancelRelease(o)} />
                     )}
                     <MobileBtn label="수정" onClick={() => setEditTarget(o)} />
+                    {isAdmin && <MobileBtn label="삭제" tone="danger" onClick={() => handleDelete(o)} />}
                   </div>
-                  {isAdmin && <MobileBtn label="계약 삭제" tone="danger" onClick={() => handleDelete(o)} />}
                 </div>
               </div>
             )
