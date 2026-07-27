@@ -314,25 +314,14 @@ export default function DashboardPage() {
               </div>
             </MobileCard>
 
-            {/* 입출고 일정 (달력) */}
-            <MobileCard
-              title="입출고 일정"
-              icon={CalendarDays}
-              action={
-                <Link to="/calendar" className="flex items-center gap-0.5 text-sm font-semibold text-indigo-600">
-                  전체 <ChevronRight size={15} />
-                </Link>
-              }
-            >
-              <p className="mb-2 text-center text-base font-bold text-slate-700">{mobile.year}년 {mobile.month}월</p>
-              <MiniCalendar year={mobile.year} month={mobile.month} todayDay={mobile.todayDay} events={mobile.cal} />
-              <Link
-                to="/calendar"
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-indigo-100 bg-indigo-50 py-3.5 text-base font-bold text-indigo-700 transition active:scale-[0.99]"
-              >
-                전체 일정 보기 <ArrowRight size={18} />
-              </Link>
-            </MobileCard>
+            {/* 입출고 일정 (달력 + 선택일 화주) */}
+            <MobileScheduleCard
+              orders={orders}
+              year={mobile.year}
+              month={mobile.month}
+              todayDay={mobile.todayDay}
+              events={mobile.cal}
+            />
 
             {/* 주요 알림 */}
             <MobileCard title="주요 알림" icon={Bell}>
@@ -527,17 +516,88 @@ const NOTI_TONE: Record<'red' | 'amber' | 'blue', string> = {
   blue: 'border-blue-200 bg-blue-50 text-blue-700',
 }
 
-/* ===== 모바일 미니 달력 (이번 달, 입고=파랑·출고=주황 점) ===== */
-function MiniCalendar({
+/* ===== 모바일 입출고 일정 카드 (달력 + 선택일 화주) ===== */
+function MobileScheduleCard({
+  orders,
   year,
   month,
   todayDay,
   events,
 }: {
+  orders: StorageOrder[]
   year: number
   month: number
   todayDay: number
   events: Map<number, { in: number; out: number }>
+}) {
+  const [selected, setSelected] = useState(todayDay)
+  // 데이터 갱신으로 오늘 날짜가 바뀌면 선택도 오늘로 재동기화
+  useEffect(() => setSelected(todayDay), [todayDay, month, year])
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const dateStr = `${year}-${pad(month)}-${pad(selected)}`
+  const inNames = orders.filter((o) => o.storageStartDate === dateStr).map((o) => o.customerName)
+  const outNames = orders
+    .filter((o) => o.actualEndDate === dateStr || (o.expectedEndDate === dateStr && isActive(o.status)))
+    .map((o) => o.customerName)
+
+  return (
+    <section className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-200/60">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-lg font-bold text-slate-800">
+          <CalendarDays size={19} className="text-indigo-600" />
+          입출고 일정
+        </h3>
+        <Link to="/calendar" className="flex items-center gap-0.5 text-sm font-semibold text-indigo-600">
+          전체 <ChevronRight size={15} />
+        </Link>
+      </div>
+
+      <p className="mb-2 text-center text-base font-bold text-slate-700">{year}년 {month}월</p>
+      <MiniCalendar year={year} month={month} todayDay={todayDay} events={events} selectedDay={selected} onSelect={setSelected} />
+
+      {/* 선택한 날짜의 입고·출고 화주 */}
+      <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+        <p className="text-base font-bold text-slate-700">
+          {month}월 {selected}일{selected === todayDay ? ' (오늘)' : ''} 입출고 화주
+        </p>
+        <div className="mt-2.5 space-y-2.5">
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 shrink-0 rounded-md bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">입고</span>
+            <span className="text-base font-medium text-slate-700">{inNames.length ? inNames.join(', ') : '없음'}</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 shrink-0 rounded-md bg-orange-100 px-2 py-1 text-xs font-bold text-orange-700">출고</span>
+            <span className="text-base font-medium text-slate-700">{outNames.length ? outNames.join(', ') : '없음'}</span>
+          </div>
+        </div>
+      </div>
+
+      <Link
+        to="/calendar"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-indigo-100 bg-indigo-50 py-3.5 text-base font-bold text-indigo-700 transition active:scale-[0.99]"
+      >
+        전체 일정 보기 <ArrowRight size={18} />
+      </Link>
+    </section>
+  )
+}
+
+/* ===== 모바일 미니 달력 (이번 달, 입고=파랑·출고=주황 점, 날짜 탭 선택) ===== */
+function MiniCalendar({
+  year,
+  month,
+  todayDay,
+  events,
+  selectedDay,
+  onSelect,
+}: {
+  year: number
+  month: number
+  todayDay: number
+  events: Map<number, { in: number; out: number }>
+  selectedDay?: number
+  onSelect?: (day: number) => void
 }) {
   const firstWeekday = new Date(year, month - 1, 1).getDay()
   const daysInMonth = new Date(year, month, 0).getDate()
@@ -559,21 +619,28 @@ function MiniCalendar({
           if (d === null) return <div key={idx} />
           const e = events.get(d)
           const isToday = d === todayDay
+          const isSel = d === selectedDay
           return (
-            <div
+            <button
+              type="button"
               key={idx}
-              className={`relative flex h-11 flex-col items-center justify-center rounded-xl text-base ${
-                isToday ? 'bg-indigo-600 font-bold text-white' : 'font-medium text-slate-700'
+              onClick={() => onSelect?.(d)}
+              className={`relative flex h-11 flex-col items-center justify-center rounded-xl text-base transition ${
+                isSel
+                  ? 'bg-indigo-600 font-bold text-white'
+                  : isToday
+                    ? 'font-bold text-indigo-700 ring-2 ring-inset ring-indigo-300'
+                    : 'font-medium text-slate-700 active:bg-slate-100'
               }`}
             >
               <span>{d}</span>
               {e && (
                 <span className="absolute bottom-1 flex gap-0.5">
-                  {e.in > 0 && <span className={`h-1.5 w-1.5 rounded-full ${isToday ? 'bg-white' : 'bg-blue-500'}`} />}
-                  {e.out > 0 && <span className={`h-1.5 w-1.5 rounded-full ${isToday ? 'bg-white' : 'bg-orange-500'}`} />}
+                  {e.in > 0 && <span className={`h-1.5 w-1.5 rounded-full ${isSel ? 'bg-white' : 'bg-blue-500'}`} />}
+                  {e.out > 0 && <span className={`h-1.5 w-1.5 rounded-full ${isSel ? 'bg-white' : 'bg-orange-500'}`} />}
                 </span>
               )}
-            </div>
+            </button>
           )
         })}
       </div>
