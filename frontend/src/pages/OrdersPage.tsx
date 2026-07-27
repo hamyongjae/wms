@@ -1376,10 +1376,8 @@ function CreateOrderModal({
     <>
       <Modal open={open} onClose={onClose} title="계약 등록" widthClass="max-w-5xl">
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* 좌: 계약 정보 폼 / 우: 고객(화주) 검색 리스트 */}
-          <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_19rem]">
-            {/* ===== 좌측 폼 ===== */}
-            <div className="space-y-4">
+          {/* 단일 컬럼: 고객 → 고객 검색 → 창고 → 위치 → 일정 순 */}
+          <div className="space-y-4">
               <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객 *</label>
                 {selectedCustomer ? (
@@ -1399,8 +1397,7 @@ function CreateOrderModal({
                   </div>
                 ) : (
                   <p className="rounded-lg border border-dashed border-slate-300 px-3.5 py-3 text-base text-slate-400 md:py-2 md:text-sm">
-                    <span className="md:hidden">아래 목록에서 고객을 검색해 선택하세요.</span>
-                    <span className="hidden md:inline">오른쪽 목록에서 고객을 검색해 선택하세요.</span>
+                    아래 목록에서 고객을 검색해 선택하세요.
                   </p>
                 )}
                 {isBlacklisted && (
@@ -1416,6 +1413,18 @@ function CreateOrderModal({
                     휴면 상태 고객입니다. 등록 시 정상 거래 고객으로 전환됩니다.
                   </p>
                 )}
+              </div>
+
+              {/* 고객 검색 — 고객 아래·창고 위 */}
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객 검색</label>
+                <CustomerListPicker
+                  customers={customers}
+                  selectedId={selectedCustomer?.id ?? null}
+                  onSelect={setSelectedCustomer}
+                  onQuickAdd={() => setCustOpen(true)}
+                  heightClass="h-64"
+                />
               </div>
 
               <div>
@@ -1567,20 +1576,6 @@ function CreateOrderModal({
                   className={cn(inputCls, 'min-h-[64px] w-full resize-y leading-relaxed')}
                 />
               </div>
-            </div>
-
-            {/* ===== 우측 고객 검색 리스트 (좌측 폼 높이에 맞춰 확장, 모바일 최소 높이 보장) ===== */}
-            <div className="flex flex-col">
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객 검색</label>
-              <CustomerListPicker
-                customers={customers}
-                selectedId={selectedCustomer?.id ?? null}
-                onSelect={setSelectedCustomer}
-                onQuickAdd={() => setCustOpen(true)}
-                heightClass=""
-                className="min-h-[18rem] flex-1"
-              />
-            </div>
           </div>
 
           {formError && <p className="text-sm text-red-600">{formError}</p>}
