@@ -26,8 +26,9 @@ import MoneyInput from '@/components/ui/MoneyInput'
 import CustomerListPicker from '@/components/customer/CustomerListPicker'
 import LocationPickerField from '@/components/yard/LocationPickerField'
 
+// 모바일에서 손가락 오작동·노안 대응으로 크게(py-3, text-base), 데스크톱은 기존 크기(md:py-2, md:text-sm)
 const inputCls =
-  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+  'w-full rounded-lg border border-slate-300 px-3.5 py-3 text-base outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 md:px-3 md:py-2 md:text-sm'
 
 /**
  * [단순 이진 상태 시각화]
@@ -991,9 +992,9 @@ function EditOrderModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">보관 시작일 *</label>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 시작일 *</label>
                 <input
                   type="date"
                   value={storageStartDate}
@@ -1007,7 +1008,7 @@ function EditOrderModal({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">출고 예정일</label>
                 <input
                   type="date"
                   value={expectedEndDate}
@@ -1028,17 +1029,17 @@ function EditOrderModal({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">보관료 *</label>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관료 *</label>
                 <MoneyInput
                   value={monthlyFee}
                   onChange={setMonthlyFee}
                   required
                   placeholder="예: 300,000"
-                  className={cn(inputCls, 'pr-9')}
+                  className={cn(inputCls, 'pr-9', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">하루 보관료</label>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
                 <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
                   {dailyFee != null ? won(dailyFee) : ''}
                 </div>
@@ -1046,7 +1047,7 @@ function EditOrderModal({
               </div>
               
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">결제 방식 *</label>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 방식 *</label>
                 <select
                   value={paymentType}
                   onChange={(e) => {
@@ -1060,7 +1061,7 @@ function EditOrderModal({
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">보관 용량 (톤)</label>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 용량 (톤)</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -1075,7 +1076,7 @@ function EditOrderModal({
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">결제 수단 *</label>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 수단 *</label>
                 <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={inputCls}>
                   <option value="BANK_TRANSFER">계좌이체</option>
                   <option value="CASH">현금</option>
@@ -1116,7 +1117,7 @@ function EditOrderModal({
             )}
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">메모 (특이사항)</label>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">메모 (특이사항)</label>
               <textarea
                 value={memo}
                 onChange={(e) => setMemo(e.target.value)}
@@ -1156,12 +1157,12 @@ function EditOrderModal({
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
 
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
+        <div className="sticky bottom-0 z-10 -mx-5 mt-2 flex gap-2 border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur md:static md:mx-0 md:mt-0 md:justify-end md:border-0 md:bg-transparent md:px-0 md:py-0 md:pt-2 md:backdrop-blur-none">
+          <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-3.5 text-base font-semibold text-slate-600 transition active:bg-slate-50 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-slate-50">
             취소
           </button>
-          <button type="submit" disabled={submitting || periodError != null} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
-            {submitting ? '저장 중…' : '저장'}
+          <button type="submit" disabled={submitting || periodError != null} className="flex-1 rounded-xl bg-indigo-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99] disabled:opacity-60 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-indigo-700">
+            {submitting ? '저장 중…' : '수정 완료'}
           </button>
         </div>
       </form>
@@ -1380,7 +1381,7 @@ function CreateOrderModal({
             {/* ===== 좌측 폼 ===== */}
             <div className="space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">고객 *</label>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객 *</label>
                 {selectedCustomer ? (
                   <div className="flex items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
                     <div className="min-w-0">
@@ -1397,8 +1398,9 @@ function CreateOrderModal({
                     </button>
                   </div>
                 ) : (
-                  <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-400">
-                    오른쪽 목록에서 고객을 선택하세요.
+                  <p className="rounded-lg border border-dashed border-slate-300 px-3.5 py-3 text-base text-slate-400 md:py-2 md:text-sm">
+                    <span className="md:hidden">아래 목록에서 고객을 검색해 선택하세요.</span>
+                    <span className="hidden md:inline">오른쪽 목록에서 고객을 검색해 선택하세요.</span>
                   </p>
                 )}
                 {isBlacklisted && (
@@ -1417,7 +1419,7 @@ function CreateOrderModal({
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">창고 *</label>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">창고 *</label>
                 <select
                   value={warehouseId}
                   onChange={(e) => {
@@ -1436,7 +1438,7 @@ function CreateOrderModal({
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">컨테이너 위치 지정</label>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">컨테이너 위치 지정</label>
                 <LocationPickerField
                   warehouseId={warehouseId ? Number(warehouseId) : null}
                   value={slotId}
@@ -1445,13 +1447,13 @@ function CreateOrderModal({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">보관 시작일 *</label>
+                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 시작일 *</label>
                   <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={inputCls} />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
+                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">출고 예정일</label>
                   <input
                     type="date"
                     value={expectedEndDate}
@@ -1462,17 +1464,17 @@ function CreateOrderModal({
                   <OutboundDatePresets startDate={storageStartDate} onPick={setEndDate} className="mt-1.5" />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">보관료 *</label>
+                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관료 *</label>
                   <MoneyInput
                     value={monthlyFee}
                     onChange={setMonthlyFee}
                     required
                     placeholder="예: 300,000"
-                    className={cn(inputCls, 'pr-9')}
+                    className={cn(inputCls, 'pr-9', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">하루 보관료</label>
+                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
                   {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
                   <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
                     {dailyFee != null ? won(dailyFee) : ''}
@@ -1480,14 +1482,14 @@ function CreateOrderModal({
                   <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">결제 방식 *</label>
+                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 방식 *</label>
                   <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={inputCls}>
                     <option value="PREPAID">선불 (당일 완납)</option>
                     <option value="POSTPAID">후불</option>
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">결제 수단 *</label>
+                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 수단 *</label>
                   <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={inputCls}>
                     <option value="BANK_TRANSFER">계좌이체</option>
                     <option value="CASH">현금</option>
@@ -1523,7 +1525,7 @@ function CreateOrderModal({
                   )}
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">보관 용량 (톤)</label>
+                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 용량 (톤)</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -1556,7 +1558,7 @@ function CreateOrderModal({
               )}
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">메모</label>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">메모</label>
                 <textarea
                   value={memo}
                   onChange={(e) => setMemo(e.target.value)}
@@ -1569,7 +1571,7 @@ function CreateOrderModal({
 
             {/* ===== 우측 고객 검색 리스트 (좌측 폼 높이에 맞춰 확장, 모바일 최소 높이 보장) ===== */}
             <div className="flex flex-col">
-              <label className="mb-1 block text-sm font-medium text-slate-700">고객 검색</label>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객 검색</label>
               <CustomerListPicker
                 customers={customers}
                 selectedId={selectedCustomer?.id ?? null}
@@ -1583,12 +1585,12 @@ function CreateOrderModal({
 
           {formError && <p className="text-sm text-red-600">{formError}</p>}
 
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
+          <div className="sticky bottom-0 z-10 -mx-5 mt-2 flex gap-2 border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur md:static md:mx-0 md:mt-0 md:justify-end md:border-0 md:bg-transparent md:px-0 md:py-0 md:pt-2 md:backdrop-blur-none">
+            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-3.5 text-base font-semibold text-slate-600 transition active:bg-slate-50 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-slate-50">
               취소
             </button>
-            <button type="submit" disabled={submitting || isBlacklisted || periodError != null} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
-              {submitting ? '등록 중…' : '등록'}
+            <button type="submit" disabled={submitting || isBlacklisted || periodError != null} className="flex-1 rounded-xl bg-indigo-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99] disabled:opacity-60 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-indigo-700">
+              {submitting ? '등록 중…' : '등록 완료'}
             </button>
           </div>
         </form>
@@ -1680,19 +1682,19 @@ function QuickCustomerModal({
     <Modal open={open} onClose={onClose} title="새 고객 등록">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">고객명 *</label>
+          <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객명 *</label>
           <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus className={inputCls} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">유형</label>
+            <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">유형</label>
             <select value={customerType} onChange={(e) => setType(e.target.value as CustomerType)} className={inputCls}>
               <option value="INDIVIDUAL">개인</option>
               <option value="CORPORATE">기업</option>
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">연락처</label>
+            <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">연락처</label>
             <input value={phoneNumber} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
           </div>
         </div>
@@ -1846,7 +1848,7 @@ function StatusChangeModal({
                   </p>
                 )}
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">실제 출고일</label>
+                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">실제 출고일</label>
                   <input
                     type="date"
                     value={actualEndDate}
@@ -1903,7 +1905,7 @@ function StatusChangeModal({
             />
             {returnKind === 'LATE' && (
               <div className="rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200/70">
-                <label className="mb-1 block text-sm font-medium text-slate-700">실제 입고일</label>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">실제 입고일</label>
                 <input
                   type="date"
                   value={actualStartDate}
@@ -2066,7 +2068,7 @@ function PaymentAccountPicker({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-      <label className="mb-1 block text-sm font-medium text-slate-700">입금 계좌 (담당 직원)</label>
+      <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">입금 계좌 (담당 직원)</label>
       {withAccount.length === 0 ? (
         <p className="text-xs text-slate-400">
           계좌가 등록된 직원이 없습니다. 직원 관리 화면에서 주거래 계좌를 먼저 등록하세요.
