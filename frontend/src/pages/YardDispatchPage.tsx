@@ -449,60 +449,51 @@ export default function YardDispatchPage() {
                       />
                     </div>
 
-                    {/* 카드 리스트 — 사용중(초록)·비어있음(회색) 색상 구분 */}
-                    <div className="space-y-2.5">
+                    {/* 블록 그리드 — 실제 배치처럼 2열, 색상으로 상태 구분. 블록을 누르면 액션 시트 */}
+                    <div className="grid grid-cols-2 gap-2.5">
                       {floor.cells.map((s) => {
                         const c = s.containerId != null ? containersById.get(s.containerId) : undefined
                         const owner = extractOwner(c?.memo)
                         const matched = matchSlot(s)
                         if (s.occupied) {
+                          const maint = c?.status === 'MAINTENANCE'
                           return (
-                            <div
+                            <button
                               key={s.id}
+                              type="button"
+                              onClick={() => setActionSlot(s)}
                               className={cn(
-                                'rounded-2xl border-l-4 border-emerald-500 bg-white p-4 shadow-soft ring-1 ring-slate-200/60',
+                                'flex min-h-[96px] flex-col rounded-2xl border-2 p-3 text-left shadow-sm transition active:scale-[0.98]',
+                                maint ? 'border-amber-300 bg-amber-50' : 'border-emerald-300 bg-emerald-50',
                                 matched && 'ring-2 ring-amber-400',
                               )}
                             >
-                              <div className="flex items-center gap-2">
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">● 사용중</span>
-                                <span className="text-sm font-medium text-slate-400">{s.locationLabel}</span>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className={cn('text-xs font-bold', maint ? 'text-amber-700' : 'text-emerald-700')}>
+                                  ● {maint ? '점검' : '사용중'}
+                                </span>
+                                <span className="shrink-0 text-xs font-medium text-slate-400">{s.locationLabel}</span>
                               </div>
-                              <p className="mt-1.5 truncate text-xl font-bold text-slate-800">{owner ?? s.containerNo ?? '컨테이너'}</p>
-                              <p className="mt-0.5 text-sm text-slate-500">
-                                번호 {s.containerNo}
-                                {c ? ` · 용량 ${c.capacityTon}톤` : ''}
-                                {c?.expectedOutboundDate ? ` · 출고예정 ${c.expectedOutboundDate}` : ''}
-                              </p>
-                              <div className="mt-3 grid grid-cols-3 gap-2">
-                                <button type="button" onClick={() => handleOutbound(s)} className="rounded-xl bg-amber-500 py-3 text-base font-bold text-white transition active:scale-[0.99]">출고</button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (s.containerId != null) setDragging({ containerId: s.containerId, fromSlotId: s.id, label: owner ?? s.containerNo ?? '컨테이너' })
-                                  }}
-                                  className="rounded-xl bg-slate-100 py-3 text-base font-bold text-slate-700 transition active:bg-slate-200"
-                                >
-                                  이동
-                                </button>
-                                <button type="button" onClick={() => setEditSlot(s)} className="rounded-xl bg-slate-100 py-3 text-base font-bold text-slate-700 transition active:bg-slate-200">수정</button>
-                              </div>
-                            </div>
+                              <p className="mt-2 truncate text-lg font-bold leading-tight text-slate-800">{owner ?? s.containerNo ?? '컨테이너'}</p>
+                              <p className="mt-auto truncate pt-1 text-xs text-slate-500">번호 {s.containerNo}</p>
+                            </button>
                           )
                         }
-                        // 빈 자리
+                        // 빈 자리 — 이동 모드면 이동 타겟, 아니면 입고
                         return (
-                          <div key={s.id} className="flex items-center justify-between gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 p-4">
-                            <div className="min-w-0">
-                              <span className="inline-flex items-center rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-bold text-slate-500">비어 있음</span>
-                              <p className="mt-1.5 truncate text-base font-semibold text-slate-500">{s.locationLabel}</p>
-                            </div>
-                            {dragging ? (
-                              <button type="button" onClick={() => handleDropMove(s)} className="shrink-0 rounded-xl bg-indigo-600 px-4 py-3 text-base font-bold text-white transition active:scale-[0.99]">여기로 이동</button>
-                            ) : (
-                              <button type="button" onClick={() => setInboundSlot(s)} className="shrink-0 rounded-xl bg-indigo-600 px-4 py-3 text-base font-bold text-white transition active:scale-[0.99]">입고 배치</button>
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => (dragging ? handleDropMove(s) : setInboundSlot(s))}
+                            className={cn(
+                              'flex min-h-[96px] flex-col items-center justify-center rounded-2xl border-2 border-dashed p-3 text-center transition active:scale-[0.98]',
+                              dragging ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-slate-50 text-slate-400',
                             )}
-                          </div>
+                          >
+                            <span className="text-sm font-bold">{dragging ? '여기로 이동' : '비어 있음'}</span>
+                            <span className="mt-1 text-xs">{s.locationLabel}</span>
+                            {!dragging && <span className="mt-2 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white">+ 입고</span>}
+                          </button>
                         )
                       })}
                     </div>
@@ -562,6 +553,17 @@ export default function YardDispatchPage() {
           container={actionSlot.containerId != null ? containersById.get(actionSlot.containerId) : undefined}
           onClose={() => setActionSlot(null)}
           onOutbound={() => handleOutbound(actionSlot)}
+          onMove={() => {
+            const s = actionSlot
+            if (s?.containerId != null) {
+              setDragging({
+                containerId: s.containerId,
+                fromSlotId: s.id,
+                label: extractOwner(containersById.get(s.containerId)?.memo) ?? s.containerNo ?? '컨테이너',
+              })
+            }
+            setActionSlot(null)
+          }}
           onEdit={() => {
             setEditSlot(actionSlot)
             setActionSlot(null)
@@ -995,14 +997,17 @@ function ActionPanel({
   container,
   onClose,
   onOutbound,
+  onMove,
   onEdit,
 }: {
   slot: YardSlot
   container?: Container
   onClose: () => void
   onOutbound: () => void
+  onMove: () => void
   onEdit: () => void
 }) {
+  const isMobile = useIsMobile()
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={onClose} />
@@ -1033,23 +1038,35 @@ function ActionPanel({
             </div>
           </dl>
 
-          <p className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-            <ArrowRightLeft size={13} /> 이동은 맵에서 컨테이너를 빈 슬롯으로 <b>드래그</b>하세요.
-          </p>
+          {/* 데스크톱은 드래그로 이동, 모바일은 아래 '다른 자리로 이동' 버튼 사용 */}
+          {!isMobile && (
+            <p className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              <ArrowRightLeft size={13} /> 이동은 맵에서 컨테이너를 빈 슬롯으로 <b>드래그</b>하세요.
+            </p>
+          )}
 
           <button
             type="button"
             onClick={onOutbound}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3.5 text-base font-bold text-white transition hover:bg-amber-600 active:scale-[0.99]"
           >
-            <LogOut size={16} /> 즉시 출고 처리
+            <LogOut size={18} /> 즉시 출고 처리
           </button>
+          {isMobile && (
+            <button
+              type="button"
+              onClick={onMove}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3.5 text-base font-bold text-white transition active:scale-[0.99]"
+            >
+              <ArrowRightLeft size={18} /> 다른 자리로 이동
+            </button>
+          )}
           <button
             type="button"
             onClick={onEdit}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3.5 text-base font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99]"
           >
-            <Pencil size={16} /> 보관 정보 수정
+            <Pencil size={18} /> 보관 정보 수정
           </button>
         </div>
       </div>
