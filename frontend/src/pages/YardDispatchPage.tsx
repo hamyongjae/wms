@@ -97,9 +97,7 @@ export default function YardDispatchPage() {
   const [dragging, setDragging] = useState<{ containerId: number; fromSlotId: number; label: string } | null>(null)
   const [gridOpen, setGridOpen] = useState(false)
   const [banner, setBanner] = useState<string | null>(null)
-  // [모바일] 층 스와이프 전환 — 한 번에 한 층만 표시
   const isMobile = useIsMobile()
-  const [floorIdx, setFloorIdx] = useState(0)
 
   const reload = () => setRefreshKey((k) => k + 1)
 
@@ -296,7 +294,6 @@ export default function YardDispatchPage() {
               onClick={() => {
                 setSelectedId(w.id)
                 setDragging(null)
-                setFloorIdx(0) // 창고가 바뀌면 1번째 층부터
               }}
               className={cn(
                 'rounded-full border px-4 py-1.5 text-sm font-medium transition',
@@ -412,10 +409,8 @@ export default function YardDispatchPage() {
                 </div>
               )
 
-              // ===== 모바일: 블록/카드 뷰 (층 선택 → 큰 카드 + 원터치) =====
+              // ===== 모바일: 층별 세로 격자 (각 층이 하나의 열, 컨테이너가 아래로 적재) =====
               if (isMobile) {
-                const idx = Math.min(floorIdx, floors.length - 1)
-                const floor = floors[idx]
                 return (
                   <div>
                     {/* 이동 모드 안내 — 빈 자리를 누르면 그 자리로 이동 */}
@@ -426,83 +421,59 @@ export default function YardDispatchPage() {
                       </div>
                     )}
 
-                    {/* 층 선택 (크게) */}
-                    <div className="mb-3 flex items-center gap-2 overflow-x-auto pb-1">
-                      {floors.map((f, i) => {
-                        const used = f.cells.filter((c) => c.occupied).length
-                        return (
-                          <button
-                            key={f.tier}
-                            type="button"
-                            onClick={() => setFloorIdx(i)}
-                            className={cn(
-                              'shrink-0 rounded-2xl px-4 py-2.5 text-base font-bold transition active:scale-[0.98]',
-                              i === idx ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500',
-                            )}
-                          >
-                            {f.tier}층 <span className="text-sm opacity-70">{used}/{f.cells.length}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    {/* 현재 층 단가 */}
-                    <div className="mb-3">
-                      <FloorPriceInline
-                        tier={floor.tier}
-                        price={floorPrices.get(floor.tier) ?? null}
-                        editable={isAdmin}
-                        onSave={(u, m) => handleSaveFloorPrice(floor.tier, u, m)}
-                      />
-                    </div>
-
-                    {/* 블록 그리드 — 실제 배치처럼 2열, 색상으로 상태 구분. 블록을 누르면 액션 시트 */}
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {floor.cells.map((s) => {
-                        const c = s.containerId != null ? containersById.get(s.containerId) : undefined
-                        const owner = extractOwner(c?.memo)
-                        const matched = matchSlot(s)
-                        if (s.occupied) {
-                          const maint = c?.status === 'MAINTENANCE'
-                          return (
-                            <button
-                              key={s.id}
-                              type="button"
-                              onClick={() => setActionSlot(s)}
-                              className={cn(
-                                'flex min-h-[64px] flex-col rounded-2xl border-2 p-2.5 text-left shadow-sm transition active:scale-[0.98]',
-                                maint ? 'border-amber-300 bg-amber-50' : 'border-emerald-300 bg-emerald-50',
-                                matched && 'ring-2 ring-amber-400',
-                              )}
-                            >
-                              <div className="flex items-center justify-between gap-1">
-                                <span className={cn('text-xs font-bold', maint ? 'text-amber-700' : 'text-emerald-700')}>
-                                  ● {maint ? '점검' : '사용중'}
-                                </span>
-                                <span className="shrink-0 text-xs font-medium text-slate-400">{s.locationLabel}</span>
-                              </div>
-                              <p className="mt-1 truncate text-base font-bold leading-tight text-slate-800">{owner ?? s.containerNo ?? '컨테이너'}</p>
-                              <p className="mt-0.5 truncate text-[11px] text-slate-500">번호 {s.containerNo}</p>
-                            </button>
-                          )
-                        }
-                        // 빈 자리 — 이동 모드면 이동 타겟, 아니면 입고
-                        return (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => (dragging ? handleDropMove(s) : setInboundSlot(s))}
-                            className={cn(
-                              'flex min-h-[64px] flex-col items-center justify-center rounded-2xl border-2 border-dashed p-2.5 text-center transition active:scale-[0.98]',
-                              dragging ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-slate-50 text-slate-400',
-                            )}
-                          >
-                            <span className="text-sm font-bold">{dragging ? '여기로 이동' : '비어 있음'}</span>
-                            <span className="mt-1 text-xs">{s.locationLabel}</span>
-                            {!dragging && <span className="mt-2 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white">+ 입고</span>}
-                          </button>
-                        )
-                      })}
+                    {/* 층별 열 — 1층·2층·3층이 가로로, 각 층의 컨테이너는 아래로 정렬 */}
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {floors.map((floor) => (
+                        <div key={floor.tier} className="flex min-w-[92px] flex-1 flex-col">
+                          {/* 층 타이틀 (크게) */}
+                          <div className="mb-2 rounded-xl bg-slate-800 py-2 text-center text-lg font-extrabold text-white">
+                            {floor.tier}층
+                          </div>
+                          {/* 이 층의 컨테이너가 위→아래로 */}
+                          <div className="flex flex-col gap-2">
+                            {floor.cells.map((s, i) => {
+                              const c = s.containerId != null ? containersById.get(s.containerId) : undefined
+                              const owner = extractOwner(c?.memo)
+                              const matched = matchSlot(s)
+                              const pos = i + 1 // 층 내 위치 번호 [1][2][3]…
+                              if (s.occupied) {
+                                const maint = c?.status === 'MAINTENANCE'
+                                return (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => setActionSlot(s)}
+                                    className={cn(
+                                      'relative flex min-h-[62px] flex-col items-center justify-center rounded-xl border-2 px-1 py-2 text-center transition active:scale-[0.97]',
+                                      maint ? 'border-amber-300 bg-amber-50' : 'border-emerald-300 bg-emerald-50',
+                                      matched && 'ring-2 ring-amber-400',
+                                    )}
+                                  >
+                                    <span className="absolute left-1.5 top-1 text-[10px] font-bold text-slate-400">{pos}</span>
+                                    <span className="w-full truncate px-1 text-sm font-bold leading-tight text-slate-800">{owner ?? '컨테이너'}</span>
+                                    {maint && <span className="mt-0.5 text-[10px] font-bold text-amber-700">점검</span>}
+                                  </button>
+                                )
+                              }
+                              // 빈 자리 — 이동 모드면 이동 타겟, 아니면 입고
+                              return (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  onClick={() => (dragging ? handleDropMove(s) : setInboundSlot(s))}
+                                  className={cn(
+                                    'relative flex min-h-[62px] flex-col items-center justify-center rounded-xl border-2 border-dashed px-1 py-2 text-center transition active:scale-[0.97]',
+                                    dragging ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-slate-50 text-slate-400',
+                                  )}
+                                >
+                                  <span className="absolute left-1.5 top-1 text-[10px] font-bold text-slate-300">{pos}</span>
+                                  <span className="text-xs font-bold">{dragging ? '여기로' : '빈 자리'}</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )
