@@ -536,10 +536,15 @@ function MobileScheduleCard({
 
   const pad = (n: number) => String(n).padStart(2, '0')
   const dateStr = `${year}-${pad(month)}-${pad(selected)}`
-  const inNames = orders.filter((o) => o.storageStartDate === dateStr).map((o) => o.customerName)
-  const outNames = orders
-    .filter((o) => o.actualEndDate === dateStr || (o.expectedEndDate === dateStr && isActive(o.status)))
-    .map((o) => o.customerName)
+  // 같은 고객이 여러 건이어도 이름은 한 번만 (중복 제거)
+  const inNames = [...new Set(orders.filter((o) => o.storageStartDate === dateStr).map((o) => o.customerName))]
+  const outNames = [
+    ...new Set(
+      orders
+        .filter((o) => o.actualEndDate === dateStr || (o.expectedEndDate === dateStr && isActive(o.status)))
+        .map((o) => o.customerName),
+    ),
+  ]
 
   return (
     <section className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-200/60">
