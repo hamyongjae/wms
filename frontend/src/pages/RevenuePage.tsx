@@ -99,15 +99,15 @@ export default function RevenuePage() {
 
       {/* [기간 필터] 정산 관리와 동일 — 진입 즉시 당월, 월 이동(연·월 동시) + 사용자 지정 기간 */}
       <div className="flex flex-col gap-3 rounded-2xl bg-white p-3.5 shadow-soft ring-1 ring-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => moveMonth(-1)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" title="이전 달">
-            <ChevronLeft size={16} />
+        <div className="flex items-center justify-between gap-2 sm:justify-start">
+          <button type="button" onClick={() => moveMonth(-1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 sm:h-8 sm:w-8" title="이전 달">
+            <ChevronLeft size={18} />
           </button>
-          <span className="min-w-24 text-center text-sm font-semibold text-slate-800">{cursor.year}년 {cursor.month1}월</span>
-          <button type="button" onClick={() => moveMonth(1)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" title="다음 달">
-            <ChevronRight size={16} />
+          <span className="text-base font-bold text-slate-800 sm:min-w-24 sm:text-center sm:text-sm sm:font-semibold">{cursor.year}년 {cursor.month1}월</span>
+          <button type="button" onClick={() => moveMonth(1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 sm:h-8 sm:w-8" title="다음 달">
+            <ChevronRight size={18} />
           </button>
-          <button type="button" onClick={goThisMonth} className="ml-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+          <button type="button" onClick={goThisMonth} className="ml-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:px-2.5 sm:py-1.5 sm:text-xs">
             이번 달
           </button>
         </div>
@@ -139,7 +139,36 @@ export default function RevenuePage() {
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
+          {/* 모바일: 매출 히어로 카드 + 가로 2칸 요약 */}
+          <div className="space-y-3 md:hidden">
+            <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-200/60">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-500">{revenueLabel}</span>
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                  <TrendingUp size={18} />
+                </span>
+              </div>
+              <p className="mt-2 text-3xl font-extrabold leading-none text-slate-900">{won(summary.total)}</p>
+              {deltaPct != null && (
+                <p className={cn('mt-2 text-sm font-bold', delta >= 0 ? 'text-emerald-600' : 'text-red-500')}>
+                  {deltaLabel} {delta >= 0 ? '▲' : '▼'} {won(Math.abs(delta))} ({deltaPct >= 0 ? '+' : ''}{deltaPct}%)
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-white p-4 text-center shadow-soft ring-1 ring-slate-200/60">
+                <p className="text-2xl font-extrabold text-slate-800">{summary.contractCount}건</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">매출 발생 계약</p>
+              </div>
+              <div className="rounded-2xl bg-white p-4 text-center shadow-soft ring-1 ring-slate-200/60">
+                <p className="text-2xl font-extrabold text-slate-800">{summary.customerCount}곳</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">거래 고객사</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 데스크톱: 3칸 요약 카드 */}
+          <div className="hidden gap-4 md:grid md:grid-cols-3">
             <div className="rounded-2xl bg-white p-6 shadow-soft ring-1 ring-slate-200/60">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-400">{revenueLabel}</span>
@@ -188,16 +217,16 @@ export default function RevenuePage() {
               <ul className="mt-5 space-y-4">
                 {summary.customers.map((c, i) => (
                   <li key={c.customerId}>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2 font-medium text-slate-700">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }} />
-                        {c.customerName}
+                    <div className="flex items-center justify-between gap-2 text-base">
+                      <span className="flex min-w-0 items-center gap-2 font-semibold text-slate-700">
+                        <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }} />
+                        <span className="truncate">{c.customerName}</span>
                       </span>
-                      <span className="tabular-nums text-slate-600">
-                        {won(c.amount)} <span className="ml-1 text-xs text-slate-400">{pct(c.share)}</span>
+                      <span className="shrink-0 tabular-nums font-bold text-slate-800">
+                        {won(c.amount)} <span className="ml-1 text-xs font-medium text-slate-400">{pct(c.share)}</span>
                       </span>
                     </div>
-                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
                       <div
                         className="h-full rounded-full transition-[width] duration-500"
                         style={{ width: `${Math.max(c.share * 100, 2)}%`, backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }}
