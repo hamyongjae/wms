@@ -61,6 +61,24 @@ const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 // 모바일 카드용 짧은 날짜(MM.DD) — 큰 글씨에서도 줄바꿈 없이 들어가도록
 const md = (s?: string | null) => (s ? s.slice(5).replace('-', '.') : '미정')
 
+// [조회 기간] 원터치 퀵 프리셋
+const PERIOD_PRESETS = [
+  { key: 'THIS_MONTH', label: '이번 달' },
+  { key: 'LAST_MONTH', label: '지난 달' },
+  { key: 'LAST_7', label: '최근 7일' },
+  { key: 'ALL', label: '전체' },
+] as const
+type PeriodKey = (typeof PERIOD_PRESETS)[number]['key'] | 'CUSTOM'
+
+const ymd = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+// 해당 달의 1일~말일
+const monthRange = (base: Date): { from: string; to: string } => {
+  const y = base.getFullYear()
+  const m = base.getMonth()
+  return { from: ymd(new Date(y, m, 1)), to: ymd(new Date(y, m + 1, 0)) }
+}
+
 /* 모바일 카드: 라벨-값 한 줄 */
 function InfoRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
@@ -124,6 +142,8 @@ export default function OrdersPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [filter, setFilter] = useState<FilterKey>('ALL')
   const [query, setQuery] = useState('') // 조회어(고객명·창고명)
+  const [range, setRange] = useState<{ from: string; to: string }>(() => monthRange(new Date())) // 조회 기간(기본 이번 달)
+  const [period, setPeriod] = useState<PeriodKey>('THIS_MONTH')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -136,6 +156,19 @@ export default function OrdersPage() {
   const [locationsByOrder, setLocationsByOrder] = useState<Map<number, string[]>>(new Map())
 
   const reload = () => setRefreshKey((k) => k + 1)
+
+  // [원터치 퀵 기간] 버튼 하나로 조회 기간을 즉시 전환 (별도 조회 버튼 없음)
+  function applyPreset(key: Exclude<PeriodKey, 'CUSTOM'>) {
+    setPeriod(key)
+    const now = new Date()
+    if (key === 'THIS_MONTH') setRange(monthRange(now))
+    else if (key === 'LAST_MONTH') setRange(monthRange(new Date(now.getFullYear(), now.getMonth() - 1, 1)))
+    else if (key === 'LAST_7') {
+      const f = new Date(now)
+      f.setDate(f.getDate() - 6)
+      setRange({ from: ymd(f), to: ymd(now) })
+    } else setRange({ from: '', to: '' }) // 전체
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -223,12 +256,20 @@ export default function OrdersPage() {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
+    const { from, to } = range
     return orders.filter((o) => {
       if (filter !== 'ALL' && o.status !== filter) return false
       if (q && !`${o.customerName} ${o.warehouseName}`.toLowerCase().includes(q)) return false
+      // [기간] 계약 보관기간이 조회 기간과 겹치면 표시 (from/to 비어있으면 전체)
+      if (from || to) {
+        const start = o.storageStartDate
+        const end = o.actualEndDate ?? o.expectedEndDate ?? '9999-12-31'
+        if (from && end < from) return false // 조회 시작 전에 이미 끝난 계약
+        if (to && start > to) return false // 조회 종료 후에 시작하는 계약
+      }
       return true
     })
-  }, [orders, filter, query])
+  }, [orders, filter, query, range])
 
   // [상태 처리 완료] 모달에서 처리된 결과를 해당 행만 즉시 반영 (새로고침 없음)
   function handleStatusChanged(updated: StorageOrder) {
@@ -293,6 +334,42 @@ export default function OrdersPage() {
       </div>
 
       <Fab actions={[{ label: '계약 등록', icon: Plus, onClick: () => setCreateOpen(true) }]} />
+
+      {/* 조회 기간 — 원터치 퀵 버튼(이번 달 기본) + 사용자 지정 기간 */}
+      <div className="rounded-2xl bg-white p-3 shadow-soft ring-1 ring-slate-200/60">
+        <div className="grid grid-cols-4 gap-2">
+          {PERIOD_PRESETS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => applyPreset(p.key)}
+              className={cn(
+                'rounded-xl py-3 text-sm font-bold transition active:scale-[0.98] sm:text-base',
+                period === p.key ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="mt-2.5 flex items-center gap-2">
+          <input
+            type="date"
+            value={range.from}
+            max={range.to || undefined}
+            onChange={(e) => { setRange((r) => ({ ...r, from: e.target.value })); setPeriod('CUSTOM') }}
+            className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:flex-none"
+          />
+          <span className="shrink-0 text-slate-400">~</span>
+          <input
+            type="date"
+            value={range.to}
+            min={range.from || undefined}
+            onChange={(e) => { setRange((r) => ({ ...r, to: e.target.value })); setPeriod('CUSTOM') }}
+            className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:flex-none"
+          />
+        </div>
+      </div>
 
       {/* 조회 — 고객명 또는 창고 이름 (상태 탭과 함께 동작) */}
       <div className="relative">
@@ -380,10 +457,10 @@ export default function OrdersPage() {
             <FileText size={22} />
           </div>
           <p className="mt-4 text-base font-semibold text-slate-700">
-            {query.trim() || filter !== 'ALL' ? '조회 결과가 없습니다' : '계약이 없습니다'}
+            {query.trim() || filter !== 'ALL' || range.from || range.to ? '조회 결과가 없습니다' : '계약이 없습니다'}
           </p>
           <p className="mt-1 text-sm text-slate-400">
-            {query.trim() || filter !== 'ALL' ? '다른 조건으로 다시 조회해 보세요.' : '"계약 등록"으로 첫 보관 계약을 추가하세요.'}
+            {query.trim() || filter !== 'ALL' || range.from || range.to ? '다른 기간·조건으로 다시 조회해 보세요.' : '"계약 등록"으로 첫 보관 계약을 추가하세요.'}
           </p>
         </div>
       )}
