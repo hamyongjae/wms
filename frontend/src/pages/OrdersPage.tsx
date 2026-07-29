@@ -1279,6 +1279,13 @@ function CreateOrderModal({
     if (rate) setMonthlyFee(calcFloorFee(rate, storageStartDate, expectedEndDate))
   }, [feeTier, floorPrices, storageStartDate, expectedEndDate])
 
+  // [자동계산 기본값] 위치(슬롯)를 안 골라도 보관료가 자동 채워지도록,
+  //   층 단가가 설정돼 있으면 '가장 낮은 층'을 기준으로 삼는다. (슬롯을 고르면 onPickSlot 이 그 층으로 갱신)
+  useEffect(() => {
+    if (feeTier != null || floorPrices.size === 0) return
+    setFeeTier(Math.min(...floorPrices.keys()))
+  }, [floorPrices, feeTier])
+
   const periodError = validateContractPeriod(storageStartDate, expectedEndDate)
 
   function validate(): boolean {
