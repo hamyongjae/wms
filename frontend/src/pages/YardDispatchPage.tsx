@@ -365,7 +365,14 @@ export default function YardDispatchPage() {
 
       {!loading && !error && slots.length > 0 && (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
+          {/* 모바일: 가로 3칸 요약 카드 (큰 숫자) */}
+          <div className="grid grid-cols-3 gap-2 md:hidden">
+            <YardStat label="총 컨테이너" value={kpi.total} tone="slate" />
+            <YardStat label="사용중" value={kpi.occupied} tone="emerald" />
+            <YardStat label="공실" value={kpi.empty} tone="indigo" />
+          </div>
+          {/* 데스크톱: 기존 StatCard */}
+          <div className="hidden gap-4 md:grid md:grid-cols-3">
             <StatCard label="총 컨테이너" value={fmt(kpi.total)} icon={Grid3x3} tone="slate" />
             <StatCard label="사용중" value={fmt(kpi.occupied)} icon={Boxes} tone="indigo" />
             <StatCard label="공실" value={fmt(kpi.empty)} icon={Square} tone="emerald" />
@@ -1451,6 +1458,18 @@ function InboundAccountPicker({
 }
 
 // 층(tier)별로 묶어 높은 층이 위로, 각 층은 자리 번호(columnNo) 오름차순
+/* 모바일 가로 요약 카드 — 큰 숫자 + 작은 라벨 */
+function YardStat({ label, value, tone }: { label: string; value: number; tone: 'slate' | 'emerald' | 'indigo' }) {
+  const numCls =
+    tone === 'emerald' ? 'text-emerald-600' : tone === 'indigo' ? 'text-indigo-600' : 'text-slate-800'
+  return (
+    <div className="rounded-2xl bg-white p-3 text-center shadow-soft ring-1 ring-slate-200/60">
+      <p className={cn('text-3xl font-extrabold leading-none', numCls)}>{fmt(value)}</p>
+      <p className="mt-1.5 text-xs font-semibold text-slate-500">{label}</p>
+    </div>
+  )
+}
+
 function groupByFloor(slots: YardSlot[]): Array<{ tier: number; cells: YardSlot[] }> {
   const map = new Map<number, YardSlot[]>()
   for (const s of slots) {
@@ -1458,7 +1477,7 @@ function groupByFloor(slots: YardSlot[]): Array<{ tier: number; cells: YardSlot[
     map.get(s.tier)!.push(s)
   }
   return [...map.entries()]
-    .sort((a, b) => b[0] - a[0])
+    .sort((a, b) => a[0] - b[0]) // 1층 → 2층 → 3층 (오름차순)
     .map(([tier, list]) => ({ tier, cells: [...list].sort((x, y) => x.columnNo - y.columnNo) }))
 }
 
