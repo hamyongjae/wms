@@ -837,10 +837,8 @@ function InboundModal({
           위치 <span className="font-semibold">{slot.locationLabel}</span> 에 새 컨테이너를 배치합니다.
         </div>
 
-        {/* 좌: 입고 정보 폼 / 우: 화주 선택 리스트 */}
-        <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_19rem]">
-          {/* ===== 좌측 폼 ===== */}
-          <div className="space-y-4">
+        {/* 단일 컬럼: 화주 → 화주 검색 → 계약 연결 → 보관료 순 */}
+        <div className="space-y-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">화주(고객) *</label>
               {selectedCustomer ? (
@@ -860,9 +858,20 @@ function InboundModal({
                 </div>
               ) : (
                 <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-400">
-                  오른쪽 목록에서 화주를 선택하세요.
+                  아래 목록에서 화주를 선택하세요.
                 </p>
               )}
+            </div>
+
+            {/* 화주 검색 — 화주(고객) 다음, 보관료 이전 */}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">화주 검색</label>
+              <CustomerListPicker
+                customers={customers}
+                selectedId={customerId ? Number(customerId) : null}
+                onSelect={(c) => setCustomerId(String(c.id))}
+                heightClass="h-64"
+              />
             </div>
 
             {/* 계약 연결(선택) — 화주 선택 시 이 창고의 활성 계약을 골라 정식 배정 */}
@@ -961,18 +970,6 @@ function InboundModal({
                 className={cn(inputCls, 'min-h-55 resize-y')}
               />
             </div>
-          </div>
-
-          {/* ===== 우측 화주 선택 리스트 (공용 컴포넌트) ===== */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">화주 검색</label>
-            <CustomerListPicker
-              customers={customers}
-              selectedId={customerId ? Number(customerId) : null}
-              onSelect={(c) => setCustomerId(String(c.id))}
-              heightClass="max-h-[30rem]"
-            />
-          </div>
         </div>
 
         {dateError && (
