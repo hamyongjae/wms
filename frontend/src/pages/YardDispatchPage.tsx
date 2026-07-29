@@ -422,7 +422,7 @@ export default function YardDispatchPage() {
                       highlighted={matchSlot(s)}
                       dragActive={dragging != null}
                       isDragSource={dragging?.fromSlotId === s.id}
-                      onClick={() => (s.occupied ? setActionSlot(s) : setInboundSlot(s))}
+                      onClick={() => (s.occupied ? setActionSlot(s) : setEmptyActionSlot(s))}
                       onDragStartCell={() => {
                         if (s.occupied && s.containerId != null) {
                           setDragging({
@@ -500,7 +500,7 @@ export default function YardDispatchPage() {
                               >
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="truncate text-lg font-extrabold text-slate-800">{owner ?? '컨테이너'}</span>
-                                  <span className="shrink-0 text-xs font-medium text-slate-400">{s.locationLabel}{maint ? ' · 점검' : ''}</span>
+                                  <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-0.5 text-base font-bold text-slate-700">{s.locationLabel}{maint ? ' · 점검' : ''}</span>
                                 </div>
                                 <div className="mt-2.5 space-y-1.5">
                                   <div className="flex items-center justify-between gap-2 text-sm">
@@ -732,8 +732,9 @@ function SlotCell({
   onDragEndCell: () => void
 }) {
   const owner = extractOwner(container?.memo)
+  const inactive = !slot.occupied && slot.active === false // 미사용(운영 중지)
   const cellLabel = slot.occupied ? (owner ?? slot.containerNo ?? `${slot.tier}층`) : ''
-  const dropTarget = dragActive && !slot.occupied
+  const dropTarget = dragActive && !slot.occupied && !inactive // 미사용 자리는 이동 대상 불가
   const tooltip = slot.occupied
     ? [
         owner ? `화주 ${owner}` : null,
@@ -745,7 +746,9 @@ function SlotCell({
       ]
         .filter(Boolean)
         .join('\n')
-    : `${slot.locationLabel} · 빈 슬롯 (클릭해 입고)`
+    : inactive
+      ? `${slot.locationLabel} · 미사용(운영 중지) — 클릭해 관리`
+      : `${slot.locationLabel} · 빈 슬롯 (클릭해 관리)`
 
   return (
     <button
@@ -777,9 +780,11 @@ function SlotCell({
         'transition-[transform,box-shadow,background-color,border-color] duration-200 ease-out',
         slot.occupied
           ? 'cursor-grab bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-[0_2px_8px_rgba(43,51,63,0.18)] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(43,51,63,0.22)] active:translate-y-0 active:cursor-grabbing'
-          : dropTarget
-            ? 'border-2 border-dashed border-[#5C7C6B] bg-[#E9EFEA] text-[#5C7C6B]'
-            : 'border border-dashed border-slate-200 bg-slate-50/60 text-slate-300 hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-white hover:text-indigo-500 hover:shadow-[0_4px_12px_rgba(43,51,63,0.08)]',
+          : inactive
+            ? 'cursor-pointer border-2 border-slate-400 bg-slate-200 text-slate-500 hover:bg-slate-300'
+            : dropTarget
+              ? 'border-2 border-dashed border-[#5C7C6B] bg-[#E9EFEA] text-[#5C7C6B]'
+              : 'border border-dashed border-slate-200 bg-slate-50/60 text-slate-300 hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-white hover:text-indigo-500 hover:shadow-[0_4px_12px_rgba(43,51,63,0.08)]',
         isDragSource && 'opacity-40',
         // [선택 강조] 브래스 링 — 화면당 한 번의 포인트
         highlighted && 'animate-pulse ring-2 ring-[#B08D57] ring-offset-1',
@@ -787,6 +792,8 @@ function SlotCell({
     >
       {slot.occupied ? (
         <span className="truncate px-1">{cellLabel}</span>
+      ) : inactive ? (
+        <Ban size={12} />
       ) : (
         <span className="text-slate-400">{slot.columnNo}</span>
       )}
