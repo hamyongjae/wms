@@ -12,6 +12,7 @@ import {
   Boxes,
   Grid3x3,
   Square,
+  Ban,
 } from 'lucide-react'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { yardApi, type YardSlot, type FloorPrice } from '@/api/yardApi'
@@ -95,6 +96,7 @@ export default function YardDispatchPage() {
   const [inboundSlot, setInboundSlot] = useState<YardSlot | null>(null)
   const [actionSlot, setActionSlot] = useState<YardSlot | null>(null)
   const [editSlot, setEditSlot] = useState<YardSlot | null>(null)
+  const [emptyActionSlot, setEmptyActionSlot] = useState<YardSlot | null>(null) // 빈 자리 옵션 시트(입고/운영전환)
   const [dragging, setDragging] = useState<{ containerId: number; fromSlotId: number; label: string } | null>(null)
   const [gridOpen, setGridOpen] = useState(false)
   const [banner, setBanner] = useState<string | null>(null)
@@ -155,7 +157,9 @@ export default function YardDispatchPage() {
   const kpi = useMemo(() => {
     const total = slots.length
     const occupied = slots.filter((s) => s.occupied).length
-    return { total, occupied, empty: total - occupied }
+    const inactive = slots.filter((s) => !s.occupied && s.active === false).length // 미사용(운영 중지)
+    const vacant = total - occupied - inactive // 공실 = 사용 가능한 빈 자리
+    return { total, occupied, vacant, inactive }
   }, [slots])
 
   // 백엔드가 반환한 매칭 컨테이너 id 집합에 속하면 하이라이트
@@ -262,6 +266,17 @@ export default function YardDispatchPage() {
       reload()
     } catch (err) {
       alert(errMsg(err, '이동에 실패했습니다.'))
+    }
+  }
+
+  // [운영 상태] 빈 자리를 미사용(운영 중지) ↔ 사용 으로 전환
+  async function handleToggleActive(slot: YardSlot, active: boolean) {
+    try {
+      await yardApi.setSlotActive(slot.id, active)
+      setBanner(active ? `${slot.locationLabel} 다시 사용 설정` : `${slot.locationLabel} 미사용(운영 중지) 처리`)
+      reload()
+    } catch (err) {
+      alert(errMsg(err, '운영 상태 변경에 실패했습니다.'))
     }
   }
 
@@ -375,17 +390,19 @@ export default function YardDispatchPage() {
 
       {!loading && !error && slots.length > 0 && (
         <>
-          {/* 모바일: 가로 3칸 요약 카드 (큰 숫자) */}
-          <div className="grid grid-cols-3 gap-2 md:hidden">
-            <YardStat label="총 컨테이너" value={kpi.total} tone="slate" />
+          {/* 모바일: 가로 4칸 요약 (총/사용중/공실/미사용) */}
+          <div className="grid grid-cols-4 gap-1.5 md:hidden">
+            <YardStat label="전체" value={kpi.total} tone="slate" />
             <YardStat label="사용중" value={kpi.occupied} tone="emerald" />
-            <YardStat label="공실" value={kpi.empty} tone="indigo" />
+            <YardStat label="공실" value={kpi.vacant} tone="indigo" />
+            <YardStat label="미사용" value={kpi.inactive} tone="rose" />
           </div>
-          {/* 데스크톱: 기존 StatCard */}
-          <div className="hidden gap-4 md:grid md:grid-cols-3">
+          {/* 데스크톱: StatCard */}
+          <div className="hidden gap-4 md:grid md:grid-cols-4">
             <StatCard label="총 컨테이너" value={fmt(kpi.total)} icon={Grid3x3} tone="slate" />
             <StatCard label="사용중" value={fmt(kpi.occupied)} icon={Boxes} tone="indigo" />
-            <StatCard label="공실" value={fmt(kpi.empty)} icon={Square} tone="emerald" />
+            <StatCard label="공실" value={fmt(kpi.vacant)} icon={Square} tone="emerald" />
+            <StatCard label="미사용" value={fmt(kpi.inactive)} icon={Ban} tone="slate" />
           </div>
 
           <section className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-200/60 sm:p-6">
@@ -498,12 +515,29 @@ export default function YardDispatchPage() {
                               </button>
                             )
                           }
-                          // 빈 자리 (얇게) — 이동 모드면 이동 타겟, 아니면 입고
+                          // 미사용(운영 중지) — 고대비 표시. 이동 대상 불가.
+                          if (s.active === false) {
+                            return (
+                              <button
+                                key={s.id}
+                                type="button"
+                                disabled={dragging != null}
+                                onClick={() => setEmptyActionSlot(s)}
+                                className="flex w-full items-center justify-between gap-2 rounded-2xl border-2 border-slate-400 bg-slate-200 px-4 py-3 transition active:scale-[0.99] disabled:opacity-50"
+                              >
+                                <span className="flex min-w-0 items-center gap-1.5 truncate text-base font-extrabold text-slate-600">
+                                  <Ban size={16} className="shrink-0" /> {s.locationLabel} · 사용 안 함
+                                </span>
+                                <span className="shrink-0 rounded-lg bg-slate-500 px-3 py-1 text-xs font-bold text-white">운영 중지</span>
+                              </button>
+                            )
+                          }
+                          // 빈 자리(공실) — 이동 모드면 이동 타겟, 아니면 옵션 시트(입고/운영전환)
                           return (
                             <button
                               key={s.id}
                               type="button"
-                              onClick={() => (dragging ? handleDropMove(s) : setInboundSlot(s))}
+                              onClick={() => (dragging ? handleDropMove(s) : setEmptyActionSlot(s))}
                               className={cn(
                                 'flex w-full items-center justify-between gap-2 rounded-2xl border-2 border-dashed px-4 py-3 transition active:scale-[0.99]',
                                 dragging ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 bg-slate-50',
@@ -512,7 +546,7 @@ export default function YardDispatchPage() {
                               <span className={cn('truncate text-sm font-bold', dragging ? 'text-indigo-700' : 'text-slate-400')}>
                                 {s.locationLabel} · {dragging ? '여기로 이동' : '빈 자리'}
                               </span>
-                              <span className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-bold text-white">{dragging ? '선택' : '+ 입고'}</span>
+                              <span className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-bold text-white">{dragging ? '선택' : '자리 관리'}</span>
                             </button>
                           )
                         })}
@@ -547,6 +581,57 @@ export default function YardDispatchPage() {
             })()}
           </section>
         </>
+      )}
+
+      {/* 빈 자리 옵션 시트 — 입고 배치 / 운영 상태(미사용) 전환 (모바일 바텀시트) */}
+      {emptyActionSlot && (
+        <Modal open onClose={() => setEmptyActionSlot(null)} title={`${emptyActionSlot.locationLabel} 자리`}>
+          <div className="space-y-3">
+            {emptyActionSlot.active === false ? (
+              <>
+                <p className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-600">
+                  이 자리는 <b className="text-slate-800">미사용(운영 중지)</b> 상태예요. 입고 대상에서 제외됩니다.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = emptyActionSlot
+                    setEmptyActionSlot(null)
+                    handleToggleActive(s, true)
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 text-lg font-bold text-white transition active:scale-[0.99]"
+                >
+                  다시 사용하기
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = emptyActionSlot
+                    setEmptyActionSlot(null)
+                    setInboundSlot(s)
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-4 text-lg font-bold text-white transition active:scale-[0.99]"
+                >
+                  <PackagePlus size={20} /> 입고 배치
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = emptyActionSlot
+                    setEmptyActionSlot(null)
+                    handleToggleActive(s, false)
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-slate-300 py-4 text-lg font-bold text-slate-700 transition active:scale-[0.99]"
+                >
+                  <Ban size={20} /> 운영 중지로 변경
+                </button>
+              </>
+            )}
+          </div>
+        </Modal>
       )}
 
       {/* 즉시 입고 팝업 */}
@@ -1470,9 +1555,9 @@ function InboundAccountPicker({
 
 // 층(tier)별로 묶어 높은 층이 위로, 각 층은 자리 번호(columnNo) 오름차순
 /* 모바일 가로 요약 카드 — 큰 숫자 + 작은 라벨 */
-function YardStat({ label, value, tone }: { label: string; value: number; tone: 'slate' | 'emerald' | 'indigo' }) {
+function YardStat({ label, value, tone }: { label: string; value: number; tone: 'slate' | 'emerald' | 'indigo' | 'rose' }) {
   const numCls =
-    tone === 'emerald' ? 'text-emerald-600' : tone === 'indigo' ? 'text-indigo-600' : 'text-slate-800'
+    tone === 'emerald' ? 'text-emerald-600' : tone === 'indigo' ? 'text-indigo-600' : tone === 'rose' ? 'text-rose-500' : 'text-slate-800'
   return (
     <div className="rounded-2xl bg-white p-3 text-center shadow-soft ring-1 ring-slate-200/60">
       <p className={cn('text-3xl font-extrabold leading-none', numCls)}>{fmt(value)}</p>

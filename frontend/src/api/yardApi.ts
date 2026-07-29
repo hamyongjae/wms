@@ -29,6 +29,7 @@ export interface YardSlot {
   tier: number
   locationLabel: string
   occupied: boolean
+  active?: boolean // false = 미사용(운영 중지). 구버전 응답 호환 위해 optional
   containerId: number | null
   containerNo: string | null
 }
@@ -79,6 +80,11 @@ export const yardApi = {
       params: { warehouseId, size: 2000 },
     })
     return data.content
+  },
+  // [운영 상태] 슬롯 미사용(운영 중지)/사용 전환
+  async setSlotActive(slotId: number, active: boolean): Promise<YardSlot> {
+    const { data } = await api.patch<YardSlot>(`/api/yard/slots/${slotId}/active`, null, { params: { active } })
+    return data
   },
   // [층별 단가] 창고 층별 단가 목록
   async floorPrices(warehouseId: number): Promise<FloorPrice[]> {

@@ -18,6 +18,7 @@ public class YardSlotResponse {
     private final Integer tier;
     private final String locationLabel;
     private final boolean occupied;
+    private final boolean active;   // false = 미사용(운영 중지)
     private final Long containerId;
     private final String containerNo;
     private final Long version;
@@ -35,6 +36,7 @@ public class YardSlotResponse {
         this.tier = s.getTier();
         this.locationLabel = s.getLocationLabel();
         this.occupied = s.isOccupied();
+        this.active = s.isActive();
         this.containerId = s.getContainer() != null ? s.getContainer().getId() : null;
         this.containerNo = s.getContainer() != null ? s.getContainer().getContainerNo() : null;
         this.version = s.getVersion();

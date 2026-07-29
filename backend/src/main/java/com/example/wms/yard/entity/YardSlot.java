@@ -67,6 +67,12 @@ public class YardSlot {
     @JoinColumn(name = "container_id")
     private Container container;    // 이 슬롯에 놓인 컨테이너 (없으면 빈 슬롯)
 
+    // ===== 운영 상태 =====
+    // active=false → '미사용(운영 중지)'. 장기 공실·시설 고장 등으로 입고 대상에서 제외한다.
+    @Column(name = "active", nullable = false)
+    @org.hibernate.annotations.ColumnDefault("true")
+    private boolean active = true;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
@@ -111,5 +117,10 @@ public class YardSlot {
     public void vacate() {
         this.container = null;
         this.occupied = false;
+    }
+
+    /** 운영 상태 전환 (true=사용, false=미사용/운영 중지) */
+    public void changeActive(boolean active) {
+        this.active = active;
     }
 }

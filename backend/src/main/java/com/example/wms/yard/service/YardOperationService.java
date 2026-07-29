@@ -123,6 +123,9 @@ public class YardOperationService {
                 });
 
         YardSlot target = lockSlot(req.getTargetSlotId(), tenantId);
+        if (!target.isActive()) {
+            throw new IllegalStateException("미사용(운영 중지) 자리에는 입고할 수 없습니다. 먼저 '다시 사용하기'로 전환하세요.");
+        }
         target.place(container);   // 이미 차 있으면 LocationFullException → 409
         container.markPlacedInYard();   // 가용 → 사용중
         return new YardSlotResponse(target);
@@ -156,6 +159,9 @@ public class YardOperationService {
             from = lockSlot(current.getId(), tenantId);
         }
 
+        if (!target.isActive()) {
+            throw new IllegalStateException("미사용(운영 중지) 자리로는 이동할 수 없습니다.");
+        }
         from.vacate();
         target.place(container);   // 대상이 차 있으면 LocationFullException → 409
         container.markPlacedInYard();   // 안전상 사용중 유지
@@ -185,6 +191,18 @@ public class YardOperationService {
             order.release(java.time.LocalDate.now());
         }
         return new YardSlotResponse(from);
+    }
+
+    /** [운영 상태] 슬롯을 미사용(운영 중지) ↔ 사용 으로 전환. 컨테이너가 있으면 불가. */
+    @Transactional
+    public YardSlotResponse setSlotActive(Long slotId, boolean active) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        YardSlot slot = lockSlot(slotId, tenantId);
+        if (slot.isOccupied()) {
+            throw new IllegalStateException("컨테이너가 있는 자리는 운영 상태를 바꿀 수 없습니다. 먼저 출고하세요.");
+        }
+        slot.changeActive(active);
+        return new YardSlotResponse(slot);
     }
 
     // ===================== 내부 =====================

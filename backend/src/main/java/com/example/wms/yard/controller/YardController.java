@@ -100,4 +100,12 @@ public class YardController {
     public ResponseEntity<YardSlotResponse> outbound(@Valid @RequestBody OutboundRequest request) {
         return ResponseEntity.ok(yardOperationService.outbound(request));
     }
+
+    // [운영 상태] 슬롯 미사용(운영 중지)/사용 전환 — 현장(STAFF+)
+    // 예: PATCH /api/yard/slots/12/active?active=false
+    @PatchMapping("/slots/{id}/active")
+    public ResponseEntity<YardSlotResponse> setSlotActive(
+            @PathVariable Long id, @RequestParam boolean active) {
+        return ResponseEntity.ok(yardOperationService.setSlotActive(id, active));
+    }
 }
