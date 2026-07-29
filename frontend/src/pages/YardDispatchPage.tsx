@@ -356,12 +356,25 @@ export default function YardDispatchPage() {
       )}
 
       {!loading && !error && slots.length === 0 && (
-        <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-10 py-16 text-center">
-          <Grid3x3 size={26} className="text-slate-300" />
-          <p className="mt-3 text-base font-semibold text-slate-700">이 창고에 슬롯이 없습니다</p>
-          <p className="mt-1 text-sm text-slate-400">
-            {isAdmin ? '우측 상단 "자리 생성"으로 층별 자리를 만드세요.' : '관리자가 자리를 생성하면 표시됩니다.'}
-          </p>
+        <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+          <Grid3x3 size={28} className="text-slate-300" />
+          <p className="mt-3 text-lg font-bold text-slate-700">아직 컨테이너 자리가 없습니다</p>
+          {isAdmin && selectedId != null ? (
+            <>
+              <p className="mt-1.5 text-sm text-slate-500">아래 버튼을 눌러 층별 자리를 만드세요.</p>
+              <button
+                type="button"
+                onClick={() => setGridOpen(true)}
+                className="mt-5 flex items-center gap-2 rounded-2xl bg-indigo-600 px-7 py-4 text-lg font-bold text-white shadow-md transition hover:bg-indigo-700 active:scale-[0.99]"
+              >
+                <Plus size={20} /> 자리 생성
+              </button>
+            </>
+          ) : (
+            <p className="mt-1.5 text-sm text-slate-400">
+              {isAdmin ? '먼저 위에서 창고를 선택하세요.' : '관리자가 자리를 생성하면 표시됩니다.'}
+            </p>
+          )}
         </div>
       )}
 
