@@ -196,19 +196,19 @@ export default function ScheduleCalendarPage() {
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="min-w-28 text-center text-sm font-semibold text-slate-700">
+        <div className="flex items-center justify-between gap-2 sm:justify-end">
+          <span className="text-base font-bold text-slate-800 sm:min-w-28 sm:text-center sm:text-sm sm:font-semibold sm:text-slate-700">
             {cursor.year}년 {cursor.month0 + 1}월
           </span>
-          <div className="flex items-center rounded-lg border border-slate-200 bg-white">
-            <button type="button" onClick={() => moveMonth(-1)} className="p-1.5 text-slate-500 hover:text-slate-800" title="이전 달">
-              <ChevronLeft size={16} />
+          <div className="flex items-center rounded-xl border border-slate-200 bg-white sm:rounded-lg">
+            <button type="button" onClick={() => moveMonth(-1)} className="p-2.5 text-slate-500 hover:text-slate-800 sm:p-1.5" title="이전 달">
+              <ChevronLeft size={18} />
             </button>
-            <button type="button" onClick={goToday} className="border-x border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900">
+            <button type="button" onClick={goToday} className="border-x border-slate-200 px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 sm:px-2.5 sm:py-1 sm:text-xs sm:font-medium">
               오늘
             </button>
-            <button type="button" onClick={() => moveMonth(1)} className="p-1.5 text-slate-500 hover:text-slate-800" title="다음 달">
-              <ChevronRight size={16} />
+            <button type="button" onClick={() => moveMonth(1)} className="p-2.5 text-slate-500 hover:text-slate-800 sm:p-1.5" title="다음 달">
+              <ChevronRight size={18} />
             </button>
           </div>
         </div>
@@ -244,6 +244,8 @@ export default function ScheduleCalendarPage() {
               <div className="grid grid-cols-7">
                 {matrix.map((cell, i) => {
                   const dayEvents = eventsByDate.get(cell.dateStr) ?? []
+                  const inCount = dayEvents.filter((e) => e.type === 'INBOUND').length
+                  const outCount = dayEvents.filter((e) => e.type === 'OUTBOUND').length
                   const isToday = cell.dateStr === today
                   const isSelected = cell.dateStr === selectedDate
                   const weekday = i % 7
@@ -253,14 +255,14 @@ export default function ScheduleCalendarPage() {
                       type="button"
                       onClick={() => setSelectedDate(cell.dateStr)}
                       className={cn(
-                        'flex min-h-24 flex-col gap-1 border-b border-r border-slate-100 p-1.5 text-left transition hover:bg-slate-50',
+                        'flex min-h-14 flex-col items-center gap-1 border-b border-r border-slate-100 p-1 text-left transition hover:bg-slate-50 lg:min-h-24 lg:items-start lg:p-1.5',
                         !cell.inMonth && 'bg-slate-50/40',
                         isSelected && 'ring-2 ring-inset ring-indigo-400',
                       )}
                     >
                       <span
                         className={cn(
-                          'flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium',
+                          'flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold lg:h-6 lg:w-6 lg:text-xs lg:font-medium',
                           isToday
                             ? 'bg-indigo-600 text-white'
                             : !cell.inMonth
@@ -275,7 +277,16 @@ export default function ScheduleCalendarPage() {
                         {cell.day}
                       </span>
 
-                      <div className="flex flex-col gap-0.5">
+                      {/* 모바일: 점으로 표시 (입고 파랑 · 출고 주황) */}
+                      {dayEvents.length > 0 && (
+                        <div className="flex items-center gap-1 lg:hidden">
+                          {inCount > 0 && <span className="h-2 w-2 rounded-full bg-[#5A748F]" />}
+                          {outCount > 0 && <span className="h-2 w-2 rounded-full bg-[#A65B44]" />}
+                        </div>
+                      )}
+
+                      {/* 데스크톱: 텍스트 배지 */}
+                      <div className="hidden w-full flex-col gap-0.5 lg:flex">
                         {dayEvents.slice(0, 3).map((e) => (
                           <span
                             key={e.id}
