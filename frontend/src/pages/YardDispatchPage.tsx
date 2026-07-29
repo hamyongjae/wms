@@ -27,7 +27,6 @@ import OutboundDatePresets from '@/components/ui/OutboundDatePresets'
 import { orderSync } from '@/lib/orderEvents'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
-import Fab from '@/components/ui/Fab'
 import MoneyInput from '@/components/ui/MoneyInput'
 import CustomerListPicker from '@/components/customer/CustomerListPicker'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -273,21 +272,17 @@ export default function YardDispatchPage() {
           <h2 className="text-xl font-bold text-slate-800">컨테이너 관리</h2>
           <p className="mt-1 text-sm text-slate-500">격자를 클릭해 그 자리에서 입고·출고·이동을 즉시 처리합니다.</p>
         </div>
-        {/* 데스크톱: 상단 버튼 / 모바일: 하단 FAB(엄지 존)이 대신한다 */}
+        {/* 자리 생성 버튼 (모바일·데스크톱 공통 · 상단) */}
         {isAdmin && selectedId != null && (
           <button
             type="button"
             onClick={() => setGridOpen(true)}
-            className="hidden shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 md:flex"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
           >
             <Plus size={16} /> 자리 생성
           </button>
         )}
       </div>
-
-      {isAdmin && selectedId != null && (
-        <Fab actions={[{ label: '자리 생성', icon: Grid3x3, onClick: () => setGridOpen(true) }]} />
-      )}
 
       {/* 창고 탭 + 검색 */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

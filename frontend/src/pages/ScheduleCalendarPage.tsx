@@ -244,8 +244,6 @@ export default function ScheduleCalendarPage() {
               <div className="grid grid-cols-7">
                 {matrix.map((cell, i) => {
                   const dayEvents = eventsByDate.get(cell.dateStr) ?? []
-                  const inCount = dayEvents.filter((e) => e.type === 'INBOUND').length
-                  const outCount = dayEvents.filter((e) => e.type === 'OUTBOUND').length
                   const isToday = cell.dateStr === today
                   const isSelected = cell.dateStr === selectedDate
                   const weekday = i % 7
@@ -255,7 +253,7 @@ export default function ScheduleCalendarPage() {
                       type="button"
                       onClick={() => setSelectedDate(cell.dateStr)}
                       className={cn(
-                        'flex min-h-14 flex-col items-center gap-1 border-b border-r border-slate-100 p-1 text-left transition hover:bg-slate-50 lg:min-h-24 lg:items-start lg:p-1.5',
+                        'flex min-h-16 flex-col items-start gap-1 border-b border-r border-slate-100 p-1 text-left transition hover:bg-slate-50 lg:min-h-24 lg:p-1.5',
                         !cell.inMonth && 'bg-slate-50/40',
                         isSelected && 'ring-2 ring-inset ring-indigo-400',
                       )}
@@ -277,15 +275,22 @@ export default function ScheduleCalendarPage() {
                         {cell.day}
                       </span>
 
-                      {/* 모바일: 점으로 표시 (입고 파랑 · 출고 주황) */}
-                      {dayEvents.length > 0 && (
-                        <div className="flex items-center gap-1 lg:hidden">
-                          {inCount > 0 && <span className="h-2 w-2 rounded-full bg-[#5A748F]" />}
-                          {outCount > 0 && <span className="h-2 w-2 rounded-full bg-[#A65B44]" />}
-                        </div>
-                      )}
+                      {/* 모바일: 화주명 칩 (작게 · 최대 2개) */}
+                      <div className="flex w-full flex-col gap-0.5 lg:hidden">
+                        {dayEvents.slice(0, 2).map((e) => (
+                          <span
+                            key={e.id}
+                            className={cn('w-full truncate rounded px-1 py-0.5 text-[10px] font-semibold leading-tight ring-1', TYPE_META[e.type].badge)}
+                          >
+                            {e.customerName ?? eventLabel(e)}
+                          </span>
+                        ))}
+                        {dayEvents.length > 2 && (
+                          <span className="pl-0.5 text-[9px] font-medium text-slate-400">+{dayEvents.length - 2}</span>
+                        )}
+                      </div>
 
-                      {/* 데스크톱: 텍스트 배지 */}
+                      {/* 데스크톱: 화주명 배지 */}
                       <div className="hidden w-full flex-col gap-0.5 lg:flex">
                         {dayEvents.slice(0, 3).map((e) => (
                           <span
@@ -294,9 +299,9 @@ export default function ScheduleCalendarPage() {
                               'truncate rounded px-1 py-0.5 text-[11px] font-medium ring-1',
                               TYPE_META[e.type].badge,
                             )}
-                            title={eventLabel(e)}
+                            title={e.customerName ?? eventLabel(e)}
                           >
-                            {eventLabel(e)}
+                            {e.customerName ?? eventLabel(e)}
                           </span>
                         ))}
                         {dayEvents.length > 3 && (
