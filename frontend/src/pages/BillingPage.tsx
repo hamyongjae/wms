@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   FileText,
   X,
-  Send,
   BadgeCheck,
   HandCoins,
   SlidersHorizontal,
@@ -166,16 +165,6 @@ export default function BillingPage() {
     return ledgers.filter((l) => l.status === statusFilter)
   }, [ledgers, statusFilter])
 
-  async function handleOverdueNotify() {
-    if (!window.confirm('미납(연체) 원장 전체에 촉구 알림을 발송할까요?')) return
-    try {
-      const msg = await billingApi.sendOverdueReminders()
-      setNotice(msg)
-    } catch (err) {
-      setNotice(errMsg(err, '촉구 발송에 실패했습니다.'))
-    }
-  }
-
   // [원터치] 전액 수금 처리 — 계좌이체·오늘 날짜로 잔액 전액을 즉시 수금 기록
   async function handleQuickCollect(l: BillingLedger) {
     const amt = l.outstanding ?? l.balance
@@ -226,16 +215,6 @@ export default function BillingPage() {
           <h2 className="text-xl font-bold text-slate-800">정산 관리</h2>
           <p className="mt-1 text-sm text-slate-500">보관료 청구 원장과 수금·조정·미수금 이월을 관리합니다.</p>
         </div>
-        {isAdmin && (
-          <button
-            type="button"
-            onClick={handleOverdueNotify}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100"
-          >
-            <Send size={16} />
-            미납 촉구 발송
-          </button>
-        )}
       </div>
 
       {notice && (
