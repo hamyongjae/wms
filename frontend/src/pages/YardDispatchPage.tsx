@@ -470,7 +470,7 @@ export default function YardDispatchPage() {
                               type="button"
                               onClick={() => setActionSlot(s)}
                               className={cn(
-                                'flex min-h-[96px] flex-col rounded-2xl border-2 p-3 text-left shadow-sm transition active:scale-[0.98]',
+                                'flex min-h-[64px] flex-col rounded-2xl border-2 p-2.5 text-left shadow-sm transition active:scale-[0.98]',
                                 maint ? 'border-amber-300 bg-amber-50' : 'border-emerald-300 bg-emerald-50',
                                 matched && 'ring-2 ring-amber-400',
                               )}
@@ -481,8 +481,8 @@ export default function YardDispatchPage() {
                                 </span>
                                 <span className="shrink-0 text-xs font-medium text-slate-400">{s.locationLabel}</span>
                               </div>
-                              <p className="mt-2 truncate text-lg font-bold leading-tight text-slate-800">{owner ?? s.containerNo ?? '컨테이너'}</p>
-                              <p className="mt-auto truncate pt-1 text-xs text-slate-500">번호 {s.containerNo}</p>
+                              <p className="mt-1 truncate text-base font-bold leading-tight text-slate-800">{owner ?? s.containerNo ?? '컨테이너'}</p>
+                              <p className="mt-0.5 truncate text-[11px] text-slate-500">번호 {s.containerNo}</p>
                             </button>
                           )
                         }
@@ -493,7 +493,7 @@ export default function YardDispatchPage() {
                             type="button"
                             onClick={() => (dragging ? handleDropMove(s) : setInboundSlot(s))}
                             className={cn(
-                              'flex min-h-[96px] flex-col items-center justify-center rounded-2xl border-2 border-dashed p-3 text-center transition active:scale-[0.98]',
+                              'flex min-h-[64px] flex-col items-center justify-center rounded-2xl border-2 border-dashed p-2.5 text-center transition active:scale-[0.98]',
                               dragging ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-slate-50 text-slate-400',
                             )}
                           >
