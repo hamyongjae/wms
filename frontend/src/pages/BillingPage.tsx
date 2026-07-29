@@ -176,6 +176,33 @@ export default function BillingPage() {
     }
   }
 
+  // [원터치] 전액 수금 처리 — 계좌이체·오늘 날짜로 잔액 전액을 즉시 수금 기록
+  async function handleQuickCollect(l: BillingLedger) {
+    const amt = l.outstanding ?? l.balance
+    if (!window.confirm(`${l.customerName} · ${won(amt)}을 전액 수금(계좌이체)으로 처리할까요?`)) return
+    try {
+      await billingApi.recordPayment(l.id, { amount: amt, method: 'BANK_TRANSFER', paidOn: today() })
+      setNotice(`${l.customerName} ${won(amt)} 수금 완료`)
+      reload()
+      orderSync.emit() // 대시보드·매출 실시간 갱신
+    } catch (err) {
+      setNotice(errMsg(err, '수금 처리에 실패했습니다.'))
+    }
+  }
+
+  // [원터치] 환불 완료 처리
+  async function handleQuickRefund(l: BillingLedger) {
+    if (!window.confirm(`${l.customerName} 환불 완료로 처리할까요?`)) return
+    try {
+      await billingApi.completeRefund(l.id)
+      setNotice(`${l.customerName} 환불 완료`)
+      reload()
+      orderSync.emit()
+    } catch (err) {
+      setNotice(errMsg(err, '환불 완료 처리에 실패했습니다.'))
+    }
+  }
+
   // 현재 조회 기간의 기준 연·월 (from 기준)
   const cursor = useMemo(() => {
     const [y, m] = range.from.split('-').map(Number)
@@ -222,15 +249,15 @@ export default function BillingPage() {
 
       {/* [기간 필터] 진입 즉시 당월. 월 이동(연·월 동시) + 사용자 지정 기간 — 변경 시 카드·표 동시 갱신 */}
       <div className="flex flex-col gap-3 rounded-2xl bg-white p-3.5 shadow-soft ring-1 ring-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => moveMonth(-1)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" title="이전 달">
-            <ChevronLeft size={16} />
+        <div className="flex items-center justify-between gap-2 sm:justify-start">
+          <button type="button" onClick={() => moveMonth(-1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 md:h-8 md:w-8" title="이전 달">
+            <ChevronLeft size={18} />
           </button>
-          <span className="min-w-24 text-center text-sm font-semibold text-slate-800">{cursor.year}년 {cursor.month1}월</span>
-          <button type="button" onClick={() => moveMonth(1)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" title="다음 달">
-            <ChevronRight size={16} />
+          <span className="min-w-28 text-center text-base font-bold text-slate-800 md:min-w-24 md:text-sm md:font-semibold">{cursor.year}년 {cursor.month1}월</span>
+          <button type="button" onClick={() => moveMonth(1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 md:h-8 md:w-8" title="다음 달">
+            <ChevronRight size={18} />
           </button>
-          <button type="button" onClick={goThisMonth} className="ml-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+          <button type="button" onClick={goThisMonth} className="ml-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 md:px-2.5 md:py-1.5 md:text-xs md:font-medium">
             이번 달
           </button>
         </div>
@@ -253,8 +280,15 @@ export default function BillingPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        
+      {/* 모바일: 가로형 요약 2×2 (큰 숫자·경고 색상) */}
+      <div className="grid grid-cols-2 gap-2.5 md:hidden">
+        <BillStat label="누적 수금액" value={won(kpi.collected)} tone="emerald" />
+        <BillStat label="정산 건수" value={`${kpi.count}건`} tone="slate" />
+        <BillStat label="미수금 총액" value={won(kpi.outstanding)} tone="amber" alert={kpi.outstanding > 0} />
+        <BillStat label="연체 건수" value={`${kpi.overdueCount}건`} tone="red" alert={kpi.overdueCount > 0} />
+      </div>
+      {/* 데스크톱: StatCard */}
+      <div className="hidden gap-4 md:grid md:grid-cols-4">
         <StatCard label="누적 수금액" value={won(kpi.collected)} icon={Coins} tone="emerald" />
         <StatCard label="정산 건수" value={`${kpi.count}건`} icon={FileText} tone="slate" />
         <StatCard
@@ -353,41 +387,81 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* ===== 모바일: 정산 요약 카드 (md 미만) — 탭하면 상세 패널 ===== */}
+      {/* ===== 모바일: 정산 내역 카드 (md 미만) — 탭하면 상세, 카드 내 원터치 처리 ===== */}
       {!loading && !error && visible.length > 0 && (
         <div className="space-y-3 md:hidden">
-          {visible.map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              onClick={() => setSelectedId(l.id)}
-              className="w-full rounded-2xl bg-white p-4 text-left shadow-soft ring-1 ring-slate-200/60 active:bg-slate-50"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="truncate text-base font-semibold text-slate-800">{l.customerName}</p>
-                <LedgerStatusBadge l={l} />
+          {visible.map((l) => {
+            const overdue = isOverdue(l)
+            const outstanding = l.outstanding ?? Math.max(l.balance, 0)
+            const refundDue = l.refundDue ?? Math.max(-l.balance, 0)
+            const canCollect = l.balance > 0 && (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
+            const canRefund = refundDue > 0 && !l.refundCompleted
+            const dueLabel = l.refundCompleted ? '환불' : refundDue > 0 ? '환불 대상' : '미수금'
+            const dueValueCls = l.refundCompleted
+              ? 'text-slate-400'
+              : refundDue > 0
+                ? 'text-emerald-600'
+                : overdue
+                  ? 'text-red-600'
+                  : outstanding > 0
+                    ? 'text-slate-900'
+                    : 'text-slate-400'
+            return (
+              <div key={l.id} className="overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60">
+                <button type="button" onClick={() => setSelectedId(l.id)} className="w-full p-4 text-left transition active:bg-slate-50">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-lg font-bold text-slate-800">{l.customerName}</p>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <LedgerStatusBadge l={l} />
+                      <ChevronRight size={20} className="text-slate-300" />
+                    </div>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">{l.periodStart} ~ {l.periodEnd}</p>
+                  <div className="mt-3 flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium text-slate-400">보관료</p>
+                      <p className="mt-0.5 text-base font-semibold text-slate-700">{won(totalDue(l))}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-slate-400">{dueLabel}</p>
+                      <p className={cn('mt-0.5 text-2xl font-extrabold leading-none', dueValueCls)}>
+                        {l.refundCompleted ? '완료' : won(refundDue > 0 ? refundDue : outstanding)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <span className="text-slate-400">납기</span>
+                    <LedgerDue l={l} />
+                    <span className="ml-auto text-slate-400">세금계산서 {l.taxInvoiceIssued ? '발행' : '미발행'}</span>
+                  </div>
+                </button>
+
+                {/* 원터치 처리 버튼 */}
+                {(canCollect || (canRefund && isAdmin)) && (
+                  <div className="space-y-2 border-t border-slate-100 p-2.5">
+                    {canCollect && (
+                      <button
+                        type="button"
+                        onClick={() => handleQuickCollect(l)}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99]"
+                      >
+                        <HandCoins size={18} /> 전액 수금 · {won(outstanding)}
+                      </button>
+                    )}
+                    {canRefund && isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleQuickRefund(l)}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99]"
+                      >
+                        <BadgeCheck size={18} /> 환불 완료
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-              <p className="mt-0.5 text-xs text-slate-500">{l.periodStart} ~ {l.periodEnd}</p>
-              <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-                <div>
-                  <dt className="text-[11px] text-slate-400">보관료</dt>
-                  <dd className="mt-0.5 text-slate-700">{won(totalDue(l))}</dd>
-                </div>
-                <div className="text-right">
-                  <dt className="text-[11px] text-slate-400">미수금</dt>
-                  <dd className="mt-0.5 font-medium"><LedgerReceivable l={l} /></dd>
-                </div>
-                <div>
-                  <dt className="text-[11px] text-slate-400">납기</dt>
-                  <dd className="mt-0.5"><LedgerDue l={l} /></dd>
-                </div>
-                <div className="text-right">
-                  <dt className="text-[11px] text-slate-400">세금계산서</dt>
-                  <dd className="mt-0.5 text-xs text-slate-600">{l.taxInvoiceIssued ? '발행' : '미발행'}</dd>
-                </div>
-              </div>
-            </button>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -856,6 +930,24 @@ function CarryOverForm({
 }
 
 /* ===== 소품 ===== */
+/* 모바일 가로형 요약 카드 — 큰 숫자 + 경고 색상 */
+function BillStat({ label, value, tone, alert }: { label: string; value: string; tone: 'emerald' | 'slate' | 'amber' | 'red'; alert?: boolean }) {
+  const numCls =
+    tone === 'emerald'
+      ? 'text-emerald-600'
+      : tone === 'amber'
+        ? alert ? 'text-amber-600' : 'text-slate-800'
+        : tone === 'red'
+          ? alert ? 'text-red-600' : 'text-slate-400'
+          : 'text-slate-800'
+  return (
+    <div className="rounded-2xl bg-white p-3.5 shadow-soft ring-1 ring-slate-200/60">
+      <p className="text-xs font-semibold text-slate-500">{label}</p>
+      <p className={cn('mt-1 text-xl font-extrabold leading-tight', numCls)}>{value}</p>
+    </div>
+  )
+}
+
 function ActionBtn({
   onClick,
   icon,
