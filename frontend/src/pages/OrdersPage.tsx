@@ -7,15 +7,12 @@ import { billingApi, type BillingLedger, type PaymentMethod } from '@/api/billin
 import { displayStatus, isOpenLedger } from '@/lib/billing'
 import { customerApi, type Customer, type CustomerType } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
-import { tenantApi } from '@/api/tenantApi'
-import OutboundDatePresets from '@/components/ui/OutboundDatePresets'
 import { containerApi } from '@/api/containerApi'
 import { yardApi } from '@/api/yardApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { validateContractPeriod } from '@/lib/dateValidation'
-import { calcDailyFee, calcFloorFee } from '@/lib/fee'
-import { useFloorPricing } from '@/hooks/useFloorPricing'
+import { calcDailyFee, storageDays } from '@/lib/fee'
 import { extractOwner } from '@/lib/owner'
 import { nextContainerNo } from '@/lib/containerNo'
 import { orderSync } from '@/lib/orderEvents'
@@ -911,18 +908,13 @@ function EditOrderModal({
   const [settlementUserId, setSettlementUserId] = useState<number | null>(null)
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [dueDate, setDueDate] = useState('')
-  const [dueTouched, setDueTouched] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   // 위치: 선택 슬롯 / 현재(원래) 슬롯·컨테이너
   const [slotId, setSlotId] = useState<number | null>(null)
   const [currentSlotId, setCurrentSlotId] = useState<number | null>(null)
   const [currentContainerId, setCurrentContainerId] = useState<number | null>(null)
-  // [층 단가 연동] feeTier = 보관료 계산 기준 층(현재 배정된 컨테이너의 층 또는 사용자가 새로 고른 층).
-  //   feeAuto = 사용자가 날짜/위치를 실제로 건드린 뒤에만 true → 그 전까지는 저장된 보관료를 보존한다.
-  const [feeTier, setFeeTier] = useState<number | null>(null)
-  const [feeAuto, setFeeAuto] = useState(false)
-  const floorPrices = useFloorPricing(target?.warehouseId ?? null, target != null)
+  // [보관료 수동 입력] 층 단가 기반 자동 재계산은 제거 — 저장된 금액은 사용자가 직접 고치기 전까지 절대 변하지 않는다.
 
   useEffect(() => {
     if (target) {
@@ -935,9 +927,6 @@ function EditOrderModal({
       setPaymentMethod(target.paymentMethod ?? 'BANK_TRANSFER')
       setSettlementUserId(target.settlementUserId ?? null)
       setDueDate(target.dueDate ?? '')
-      setDueTouched(true) // 기존값 보존 — 사용자가 결제 방식을 바꿀 때만 자동 매핑 시작
-      setFeeTier(null)
-      setFeeAuto(false) // 저장된 보관료 보존 — 날짜/위치를 실제로 바꾼 뒤에만 자동 재계산
       setFormError(null)
     }
   }, [target])
@@ -951,21 +940,6 @@ function EditOrderModal({
       alive = false
     }
   }, [target])
-
-  // [납기일 자동 매핑] 등록 화면과 동일 — 선불=시작일 / 후불=종료일. 사용자가 만지면 중단.
-  useEffect(() => {
-    if (dueTouched) return
-    const mapped = paymentType === 'PREPAID' ? storageStartDate : expectedEndDate || storageStartDate
-    if (mapped) setDueDate(mapped)
-  }, [paymentType, storageStartDate, expectedEndDate, dueTouched])
-
-  // 위치(층) 선택 또는 보관 기간 변경 시 층 단가·최소료로 보관료 자동 보정 (공통 엔진)
-  //   feeAuto=false(초기 로드)면 저장된 보관료를 그대로 두고, 사용자가 날짜/위치를 바꾼 뒤에만 재계산한다.
-  useEffect(() => {
-    if (!feeAuto || feeTier == null) return
-    const rate = floorPrices.get(feeTier)
-    if (rate) setMonthlyFee(calcFloorFee(rate, storageStartDate, expectedEndDate))
-  }, [feeAuto, feeTier, floorPrices, storageStartDate, expectedEndDate])
 
   // 이 계약에 배정·적재된 컨테이너의 현재 자리를 조회 (수정 모드 강조/이동 기준)
   useEffect(() => {
@@ -984,7 +958,6 @@ function EditOrderModal({
         if (slot) {
           setCurrentSlotId(slot.id)
           setSlotId(slot.id)
-          setFeeTier(slot.tier ?? null) // 현재 배정된 층을 보관료 재계산 기준으로 (feeAuto 전까진 미적용)
         }
       })
       .catch(() => undefined)
@@ -1049,6 +1022,8 @@ function EditOrderModal({
   }
 
   const locationChanged = slotId !== currentSlotId
+  // 읽기 전용 파생값 — 입력 필드를 덮어쓰지 않고 표기만 한다
+  const days = storageDays(storageStartDate, expectedEndDate)
   const dailyFee = calcDailyFee(monthlyFee, storageStartDate, expectedEndDate)
 
   return (
@@ -1076,10 +1051,7 @@ function EditOrderModal({
                   type="date"
                   value={storageStartDate}
                   max={expectedEndDate || undefined}
-                  onChange={(e) => {
-                    setStartDate(e.target.value)
-                    setFeeAuto(true) // 날짜 변경 → 층 단가 기준 보관료 자동 재계산 시작
-                  }}
+                  onChange={(e) => setStartDate(e.target.value)}
                   required
                   className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
                 />
@@ -1090,20 +1062,17 @@ function EditOrderModal({
                   type="date"
                   value={expectedEndDate}
                   min={storageStartDate || undefined}
-                  onChange={(e) => {
-                    setEndDate(e.target.value)
-                    setFeeAuto(true) // 날짜 변경 → 층 단가 기준 보관료 자동 재계산 시작
-                  }}
+                  onChange={(e) => setEndDate(e.target.value)}
                   className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
                 />
-                <OutboundDatePresets
-                  startDate={storageStartDate}
-                  onPick={(d) => {
-                    setEndDate(d)
-                    setFeeAuto(true)
-                  }}
-                  className="mt-1.5"
-                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
+                {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
+                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                  {days != null ? `${days.toLocaleString()}일` : ''}
+                </div>
+                <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
               </div>
               <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관료 *</label>
@@ -1127,10 +1096,7 @@ function EditOrderModal({
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 방식 *</label>
                 <select
                   value={paymentType}
-                  onChange={(e) => {
-                    setPaymentType(e.target.value as PaymentType)
-                    setDueTouched(false) // 결제 방식 바꾸면 납기일 자동 매핑 재개
-                  }}
+                  onChange={(e) => setPaymentType(e.target.value as PaymentType)}
                   className={inputCls}
                 >
                   <option value="PREPAID">선불 (완납)</option>
@@ -1161,23 +1127,8 @@ function EditOrderModal({
                 </select>
               </div>
               <div>
-                <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-slate-700">
-                  납기일
-                  {!dueTouched && (
-                    <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600">
-                      {paymentType === 'PREPAID' ? '보관 시작일 자동' : '보관 종료일 자동'}
-                    </span>
-                  )}
-                </label>
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => {
-                    setDueDate(e.target.value)
-                    setDueTouched(true)
-                  }}
-                  className={inputCls}
-                />
+                <label className="mb-1 block text-sm font-medium text-slate-700">납기일</label>
+                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} />
               </div>
             </div>
 
@@ -1223,10 +1174,6 @@ function EditOrderModal({
               warehouseId={target.warehouseId}
               value={slotId}
               onChange={setSlotId}
-              onPickSlot={(s) => {
-                setFeeTier(s?.tier ?? null)
-                setFeeAuto(true) // 위치(층) 변경 → 새 층 단가로 보관료 자동 재계산
-              }}
               currentSlotId={currentSlotId}
             />
           </div>
@@ -1269,15 +1216,15 @@ export function CreateOrderModal({
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [warehouseId, setWarehouseId] = useState('')
   const [slotId, setSlotId] = useState<number | null>(null) // 선택 슬롯(null=미지정)
-  const [storageStartDate, setStartDate] = useState(today())
+  // [수동 입력 원칙] 날짜 3종(보관 시작일·출고 예정일·납기일)은 기본값 없이 빈 값으로 시작한다.
+  //   자동 프리필은 담당자가 확인 없이 저장할 여지를 만들어 계약 기간·납기 오류의 원인이 되므로 제거.
+  const [storageStartDate, setStartDate] = useState('')
   const [expectedEndDate, setEndDate] = useState('')
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
   const [capacityTons, setCapacityTons] = useState<number | null>(null) // 보관 용량(톤)
   const [paymentType, setPaymentType] = useState<PaymentType>('PREPAID')
   const [paymentMethod, setPaymentMethod] = useState<OrderPaymentMethod>('BANK_TRANSFER') // 결제 수단 기본 계좌이체
-  // [납기일] 선불→보관 시작일 / 후불→보관 종료일이 제로클릭 기본값. 사용자가 만지면(dueTouched) 자동 매핑 중단.
   const [dueDate, setDueDate] = useState('')
-  const [dueTouched, setDueTouched] = useState(false)
   const [settlementUserId, setSettlementUserId] = useState<number | null>(null)
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [memo, setMemo] = useState('')
@@ -1285,16 +1232,13 @@ export function CreateOrderModal({
   const [formError, setFormError] = useState<string | null>(null)
   const [custOpen, setCustOpen] = useState(false)
   const [dormantConfirm, setDormantConfirm] = useState(false)
-  // [마스터 기본값] 전역 기본 계약 유지 기간(일) = '당일 포함 보관일수'.
-  //   출고예정일 = 보관 시작일 + (defaultDays - 1). 예) 10 → 07.21~07.30 (당일 포함 10일). 기본 10.
-  const [defaultDays, setDefaultDays] = useState(10)
-  useEffect(() => {
-    tenantApi.me().then((t) => setDefaultDays(t.defaultStoragePeriodDays ?? 10)).catch(() => { })
-  }, [])
 
-  // [실시간 계산] 하루 보관료 = 보관료 ÷ (보관시작일~출고예정일 총 일수, 당일 포함).
-  // 보관료·시작일·출고예정일 세 값이 모두 유효할 때만 값이 나오고, 그 외(출고예정일 미입력,
-  // 날짜 역전 등)엔 null → 화면엔 빈 값으로 표기. 입력 3종이 바뀔 때만 재계산된다.
+  // [읽기 전용 파생값] 날짜 두 값에서 보관일수(당일 포함)를 도출한다.
+  //   입력 필드를 건드리지 않고 화면 표기용으로만 쓰므로, 사용자가 입력한 값이 덮어써질 일이 없다.
+  const days = useMemo(() => storageDays(storageStartDate, expectedEndDate), [storageStartDate, expectedEndDate])
+
+  // [읽기 전용 파생값] 하루 보관료 = 보관료 ÷ 보관일수(당일 포함).
+  //   세 값이 모두 유효할 때만 숫자, 그 외(출고예정일 미입력·날짜 역전 등)엔 null → 빈 값으로 표기.
   const dailyFee = useMemo(
     () => calcDailyFee(monthlyFee, storageStartDate, expectedEndDate),
     [monthlyFee, storageStartDate, expectedEndDate],
@@ -1310,42 +1254,24 @@ export function CreateOrderModal({
       if (fixedSlot) {
         setWarehouseId(String(fixedSlot.warehouseId))
         setSlotId(fixedSlot.id)
-        setFeeTier(fixedSlot.tier)
       } else {
         setWarehouseId(warehouses[0] ? String(warehouses[0].id) : '')
         setSlotId(null)
-        setFeeTier(null)
       }
-      setStartDate(today())
-      setEndDate(addDays(today(), Math.max(defaultDays - 1, 0))) // 당일 포함 defaultDays일
+      // 날짜 3종은 기본값 없이 초기화 — 담당자가 매 계약마다 명시적으로 입력한다
+      setStartDate('')
+      setEndDate('')
       setMonthlyFee(null)
       setCapacityTons(null)
       setPaymentType('PREPAID')
       setPaymentMethod('BANK_TRANSFER')
       setSettlementUserId(null)
-      setDueDate(today()) // 선불 기본값 = 보관 시작일(=today)
-      setDueTouched(false)
+      setDueDate('')
       setMemo('')
       setFormError(null)
       setDormantConfirm(false)
     }
   }, [open, warehouses, fixedSlot])
-
-  // [납기일 제로클릭 자동 세팅] 결제 방식/기준 날짜가 바뀌면 납기 기본값을 즉시 매핑한다.
-  //   · 선불: 보관 시작일  · 후불: 보관 종료일(없으면 시작일)
-  //   사용자가 납기일을 직접 만진 뒤(dueTouched)엔 덮어쓰지 않아 수동 변경을 존중한다.
-  useEffect(() => {
-    if (dueTouched) return
-    const mapped = paymentType === 'PREPAID' ? storageStartDate : expectedEndDate || storageStartDate
-    if (mapped) setDueDate(mapped)
-  }, [paymentType, storageStartDate, expectedEndDate, dueTouched])
-
-  // [자동 계산] 보관 시작일이 변경되면 출고 예정일을 전역 기본 기간(당일 포함)만큼 뒤로 설정
-  useEffect(() => {
-    if (storageStartDate && !expectedEndDate) {
-      setEndDate(addDays(storageStartDate, Math.max(defaultDays - 1, 0)))
-    }
-  }, [storageStartDate])
 
   // [수납 계좌] 직원 목록 로드 (계좌이체 시 담당 직원 선택용) — 권한 없으면 빈 목록
   useEffect(() => {
@@ -1357,21 +1283,8 @@ export function CreateOrderModal({
     }
   }, [open])
 
-  // [층 단가 연동] 공통 로더 — 슬롯 선택/기간 변경 시 보관료 자동 보정
-  const floorPrices = useFloorPricing(warehouseId ? Number(warehouseId) : null, open)
-  const [feeTier, setFeeTier] = useState<number | null>(null)
-  useEffect(() => {
-    if (feeTier == null) return
-    const rate = floorPrices.get(feeTier)
-    if (rate) setMonthlyFee(calcFloorFee(rate, storageStartDate, expectedEndDate))
-  }, [feeTier, floorPrices, storageStartDate, expectedEndDate])
-
-  // [자동계산 기본값] 위치(슬롯)를 안 골라도 보관료가 자동 채워지도록,
-  //   층 단가가 설정돼 있으면 '가장 낮은 층'을 기준으로 삼는다. (슬롯을 고르면 onPickSlot 이 그 층으로 갱신)
-  useEffect(() => {
-    if (feeTier != null || floorPrices.size === 0) return
-    setFeeTier(Math.min(...floorPrices.keys()))
-  }, [floorPrices, feeTier])
+  // [보관료 수동 입력] 층 단가 × 보관일수 기반 자동 계산은 제거됐다.
+  //   보관료는 담당자가 직접 입력한 값만 저장되며, 날짜·위치를 바꿔도 금액이 바뀌지 않는다.
 
   const periodError = validateContractPeriod(storageStartDate, expectedEndDate)
 
@@ -1512,7 +1425,6 @@ export function CreateOrderModal({
                     warehouseId={warehouseId ? Number(warehouseId) : null}
                     value={slotId}
                     onChange={setSlotId}
-                    onPickSlot={(s) => setFeeTier(s?.tier ?? null)}
                   />
                 </div>
               </>
@@ -1581,7 +1493,14 @@ export function CreateOrderModal({
                   onChange={(e) => setEndDate(e.target.value)}
                   className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
                 />
-                <OutboundDatePresets startDate={storageStartDate} onPick={setEndDate} className="mt-1.5" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
+                {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
+                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                  {days != null ? `${days.toLocaleString()}일` : ''}
+                </div>
+                <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
               </div>
               <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관료 *</label>
@@ -1635,32 +1554,8 @@ export function CreateOrderModal({
               </div>
             </div>
             <div>
-              <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-slate-700">
-                납기일
-                {!dueTouched && (
-                  <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600">
-                    {paymentType === 'PREPAID' ? '보관 시작일 자동' : '보관 종료일 자동'}
-                  </span>
-                )}
-              </label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => {
-                  setDueDate(e.target.value)
-                  setDueTouched(true)
-                }}
-                className={inputCls}
-              />
-              {dueTouched && (
-                <button
-                  type="button"
-                  onClick={() => setDueTouched(false)}
-                  className="mt-1 text-[11px] text-slate-400 underline-offset-2 hover:text-indigo-600 hover:underline"
-                >
-                  결제 방식 기준으로 되돌리기
-                </button>
-              )}
+              <label className="mb-1 block text-sm font-medium text-slate-700">납기일</label>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} />
             </div>
 
             {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 */}
