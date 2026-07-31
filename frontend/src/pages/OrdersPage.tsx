@@ -1472,6 +1472,52 @@ export function CreateOrderModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* 단일 컬럼: 고객 → 고객 검색 → 창고 → 위치 → 일정 순 */}
           <div className="space-y-4">
+
+            
+            {fixedSlot ? (
+              /* [통합] 컨테이너 관리에서 입고: 창고·자리 자동 고정(변경 불가) */
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">창고 · 위치</label>
+                <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3.5 py-3">
+                  <span className="text-base font-semibold text-slate-800 md:text-sm">
+                    {fixedSlot.warehouseName} · {fixedSlot.locationLabel}
+                  </span>
+                  <span className="ml-auto shrink-0 rounded-md bg-white px-2 py-0.5 text-xs font-medium text-slate-500">자동 선택</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">창고 *</label>
+                  <select
+                    value={warehouseId}
+                    onChange={(e) => {
+                      setWarehouseId(e.target.value)
+                      setSlotId(null) // 창고가 바뀌면 이전 자리 선택 초기화
+                    }}
+                    className={inputCls}
+                  >
+                    <option value="">창고 선택…</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">컨테이너 위치 지정</label>
+                  <LocationPickerField
+                    warehouseId={warehouseId ? Number(warehouseId) : null}
+                    value={slotId}
+                    onChange={setSlotId}
+                    onPickSlot={(s) => setFeeTier(s?.tier ?? null)}
+                  />
+                </div>
+              </>
+            )}
+            
             <div>
               <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객 *</label>
               {selectedCustomer ? (
@@ -1520,50 +1566,6 @@ export function CreateOrderModal({
                 heightClass="h-64"
               />
             </div>
-
-            {fixedSlot ? (
-              /* [통합] 컨테이너 관리에서 입고: 창고·자리 자동 고정(변경 불가) */
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">창고 · 위치</label>
-                <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3.5 py-3">
-                  <span className="text-base font-semibold text-slate-800 md:text-sm">
-                    {fixedSlot.warehouseName} · {fixedSlot.locationLabel}
-                  </span>
-                  <span className="ml-auto shrink-0 rounded-md bg-white px-2 py-0.5 text-xs font-medium text-slate-500">자동 선택</span>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">창고 *</label>
-                  <select
-                    value={warehouseId}
-                    onChange={(e) => {
-                      setWarehouseId(e.target.value)
-                      setSlotId(null) // 창고가 바뀌면 이전 자리 선택 초기화
-                    }}
-                    className={inputCls}
-                  >
-                    <option value="">창고 선택…</option>
-                    {warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">컨테이너 위치 지정</label>
-                  <LocationPickerField
-                    warehouseId={warehouseId ? Number(warehouseId) : null}
-                    value={slotId}
-                    onChange={setSlotId}
-                    onPickSlot={(s) => setFeeTier(s?.tier ?? null)}
-                  />
-                </div>
-              </>
-            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
