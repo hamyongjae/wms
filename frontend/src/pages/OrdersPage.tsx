@@ -58,22 +58,14 @@ const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 // 모바일 카드용 짧은 날짜(MM.DD) — 큰 글씨에서도 줄바꿈 없이 들어가도록
 const md = (s?: string | null) => (s ? s.slice(5).replace('-', '.') : '미정')
 
-// [조회 기간] 원터치 퀵 프리셋
-const PERIOD_PRESETS = [
-  { key: 'THIS_MONTH', label: '이번 달' },
-  { key: 'LAST_MONTH', label: '지난 달' },
-  { key: 'LAST_7', label: '최근 7일' },
-  { key: 'ALL', label: '전체' },
-] as const
-type PeriodKey = (typeof PERIOD_PRESETS)[number]['key'] | 'CUSTOM'
-
 const ymd = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-// 해당 달의 1일~말일
-const monthRange = (base: Date): { from: string; to: string } => {
-  const y = base.getFullYear()
-  const m = base.getMonth()
-  return { from: ymd(new Date(y, m, 1)), to: ymd(new Date(y, m + 1, 0)) }
+// [조회 기간 기본값] 오늘로부터 한 달 전 ~ 오늘
+const defaultRange = (): { from: string; to: string } => {
+  const to = new Date()
+  const from = new Date(to)
+  from.setMonth(from.getMonth() - 1)
+  return { from: ymd(from), to: ymd(to) }
 }
 
 /* 모바일 카드: 라벨-값 한 줄 */
@@ -139,8 +131,7 @@ export default function OrdersPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [filter, setFilter] = useState<FilterKey>('ALL')
   const [query, setQuery] = useState('') // 조회어(고객명·창고명)
-  const [range, setRange] = useState<{ from: string; to: string }>(() => monthRange(new Date())) // 조회 기간(기본 이번 달)
-  const [period, setPeriod] = useState<PeriodKey>('THIS_MONTH')
+  const [range, setRange] = useState<{ from: string; to: string }>(() => defaultRange()) // 조회 기간(기본: 오늘로부터 한 달)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -153,19 +144,6 @@ export default function OrdersPage() {
   const [locationsByOrder, setLocationsByOrder] = useState<Map<number, string[]>>(new Map())
 
   const reload = () => setRefreshKey((k) => k + 1)
-
-  // [원터치 퀵 기간] 버튼 하나로 조회 기간을 즉시 전환 (별도 조회 버튼 없음)
-  function applyPreset(key: Exclude<PeriodKey, 'CUSTOM'>) {
-    setPeriod(key)
-    const now = new Date()
-    if (key === 'THIS_MONTH') setRange(monthRange(now))
-    else if (key === 'LAST_MONTH') setRange(monthRange(new Date(now.getFullYear(), now.getMonth() - 1, 1)))
-    else if (key === 'LAST_7') {
-      const f = new Date(now)
-      f.setDate(f.getDate() - 6)
-      setRange({ from: ymd(f), to: ymd(now) })
-    } else setRange({ from: '', to: '' }) // 전체
-  }
 
   useEffect(() => {
     setLoading(true)
@@ -332,29 +310,62 @@ export default function OrdersPage() {
 
       <Fab actions={[{ label: '계약 등록', icon: Plus, onClick: () => setCreateOpen(true) }]} />
 
-      {/* 조회 기간 — 원터치 퀵 버튼(이번 달 기본) + 사용자 지정 기간 */}
+      {/* 조회 기간 — 상태 필터(전체·입고·출고) + 사용자 지정 기간(기본: 오늘로부터 한 달) */}
       <div className="rounded-2xl bg-white p-3 shadow-soft ring-1 ring-slate-200/60">
-        <div className="grid grid-cols-4 gap-2">
-          {PERIOD_PRESETS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => applyPreset(p.key)}
-              className={cn(
-                'rounded-xl py-3 text-sm font-bold transition active:scale-[0.98] sm:text-base',
-                period === p.key ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-              )}
-            >
-              {p.label}
-            </button>
-          ))}
+        {/* 데스크톱: 작은 필터 칩 */}
+        <div className="hidden flex-wrap items-center gap-1.5 md:flex">
+          {FILTERS.map((f) => {
+            const count =
+              f.key === 'ALL'
+                ? orders.length
+                : orders.filter((o) => o.status === f.key).length
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilter(f.key)}
+                className={cn(
+                  'rounded-lg px-3 py-1.5 text-xs font-medium transition',
+                  filter === f.key
+                    ? 'bg-slate-800 text-white'
+                    : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50',
+                )}
+              >
+                {f.label} <span className="ml-0.5 opacity-70">{count}</span>
+              </button>
+            )
+          })}
         </div>
+
+        {/* 모바일: 큰 상태 퀵탭 — 한 번 터치로 원하는 상태만 보기 */}
+        <div className="grid grid-cols-3 gap-2 md:hidden">
+          {FILTERS.map((f) => {
+            const count =
+              f.key === 'ALL' ? orders.length : orders.filter((o) => o.status === f.key).length
+            const active = filter === f.key
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilter(f.key)}
+                className={cn(
+                  'flex flex-col items-center rounded-2xl py-3 text-base font-bold transition active:scale-[0.98]',
+                  active ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-500 ring-1 ring-slate-200',
+                )}
+              >
+                {f.label}
+                <span className={cn('mt-0.5 text-sm font-semibold', active ? 'text-white/80' : 'text-slate-400')}>{count}</span>
+              </button>
+            )
+          })}
+        </div>
+
         <div className="mt-2.5 flex items-center gap-2">
           <input
             type="date"
             value={range.from}
             max={range.to || undefined}
-            onChange={(e) => { setRange((r) => ({ ...r, from: e.target.value })); setPeriod('CUSTOM') }}
+            onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
             className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:flex-none"
           />
           <span className="shrink-0 text-slate-400">~</span>
@@ -362,7 +373,7 @@ export default function OrdersPage() {
             type="date"
             value={range.to}
             min={range.from || undefined}
-            onChange={(e) => { setRange((r) => ({ ...r, to: e.target.value })); setPeriod('CUSTOM') }}
+            onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
             className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:flex-none"
           />
         </div>
@@ -387,54 +398,6 @@ export default function OrdersPage() {
             <X size={18} />
           </button>
         )}
-      </div>
-
-      {/* 데스크톱: 작은 필터 칩 */}
-      <div className="hidden flex-wrap items-center gap-1.5 md:flex">
-        {FILTERS.map((f) => {
-          const count =
-            f.key === 'ALL'
-              ? orders.length
-              : orders.filter((o) => o.status === f.key).length
-          return (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setFilter(f.key)}
-              className={cn(
-                'rounded-lg px-3 py-1.5 text-xs font-medium transition',
-                filter === f.key
-                  ? 'bg-slate-800 text-white'
-                  : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50',
-              )}
-            >
-              {f.label} <span className="ml-0.5 opacity-70">{count}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* 모바일: 큰 상태 퀵탭 — 한 번 터치로 원하는 상태만 보기 */}
-      <div className="grid grid-cols-3 gap-2 md:hidden">
-        {FILTERS.map((f) => {
-          const count =
-            f.key === 'ALL' ? orders.length : orders.filter((o) => o.status === f.key).length
-          const active = filter === f.key
-          return (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setFilter(f.key)}
-              className={cn(
-                'flex flex-col items-center rounded-2xl py-3 text-base font-bold transition active:scale-[0.98]',
-                active ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-500 ring-1 ring-slate-200',
-              )}
-            >
-              {f.label}
-              <span className={cn('mt-0.5 text-sm font-semibold', active ? 'text-white/80' : 'text-slate-400')}>{count}</span>
-            </button>
-          )
-        })}
       </div>
 
       {loading && (
