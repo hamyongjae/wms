@@ -132,21 +132,21 @@ export default function LocationPickerField({
                           onChange(next ? next.id : null)
                           onPickSlot?.(next)
                         }}
-                        title={s.occupied && !isCurrent ? `사용중 (${s.containerNo ?? '점유'})` : s.locationLabel}
+                        title={s.occupied && !isCurrent ? `사용중 (${s.containerNo ?? '점유'})` : `빈자리 (${s.locationLabel})`}
                         className={cn(
-                          'relative flex h-10 w-10 items-center justify-center rounded-lg border text-[11px] font-medium transition',
+                          'relative flex h-12 w-12 items-center justify-center rounded-lg border-2 text-base font-extrabold tabular-nums transition',
                           isSelected
-                            ? 'border-indigo-600 bg-indigo-600 text-white shadow'
+                            ? 'border-indigo-600 bg-indigo-600 text-white shadow-md'
                             : isCurrent
-                              ? 'border-dashed border-indigo-400 bg-indigo-50 text-indigo-700'
+                              ? 'border-dashed border-indigo-500 bg-indigo-50 text-indigo-700'
                               : s.occupied
-                                ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                                : 'border-dashed border-slate-300 text-slate-500 hover:border-indigo-400 hover:bg-indigo-50',
+                                ? 'cursor-not-allowed border-slate-700 bg-slate-700 text-white shadow-inner'
+                                : 'border-dashed border-emerald-500 bg-emerald-50 text-emerald-700 hover:border-emerald-600 hover:bg-emerald-100',
                         )}
                       >
-                        {isSelected ? <Check size={14} /> : s.columnNo}
+                        {isSelected ? <Check size={20} strokeWidth={3} /> : s.columnNo}
                         {isCurrent && !isSelected && (
-                          <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 rounded bg-indigo-500 px-1 text-[8px] leading-tight text-white">
+                          <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded bg-indigo-500 px-1 text-[9px] font-bold leading-tight text-white">
                             현재
                           </span>
                         )}
@@ -161,17 +161,19 @@ export default function LocationPickerField({
       </div>
 
       {/* 범례 */}
-      <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 px-3 py-2 text-[11px] text-slate-500">
-        <span className="flex items-center gap-1">
-          <span className="h-3 w-3 rounded border border-dashed border-slate-300" /> 빈자리
+      <div className="flex flex-wrap items-center gap-4 border-t border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600">
+        <span className="flex items-center gap-1.5">
+          <span className="h-4 w-4 rounded border-2 border-dashed border-emerald-500 bg-emerald-50" /> 빈자리
         </span>
-        <span className="flex items-center gap-1">
-          <span className="h-3 w-3 rounded bg-slate-100" /> 사용중
+        <span className="flex items-center gap-1.5">
+          <span className="h-4 w-4 rounded border-2 border-slate-700 bg-slate-700" /> 사용중
         </span>
-        <span className="flex items-center gap-1">
-          <span className="h-3 w-3 rounded bg-indigo-600" /> 선택
+        <span className="flex items-center gap-1.5">
+          <span className="h-4 w-4 rounded bg-indigo-600" /> 선택
         </span>
-        {warehouseId != null && !loading && <span className="ml-auto">빈자리 {emptyCount}칸</span>}
+        {warehouseId != null && !loading && (
+          <span className="ml-auto text-sm font-bold text-emerald-700">빈자리 {emptyCount}칸</span>
+        )}
       </div>
     </div>
   )
