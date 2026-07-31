@@ -1248,13 +1248,14 @@ function EditOrderModal({
 }
 
 /* ===== 계약 등록 ===== */
-function CreateOrderModal({
+export function CreateOrderModal({
   open,
   onClose,
   customers,
   warehouses,
   onCustomerAdded,
   onDone,
+  fixedSlot,
 }: {
   open: boolean
   onClose: () => void
@@ -1262,6 +1263,8 @@ function CreateOrderModal({
   warehouses: Warehouse[]
   onCustomerAdded: (c: Customer) => void
   onDone: () => void
+  // [통합] 컨테이너 관리에서 빈 자리 입고로 열 때: 이 슬롯의 창고·자리로 자동 고정(변경 불가)
+  fixedSlot?: { id: number; warehouseId: number; warehouseName: string; locationLabel: string; tier: number } | null
 }) {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [warehouseId, setWarehouseId] = useState('')
@@ -1303,8 +1306,16 @@ function CreateOrderModal({
   useEffect(() => {
     if (open) {
       setSelectedCustomer(null)
-      setWarehouseId(warehouses[0] ? String(warehouses[0].id) : '')
-      setSlotId(null)
+      // [통합] 컨테이너 관리 입고로 열렸으면 그 창고·자리로 고정, 아니면 기본 창고 + 미지정
+      if (fixedSlot) {
+        setWarehouseId(String(fixedSlot.warehouseId))
+        setSlotId(fixedSlot.id)
+        setFeeTier(fixedSlot.tier)
+      } else {
+        setWarehouseId(warehouses[0] ? String(warehouses[0].id) : '')
+        setSlotId(null)
+        setFeeTier(null)
+      }
       setStartDate(today())
       setEndDate(addDays(today(), Math.max(defaultDays - 1, 0))) // 당일 포함 defaultDays일
       setMonthlyFee(null)
@@ -1314,12 +1325,11 @@ function CreateOrderModal({
       setSettlementUserId(null)
       setDueDate(today()) // 선불 기본값 = 보관 시작일(=today)
       setDueTouched(false)
-      setFeeTier(null)
       setMemo('')
       setFormError(null)
       setDormantConfirm(false)
     }
-  }, [open, warehouses])
+  }, [open, warehouses, fixedSlot])
 
   // [납기일 제로클릭 자동 세팅] 결제 방식/기준 날짜가 바뀌면 납기 기본값을 즉시 매핑한다.
   //   · 선불: 보관 시작일  · 후불: 보관 종료일(없으면 시작일)
@@ -1511,36 +1521,51 @@ function CreateOrderModal({
               />
             </div>
 
-            <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">창고 *</label>
-              <select
-                value={warehouseId}
-                onChange={(e) => {
-                  setWarehouseId(e.target.value)
-                  setSlotId(null) // 창고가 바뀌면 이전 자리 선택 초기화
-                }}
-                className={inputCls}
-              >
-                <option value="">창고 선택…</option>
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {fixedSlot ? (
+              /* [통합] 컨테이너 관리에서 입고: 창고·자리 자동 고정(변경 불가) */
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">창고 · 위치</label>
+                <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3.5 py-3">
+                  <span className="text-base font-semibold text-slate-800 md:text-sm">
+                    {fixedSlot.warehouseName} · {fixedSlot.locationLabel}
+                  </span>
+                  <span className="ml-auto shrink-0 rounded-md bg-white px-2 py-0.5 text-xs font-medium text-slate-500">자동 선택</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">창고 *</label>
+                  <select
+                    value={warehouseId}
+                    onChange={(e) => {
+                      setWarehouseId(e.target.value)
+                      setSlotId(null) // 창고가 바뀌면 이전 자리 선택 초기화
+                    }}
+                    className={inputCls}
+                  >
+                    <option value="">창고 선택…</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">컨테이너 위치 지정</label>
-              <LocationPickerField
-                warehouseId={warehouseId ? Number(warehouseId) : null}
-                value={slotId}
-                onChange={setSlotId}
-                onPickSlot={(s) => setFeeTier(s?.tier ?? null)}
-              />
-            </div>
+                <div>
+                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">컨테이너 위치 지정</label>
+                  <LocationPickerField
+                    warehouseId={warehouseId ? Number(warehouseId) : null}
+                    value={slotId}
+                    onChange={setSlotId}
+                    onPickSlot={(s) => setFeeTier(s?.tier ?? null)}
+                  />
+                </div>
+              </>
+            )}
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 시작일 *</label>
                 <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={inputCls} />
@@ -1590,20 +1615,22 @@ function CreateOrderModal({
                 </div>
               </div>
             </div>
-            <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 방식 *</label>
-              <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={inputCls}>
-                <option value="PREPAID">선불 (당일 완납)</option>
-                <option value="POSTPAID">후불</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 수단 *</label>
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={inputCls}>
-                <option value="BANK_TRANSFER">계좌이체</option>
-                <option value="CASH">현금</option>
-                <option value="CARD">카드</option>
-              </select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 방식 *</label>
+                <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={inputCls}>
+                  <option value="PREPAID">선불 (당일 완납)</option>
+                  <option value="POSTPAID">후불</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 수단 *</label>
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={inputCls}>
+                  <option value="BANK_TRANSFER">계좌이체</option>
+                  <option value="CASH">현금</option>
+                  <option value="CARD">카드</option>
+                </select>
+              </div>
             </div>
             <div>
               <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-slate-700">

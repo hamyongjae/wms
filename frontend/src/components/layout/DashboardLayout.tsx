@@ -22,15 +22,17 @@ export default function DashboardLayout() {
   }, [collapsed])
 
   return (
-    <div className="bg-yard-grid flex h-screen">
+    // h-app-screen: 100dvh(폴백 100vh) — 모바일 주소창이 보일 때도 셸이 화면을 넘지 않아 하단이 잘리지 않는다
+    <div className="bg-yard-grid flex h-app-screen">
       {/* 사이드바는 md 이상에서만 — 모바일에선 하단 탭 바로 대체 */}
       <div className="hidden md:contents">
         <Sidebar collapsed={collapsed} />
       </div>
-      <div className="flex-1 overflow-y-auto">
+      {/* overscroll-contain: 끝까지 스크롤했을 때 바깥(body)으로 스크롤이 전파돼 화면이 밀리는 것을 막는다 */}
+      <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain">
         <Header collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
-        {/* 모바일은 하단 탭 바 높이만큼 여백을 확보해 콘텐츠가 가려지지 않게 */}
-        <main className="p-4 pb-24 sm:p-6 md:pb-8 lg:p-8">
+        {/* pb-tabbar: 탭 바 높이 + 홈 인디케이터 세이프 에어리어만큼 여백 확보(md 이상은 자동 원복) */}
+        <main className="p-4 pb-tabbar sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>

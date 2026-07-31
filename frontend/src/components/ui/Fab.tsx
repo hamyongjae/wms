@@ -6,7 +6,8 @@ import { cn } from '@/lib/cn'
  * [엄지 존] 모바일 전용 플로팅 액션 버튼.
  *  - 액션이 1개면: 탭 즉시 실행.
  *  - 여러 개면: 탭 시 위로 순차(stagger) 펼침 + 배경 스크림, FAB 아이콘은 ×로 회전.
- * 하단 탭 바(약 64px) 위에 떠서 오른손 엄지 궤적의 종점에 놓인다. md 이상에선 렌더되지 않는다.
+ * 위치는 매직 넘버 대신 --tabbar-total(탭 바 높이 + 세이프 에어리어) 기준선을 공유한다.
+ * 덕분에 홈 인디케이터가 있는 기기에서도 탭 바와 절대 겹치지 않는다. md 이상에선 렌더되지 않는다.
  */
 
 export interface FabAction {
@@ -35,7 +36,7 @@ export default function Fab({ actions }: { actions: FabAction[] }) {
 
       {/* 펼쳐지는 액션들 (아래→위 스태거) */}
       {!single && (
-        <div className="fixed bottom-40 right-4 z-50 flex flex-col items-end gap-2.5">
+        <div className="bottom-above-fab fixed right-4 z-50 flex flex-col items-end gap-2.5">
           {open &&
             actions.map((a, i) => (
               <button
@@ -63,7 +64,7 @@ export default function Fab({ actions }: { actions: FabAction[] }) {
         onClick={handleMain}
         aria-label={single ? actions[0].label : '빠른 작업'}
         className={cn(
-          'card-press fixed bottom-24 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-soft transition',
+          'card-press bottom-above-tabbar fixed right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-soft transition',
           open ? 'rotate-45 bg-slate-700' : 'bg-indigo-600 hover:bg-indigo-700',
         )}
         style={{ transition: 'transform 240ms ease-out, background-color 200ms ease-out' }}

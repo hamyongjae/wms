@@ -136,7 +136,7 @@ export default function SignupPage({ isSocialSignup: isSocialProp }: { isSocialS
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
+    <div className="flex min-h-app-screen items-center justify-center bg-slate-100 px-4 py-10">
       <div className="w-full max-w-md">
         {/* 브랜드 */}
         <div className="mb-6 flex items-center justify-center gap-2">

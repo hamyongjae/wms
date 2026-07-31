@@ -19,24 +19,16 @@ import { yardApi, type YardSlot, type FloorPrice } from '@/api/yardApi'
 import { containerApi, type Container } from '@/api/containerApi'
 import { customerApi, type Customer } from '@/api/customerApi'
 import { orderApi, type StorageOrder, type PaymentType, type PaymentMethod } from '@/api/orderApi'
-import { staffApi, type Staff } from '@/api/staffApi'
-import { addDays } from '@/lib/dates'
-import { calcFloorFee } from '@/lib/fee'
-import { useFloorPricing } from '@/hooks/useFloorPricing'
-import { tenantApi } from '@/api/tenantApi'
-import OutboundDatePresets from '@/components/ui/OutboundDatePresets'
 import { orderSync } from '@/lib/orderEvents'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
 import MoneyInput from '@/components/ui/MoneyInput'
-import CustomerListPicker from '@/components/customer/CustomerListPicker'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
-import { calcDailyFee } from '@/lib/fee'
 import { extractOwner } from '@/lib/owner'
-import { nextContainerNo } from '@/lib/containerNo'
 import { validateInOut, todayStr } from '@/lib/dateValidation'
+import { CreateOrderModal } from './OrdersPage' // [통합] 계약등록 공용 폼(컨테이너 관리 입고에서 창고·자리 고정)
 
 /* ===== 타입 명세 ===== */
 // 좌표 + 컨테이너가 결합된 슬롯 (백엔드 YardSlotResponse와 매칭)
@@ -199,45 +191,6 @@ export default function YardDispatchPage() {
   }
 
   /* ===== 액션 ===== */
-  async function doQuickInbound(body: QuickInboundDto) {
-    // 파이프라인: (계약 미연결 시) 새 계약 생성 → 컨테이너 생성 → 계약 배정 → 슬롯 적재
-    // 화주는 memo 앞 태그로, 입고/출고예정일은 정식 필드로 저장.
-    let orderId = body.orderId
-    // 기존 계약을 연결하지 않았으면, 이 입고 정보로 새 계약을 만들어 계약 관리에도 뜨게 한다.
-    // [선불 자동 정산] paymentType=PREPAID면 백엔드가 계약 등록과 한 트랜잭션으로 청구·수금까지 완결한다.
-    if (orderId == null && body.customerId != null) {
-      const order = await orderApi.create({
-        customerId: body.customerId,
-        warehouseId: body.warehouseId,
-        storageStartDate: body.inboundDate ?? todayStr(),
-        expectedEndDate: body.outboundDate,
-        monthlyFee: body.monthlyFee ?? 0,
-        capacityTons: body.capacityTons,
-        paymentType: body.paymentType,
-        memo: body.memo,
-      })
-      orderId = order.id
-    }
-
-    const tag = body.customerName ? `[${body.customerName}]` : ''
-    const composedMemo = [tag, body.memo].filter(Boolean).join(' ').trim() || undefined
-    // 컨테이너 번호는 업체 전체에서 유일해야 하므로 전 창고 기준으로 채번(충돌 방지)
-    const allContainers = await containerApi.list({})
-    const containerNo = nextContainerNo(new Set(allContainers.map((c) => c.containerNo)))
-    const created = await containerApi.create({
-      warehouseId: body.warehouseId,
-      containerNo,
-      capacityTon: body.capacityTon,   // 물리 컨테이너 용량 (보관 용량 입력값과 동기화, 기본 5톤)
-      memo: composedMemo,
-      inboundDate: body.inboundDate,
-      expectedOutboundDate: body.outboundDate,
-    })
-    // 적재(OCCUPIED) 전에 배정해야 함(assignTo 는 AVAILABLE 상태만 허용)
-    if (orderId != null) {
-      await containerApi.assign(created.id, orderId)
-    }
-    await containerApi.inbound({ containerId: created.id, targetSlotId: body.targetSlotId })
-  }
 
   async function handleOutbound(slot: YardSlot) {
     if (slot.containerId == null) return
@@ -392,16 +345,16 @@ export default function YardDispatchPage() {
         <>
           {/* 모바일: 가로 4칸 요약 (총/사용중/공실/미사용) */}
           <div className="grid grid-cols-4 gap-1.5 md:hidden">
-            <YardStat label="전체" value={kpi.total} tone="slate" />
-            <YardStat label="사용중" value={kpi.occupied} tone="emerald" />
-            <YardStat label="공실" value={kpi.vacant} tone="indigo" />
-            <YardStat label="미사용" value={kpi.inactive} tone="rose" />
+            <YardStat label="전체" value={kpi.total} />
+            <YardStat label="사용중" value={kpi.occupied} />
+            <YardStat label="공실" value={kpi.vacant} />
+            <YardStat label="미사용" value={kpi.inactive} />
           </div>
-          {/* 데스크톱: StatCard */}
+          {/* 데스크톱: StatCard (검정 톤 통일) */}
           <div className="hidden gap-4 md:grid md:grid-cols-4">
             <StatCard label="총 컨테이너" value={fmt(kpi.total)} icon={Grid3x3} tone="slate" />
-            <StatCard label="사용중" value={fmt(kpi.occupied)} icon={Boxes} tone="indigo" />
-            <StatCard label="공실" value={fmt(kpi.vacant)} icon={Square} tone="emerald" />
+            <StatCard label="사용중" value={fmt(kpi.occupied)} icon={Boxes} tone="slate" />
+            <StatCard label="공실" value={fmt(kpi.vacant)} icon={Square} tone="slate" />
             <StatCard label="미사용" value={fmt(kpi.inactive)} icon={Ban} tone="slate" />
           </div>
 
@@ -634,16 +587,25 @@ export default function YardDispatchPage() {
         </Modal>
       )}
 
-      {/* 즉시 입고 팝업 */}
+      {/* 계약 등록(통합) — 컨테이너 관리 입고: 선택한 창고·자리 자동 고정(변경 불가) */}
       {inboundSlot && selectedId != null && (
-        <InboundModal
-          slot={inboundSlot}
-          warehouseId={selectedId}
+        <CreateOrderModal
+          open
+          fixedSlot={inboundSlot}
           customers={customers}
-          orders={orders}
-          existingNos={new Set([...containersById.values()].map((c) => c.containerNo))}
+          warehouses={warehouses}
+          onCustomerAdded={(c) =>
+            setCustomers((prev) => {
+              const i = prev.findIndex((x) => x.id === c.id)
+              if (i >= 0) {
+                const next = [...prev]
+                next[i] = c
+                return next
+              }
+              return [...prev, c]
+            })
+          }
           onClose={() => setInboundSlot(null)}
-          onSubmit={doQuickInbound}
           onDone={() => {
             setInboundSlot(null)
             setBanner('입고 배치 완료')
@@ -801,305 +763,6 @@ function SlotCell({
   )
 }
 
-/* ===== 즉시 입고 모달 ===== */
-function InboundModal({
-  slot,
-  warehouseId,
-  customers,
-  orders,
-  existingNos,
-  onClose,
-  onSubmit,
-  onDone,
-}: {
-  slot: YardSlot
-  warehouseId: number
-  customers: Customer[]
-  orders: StorageOrder[]
-  existingNos: Set<string>
-  onClose: () => void
-  onSubmit: (body: QuickInboundDto) => Promise<void>
-  onDone: () => void
-}) {
-  const [customerId, setCustomerId] = useState('')
-  const [orderId, setOrderId] = useState('') // 선택 계약(빈 값이면 배정 안 함)
-  const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
-  const [capacityTons, setCapacityTons] = useState<number | null>(null) // 보관 용량(톤)
-  const [paymentType, setPaymentType] = useState<PaymentType>('PREPAID')
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('BANK_TRANSFER')
-  const [settlementUserId, setSettlementUserId] = useState<number | null>(null)
-  const [staffList, setStaffList] = useState<Staff[]>([])
-  const today = new Date().toISOString().slice(0, 10)
-  const [inboundDate, setInboundDate] = useState(today)
-  const [outboundDate, setOutboundDate] = useState(addDays(today, 9)) // 당일 포함 10일
-  const [defaultDays, setDefaultDays] = useState(10) // 전역 기본 계약 유지 기간(당일 포함 보관일수)
-  const [memo, setMemo] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-
-  // 컨테이너 번호 자동 배정 (접두사 없이 순번) — 기존 번호 중 최대 정수 +1
-  const autoNo = useMemo(() => nextContainerNo(existingNos), [existingNos])
-
-  // [수납 계좌] 직원 목록 (계좌이체 담당 선택용) — 권한 없으면 빈 목록
-  useEffect(() => {
-    let alive = true
-    staffApi.list().then((s) => alive && setStaffList(s)).catch(() => alive && setStaffList([]))
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  // 전역 기본 계약 유지 기간 로드 (출고 예정일 기본값)
-  useEffect(() => {
-    tenantApi.me().then((t) => setDefaultDays(t.defaultStoragePeriodDays ?? 10)).catch(() => {})
-  }, [])
-
-  // [자동 계산] 입고일이 변경되면 출고 예정일을 전역 기본 기간(당일 포함)만큼 뒤로 설정
-  useEffect(() => {
-    if (inboundDate && !outboundDate) {
-      setOutboundDate(addDays(inboundDate, Math.max(defaultDays - 1, 0)))
-    }
-  }, [inboundDate])
-
-  // [층 단가 연동] 이 슬롯의 층 단가·최소료로 보관료 자동 보정 (공통 엔진).
-  //   새 계약 생성 시(기존 계약 미연결)만, 기간이 바뀌면 실시간 재계산 — 제로 타이핑.
-  const floorPrices = useFloorPricing(warehouseId, true)
-  useEffect(() => {
-    if (orderId) return // 기존 계약에 연결하면 보관료는 그 계약을 따른다
-    const rate = floorPrices.get(slot.tier)
-    if (rate) setMonthlyFee(calcFloorFee(rate, inboundDate, outboundDate))
-  }, [floorPrices, slot.tier, orderId, inboundDate, outboundDate])
-
-  const selectedCustomer = useMemo(
-    () => customers.find((c) => String(c.id) === customerId) ?? null,
-    [customers, customerId],
-  )
-
-  // 선택된 화주 + 이 창고의 '입고(활성)' 계약만 연결 대상으로 노출.
-  //   [상태 모델] 계약 상태는 INBOUND/OUTBOUND 이진 — 예전 RECEIVED/IN_STORAGE 값은 폐기됨.
-  //   컨테이너 미지정으로 등록된 활성 계약을 이 입고 컨테이너에 연결할 수 있게 한다.
-  const contractOptions = useMemo(() => {
-    if (!selectedCustomer) return []
-    return orders.filter(
-      (o) =>
-        o.customerId === selectedCustomer.id &&
-        o.warehouseId === warehouseId &&
-        o.status === 'INBOUND',
-    )
-  }, [orders, selectedCustomer, warehouseId])
-
-  // 화주를 바꾸면 이전 계약 선택은 초기화
-  useEffect(() => {
-    setOrderId('')
-  }, [customerId])
-
-  // [실시간] 하루 보관료 = 보관료 ÷ (입고일~출고예정일 일수, 당일 포함).
-  // 보관료·입고일·출고예정일이 모두 유효할 때만 값, 아니면 null(빈 값).
-  const dailyFee = useMemo(
-    () => calcDailyFee(monthlyFee, inboundDate, outboundDate),
-    [monthlyFee, inboundDate, outboundDate],
-  )
-
-  // 실제 입고 확정이므로 입고일 미래 불가 + 출고예정일 >= 입고일
-  const dateError = validateInOut(inboundDate, outboundDate)
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (!customerId) return setFormError('화주(고객)를 선택하세요.')
-    if (dateError) return setFormError(dateError)
-    // 기존 계약을 연결하지 않으면 이 입고로 새 계약이 생성되므로 보관료가 필요하다.
-    if (!orderId && (monthlyFee == null || monthlyFee <= 0)) {
-      return setFormError('보관료를 입력하세요. (입고 시 새 계약이 생성됩니다)')
-    }
-    setFormError(null)
-    setSubmitting(true)
-    try {
-      await onSubmit({
-        warehouseId,
-        targetSlotId: slot.id,
-        containerNo: autoNo,
-        capacityTon: capacityTons ?? 5, // 보관 용량 입력값(없으면 기본 5톤)을 컨테이너 용량으로도 반영
-        capacityTons: !orderId ? (capacityTons ?? undefined) : undefined, // 새 계약 생성 시에만 보관 용량 전달
-        customerId: Number(customerId),
-        customerName: selectedCustomer?.name,
-        orderId: orderId ? Number(orderId) : undefined,
-        monthlyFee: monthlyFee ?? undefined,
-        paymentType: !orderId ? paymentType : undefined,
-        paymentMethod: !orderId ? paymentMethod : undefined,
-        settlementUserId: !orderId && paymentMethod === 'BANK_TRANSFER' ? (settlementUserId ?? undefined) : undefined,
-        inboundDate: inboundDate || undefined,
-        outboundDate: outboundDate || undefined,
-        memo: memo.trim() || undefined,
-      })
-      onDone()
-    } catch (err) {
-      setFormError(errMsg(err, '입고에 실패했습니다.'))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <Modal open onClose={onClose} title="즉시 입고 및 배치" widthClass="max-w-3xl">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-700">
-          <PackagePlus size={16} />
-          위치 <span className="font-semibold">{slot.locationLabel}</span> 에 새 컨테이너를 배치합니다.
-        </div>
-
-        {/* 단일 컬럼: 화주 → 화주 검색 → 계약 연결 → 보관료 순 */}
-        <div className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">화주(고객) *</label>
-              {selectedCustomer ? (
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-800">{selectedCustomer.name}</p>
-                    <p className="truncate text-xs text-slate-500">{selectedCustomer.phoneNumber || '연락처 없음'}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setCustomerId('')}
-                    className="shrink-0 rounded-md p-1 text-slate-400 transition hover:bg-white hover:text-slate-600"
-                    title="선택 해제"
-                  >
-                    <X size={15} />
-                  </button>
-                </div>
-              ) : (
-                <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-400">
-                  아래 목록에서 화주를 선택하세요.
-                </p>
-              )}
-            </div>
-
-            {/* 화주 검색 — 화주(고객) 다음, 보관료 이전 */}
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">화주 검색</label>
-              <CustomerListPicker
-                customers={customers}
-                selectedId={customerId ? Number(customerId) : null}
-                onSelect={(c) => setCustomerId(String(c.id))}
-                heightClass="h-64"
-              />
-            </div>
-
-            {/* 계약 연결(선택) — 화주 선택 시 이 창고의 활성 계약을 골라 정식 배정 */}
-            {selectedCustomer && (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">계약 연결 (선택)</label>
-                {contractOptions.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-400">
-                    이 창고에 연결할 활성 계약이 없습니다. (배정 없이 입고됩니다)
-                  </p>
-                ) : (
-                  <select value={orderId} onChange={(e) => setOrderId(e.target.value)} className={inputCls}>
-                    <option value="">배정 안 함</option>
-                    {contractOptions.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.storageStartDate}~{o.expectedEndDate ?? '미정'} · {fmt(o.monthlyFee)}원/월
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">입고일</label>
-                <input type="date" value={inboundDate} max={todayStr()} onChange={(e) => setInboundDate(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
-                <input type="date" value={outboundDate} min={inboundDate || undefined} onChange={(e) => setOutboundDate(e.target.value)} className={inputCls} />
-                <OutboundDatePresets startDate={inboundDate} onPick={setOutboundDate} className="mt-1.5" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">보관료</label>
-                <MoneyInput
-                  value={monthlyFee}
-                  onChange={setMonthlyFee}
-                  placeholder="예: 300,000"
-                  className={cn(inputCls, 'pr-9')}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">하루 보관료</label>
-                {/* 보관료·입고일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
-                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
-                  {dailyFee != null ? `${fmt(dailyFee)}원` : ''}
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">보관 용량 (톤)</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.1"
-                    value={capacityTons ?? ''}
-                    onChange={(e) => setCapacityTons(e.target.value === '' ? null : Number(e.target.value))}
-                    placeholder="예: 5"
-                    className={cn(inputCls, 'pr-10')}
-                  />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">결제 방식 (신규 계약 시)</label>
-                <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={inputCls}>
-                  <option value="PREPAID">선불 (당일 완납)</option>
-                  <option value="POSTPAID">후불</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">결제 수단</label>
-                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)} className={inputCls}>
-                  <option value="BANK_TRANSFER">계좌이체</option>
-                  <option value="CASH">현금</option>
-                  <option value="CARD">카드</option>
-                </select>
-              </div>
-            </div>
-
-            {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 */}
-            {!orderId && paymentMethod === 'BANK_TRANSFER' && (
-              <InboundAccountPicker staffList={staffList} value={settlementUserId} onChange={setSettlementUserId} />
-            )}
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">특이사항</label>
-              <textarea
-                value={memo}
-                onChange={(e) => setMemo(e.target.value)}
-                rows={3}
-                placeholder="컨테이너 특이사항을 자유롭게 입력하세요."
-                className={cn(inputCls, 'min-h-55 resize-y')}
-              />
-            </div>
-        </div>
-
-        {dateError && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{dateError}</p>
-        )}
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
-
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
-            취소
-          </button>
-          <button type="submit" disabled={submitting || dateError != null} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
-            {submitting && <Loader2 size={14} className="animate-spin" />}
-            입고 배치
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
 
 /* ===== 적재 슬롯 액션 패널 ===== */
 function ActionPanel({
@@ -1518,56 +1181,13 @@ function FloorPriceInline({
 }
 
 /* 계좌이체 시 입금 계좌(담당 직원) 지정 — 직원 정보에 등록된 계좌를 선택만으로 매핑 */
-function InboundAccountPicker({
-  staffList,
-  value,
-  onChange,
-}: {
-  staffList: Staff[]
-  value: number | null
-  onChange: (id: number | null) => void
-}) {
-  const withAccount = staffList.filter((s) => s.accountNumber)
-  const selected = withAccount.find((s) => s.id === value) ?? null
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-      <label className="mb-1 block text-sm font-medium text-slate-700">입금 계좌 (담당 직원)</label>
-      {withAccount.length === 0 ? (
-        <p className="text-xs text-slate-400">계좌가 등록된 직원이 없습니다. 직원 관리에서 계좌를 먼저 등록하세요.</p>
-      ) : (
-        <>
-          <select
-            value={value ?? ''}
-            onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-            className={inputCls}
-          >
-            <option value="">계좌 미지정</option>
-            {withAccount.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} · {s.bankName ?? ''} {s.accountNumber}
-              </option>
-            ))}
-          </select>
-          {selected && (
-            <div className="mt-2 rounded-lg bg-white px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200">
-              <span className="font-medium text-slate-800">{selected.bankName}</span> {selected.accountNumber}
-              <span className="ml-1 text-slate-400">· 예금주 {selected.accountHolder ?? selected.name}</span>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
 
 // 층(tier)별로 묶어 높은 층이 위로, 각 층은 자리 번호(columnNo) 오름차순
 /* 모바일 가로 요약 카드 — 큰 숫자 + 작은 라벨 */
-function YardStat({ label, value, tone }: { label: string; value: number; tone: 'slate' | 'emerald' | 'indigo' | 'rose' }) {
-  const numCls =
-    tone === 'emerald' ? 'text-emerald-600' : tone === 'indigo' ? 'text-indigo-600' : tone === 'rose' ? 'text-rose-500' : 'text-slate-800'
+function YardStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-2xl bg-white p-3 text-center shadow-soft ring-1 ring-slate-200/60">
-      <p className={cn('text-3xl font-extrabold leading-none', numCls)}>{fmt(value)}</p>
+      <p className="text-3xl font-extrabold leading-none text-slate-900">{fmt(value)}</p>
       <p className="mt-1.5 text-xs font-semibold text-slate-500">{label}</p>
     </div>
   )

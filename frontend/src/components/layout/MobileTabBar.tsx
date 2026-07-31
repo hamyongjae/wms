@@ -33,14 +33,16 @@ export default function MobileTabBar() {
 
   return (
     <>
-      <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/92 backdrop-blur-md md:hidden">
-        <div className="flex items-stretch">
+      {/* tabbar-fixed: 화면 바닥 고정 + 세이프 에어리어 패딩 + iOS 스크롤 중 떨림 방지(합성 레이어 승격) */}
+      <nav className="tabbar-fixed z-40 border-t border-slate-200 bg-white/92 backdrop-blur-md md:hidden">
+        {/* 높이를 --tabbar-h 로 고정 — 콘텐츠 여백(pb-tabbar)·FAB 위치와 같은 기준선을 쓴다 */}
+        <div className="flex items-stretch" style={{ height: 'var(--tabbar-h)' }}>
           {primary.map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} className="min-w-0 flex-1">
               {({ isActive }) => (
                 <div
                   className={cn(
-                    'card-press flex flex-col items-center gap-0.5 py-2 pt-2.5',
+                    'card-press flex h-full flex-col items-center justify-center gap-0.5',
                     isActive ? 'text-indigo-600' : 'text-slate-400',
                   )}
                 >
@@ -55,7 +57,7 @@ export default function MobileTabBar() {
           <button type="button" onClick={() => setMoreOpen(true)} className="min-w-0 flex-1">
             <div
               className={cn(
-                'card-press flex flex-col items-center gap-0.5 py-2 pt-2.5',
+                'card-press flex h-full flex-col items-center justify-center gap-0.5',
                 onRestPage ? 'text-indigo-600' : 'text-slate-400',
               )}
             >

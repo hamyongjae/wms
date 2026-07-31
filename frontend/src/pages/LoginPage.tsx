@@ -48,7 +48,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-100">
+    <div className="flex min-h-app-screen bg-slate-100">
       {/* ===== 좌측 브랜드 히어로 (데스크톱) ===== */}
       <aside className="bg-brand-hero relative hidden w-1/2 flex-col justify-between overflow-hidden p-12 lg:flex xl:w-[55%]">
         <div className="bg-node-dots absolute inset-0 opacity-60" />
