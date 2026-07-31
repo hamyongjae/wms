@@ -1093,7 +1093,7 @@ function EditOrderModal({
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
                 </div>
               </div>
-              
+
               <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
                 <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
@@ -1499,14 +1499,6 @@ export function CreateOrderModal({
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
-                {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
-                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
-                  {days != null ? `${days.toLocaleString()}일` : ''}
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
-              </div>
-              <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관료 *</label>
                 <MoneyInput
                   value={monthlyFee}
@@ -1515,14 +1507,6 @@ export function CreateOrderModal({
                   placeholder="예: 300,000"
                   className={cn(inputCls, 'pr-9', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
                 />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
-                {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
-                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
-                  {dailyFee != null ? won(dailyFee) : ''}
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
               </div>
               <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 용량 (톤)</label>
@@ -1538,6 +1522,22 @@ export function CreateOrderModal({
                   />
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
                 </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
+                {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
+                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                  {days != null ? `${days.toLocaleString()}일` : ''}
+                </div>
+                <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
+                {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
+                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                  {dailyFee != null ? won(dailyFee) : ''}
+                </div>
+                <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
