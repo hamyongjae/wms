@@ -1066,14 +1066,7 @@ function EditOrderModal({
                   className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
                 />
               </div>
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
-                {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
-                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
-                  {days != null ? `${days.toLocaleString()}일` : ''}
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
-              </div>
+              
               <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관료 *</label>
                 <MoneyInput
@@ -1084,6 +1077,23 @@ function EditOrderModal({
                   className={cn(inputCls, 'pr-9', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
                 />
               </div>
+
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 용량 (톤)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0}
+                    step="1"
+                    value={capacityTons}
+                    onChange={(e) => setCapacityTons(e.target.value)}
+                    placeholder="예: 2.5"
+                    className={cn(inputCls, 'pr-10')}
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
+                </div>
+              </div>
+              
               <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
                 <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
@@ -1104,20 +1114,14 @@ function EditOrderModal({
                 </select>
               </div>
               <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 용량 (톤)</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={0}
-                    step="1"
-                    value={capacityTons}
-                    onChange={(e) => setCapacityTons(e.target.value)}
-                    placeholder="예: 2.5"
-                    className={cn(inputCls, 'pr-10')}
-                  />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
+                {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
+                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                  {days != null ? `${days.toLocaleString()}일` : ''}
                 </div>
+                <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
               </div>
+              
               <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 수단 *</label>
                 <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={inputCls}>
