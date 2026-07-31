@@ -1007,6 +1007,15 @@ function InboundModal({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">입고일</label>
+                <input type="date" value={inboundDate} max={todayStr()} onChange={(e) => setInboundDate(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
+                <input type="date" value={outboundDate} min={inboundDate || undefined} onChange={(e) => setOutboundDate(e.target.value)} className={inputCls} />
+                <OutboundDatePresets startDate={inboundDate} onPick={setOutboundDate} className="mt-1.5" />
+              </div>
+              <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">보관료</label>
                 <MoneyInput
                   value={monthlyFee}
@@ -1040,15 +1049,6 @@ function InboundModal({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">입고일</label>
-                <input type="date" value={inboundDate} max={todayStr()} onChange={(e) => setInboundDate(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
-                <input type="date" value={outboundDate} min={inboundDate || undefined} onChange={(e) => setOutboundDate(e.target.value)} className={inputCls} />
-                <OutboundDatePresets startDate={inboundDate} onPick={setOutboundDate} className="mt-1.5" />
-              </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">결제 방식 (신규 계약 시)</label>
                 <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={inputCls}>
@@ -1140,7 +1140,7 @@ function ActionPanel({
             </div>
             <Info label="용량">{container ? `${container.capacityTon}톤` : '—'}</Info>
             <Info label="상태">{container ? (CONTAINER_STATUS_KO[container.status] ?? container.status) : '—'}</Info>
-            <Info label="입고일">{container?.inboundDate ?? '—'}</Info>
+            <Info label="보관 입고일">{container?.inboundDate ?? '—'}</Info>
             <Info label="출고 예정일">{container?.expectedOutboundDate ?? '—'}</Info>
             <div className="col-span-2">
               <dt className="text-xs text-slate-400">특이사항</dt>
@@ -1244,7 +1244,7 @@ function EditModal({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">입고일</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">보관 입고일</label>
             <input type="date" value={inboundDate} max={todayStr()} onChange={(e) => setInboundDate(e.target.value)} className={inputCls} />
           </div>
           <div>
