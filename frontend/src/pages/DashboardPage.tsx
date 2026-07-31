@@ -359,12 +359,6 @@ export default function DashboardPage() {
             <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-slate-100 backdrop-blur">
               Smart Yard &amp; Warehouse
             </span>
-            <h2 className="mt-3 text-2xl font-bold text-white">
-              안녕하세요, {user?.name ?? ''}님 👋
-            </h2>
-            <p className="mt-1.5 text-sm leading-relaxed text-slate-300">
-              오늘의 입출고·보관·정산 현황을 한눈에 확인하세요.
-            </p>
           </div>
         </section>
 
