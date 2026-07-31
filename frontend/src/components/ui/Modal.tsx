@@ -79,7 +79,7 @@ export default function Modal({
       <div className="fixed inset-0 z-50 flex items-end">
         <div className="animate-scrim-in absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]" onClick={onClose} />
         <div
-          className="animate-sheet-up relative flex max-h-[92dvh] w-full flex-col rounded-t-3xl bg-white shadow-soft"
+          className="animate-sheet-up relative flex max-h-[92dvh] w-full flex-col overflow-x-hidden rounded-t-3xl bg-white shadow-soft"
           style={{
             transform: dragY > 0 ? `translateY(${dragY}px)` : undefined,
             transition: dragging ? 'none' : 'transform 280ms cubic-bezier(0.32, 0.72, 0, 1)',
@@ -108,7 +108,7 @@ export default function Modal({
           </div>
 
           {/* 내용 — 시트 내부만 스크롤, 하단 세이프 에어리어 존중 */}
-          <div className="pb-safe min-h-0 flex-1 overflow-y-auto px-5 pb-5">{children}</div>
+          <div className="pb-safe min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 pb-5">{children}</div>
         </div>
       </div>
     )
