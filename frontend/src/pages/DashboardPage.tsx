@@ -217,22 +217,11 @@ export default function DashboardPage() {
   if (stats.overdue > 0) urgentItems.push(`연체 청구 ${stats.overdue}건`)
   if (mobile.delayedOut.length > 0) urgentItems.push(`출고 지연 ${mobile.delayedOut.length}건`)
 
-  const todayStr = today()
-  const [ty, tm, td] = todayStr.split('-').map(Number)
-  const todayLabel = `${tm}월 ${td}일 (${WEEKDAY[new Date(ty, tm - 1, td).getDay()]})`
-
   return (
     <>
       {/* ===================== 모바일 전용 대시보드 (md 미만) ===================== */}
       <div className="space-y-4 md:hidden">
         {/* 인사 */}
-        <section className="bg-brand-hero relative overflow-hidden rounded-2xl px-5 py-5 shadow-sm">
-          <div className="bg-node-dots absolute inset-0 opacity-40" />
-          <div className="relative">
-            <p className="text-xl font-bold text-white">안녕하세요, {user?.name ?? ''}님 👋</p>
-            <p className="mt-1 text-sm text-slate-200">{todayLabel} · 오늘도 안전 운영하세요</p>
-          </div>
-        </section>
 
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-20 text-slate-400">
@@ -359,6 +348,12 @@ export default function DashboardPage() {
             <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-slate-100 backdrop-blur">
               Smart Yard &amp; Warehouse
             </span>
+            <h2 className="mt-3 text-2xl font-bold text-white">
+              안녕하세요, {user?.name ?? ''}님 👋
+            </h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-slate-300">
+              오늘의 입출고·보관·정산 현황을 한눈에 확인하세요.
+            </p>
           </div>
         </section>
 
