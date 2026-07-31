@@ -1122,7 +1122,7 @@ function EditOrderModal({
                 </div>
                 <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
               </div>
-              
+
               <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 방식 *</label>
                 <select
@@ -1286,7 +1286,7 @@ function CreateOrderModal({
   //   출고예정일 = 보관 시작일 + (defaultDays - 1). 예) 10 → 07.21~07.30 (당일 포함 10일). 기본 10.
   const [defaultDays, setDefaultDays] = useState(10)
   useEffect(() => {
-    tenantApi.me().then((t) => setDefaultDays(t.defaultStoragePeriodDays ?? 10)).catch(() => {})
+    tenantApi.me().then((t) => setDefaultDays(t.defaultStoragePeriodDays ?? 10)).catch(() => { })
   }, [])
 
   // [실시간 계산] 하루 보관료 = 보관료 ÷ (보관시작일~출고예정일 총 일수, 당일 포함).
@@ -1462,204 +1462,204 @@ function CreateOrderModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* 단일 컬럼: 고객 → 고객 검색 → 창고 → 위치 → 일정 순 */}
           <div className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객 *</label>
-                {selectedCustomer ? (
-                  <div className="flex items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-800">{selectedCustomer.name}</p>
-                      <p className="truncate text-xs text-slate-500">{selectedCustomer.phoneNumber || '연락처 없음'}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCustomer(null)}
-                      className="shrink-0 rounded-md p-1 text-slate-400 transition hover:bg-white hover:text-slate-600"
-                      title="선택 해제"
-                    >
-                      <X size={15} />
-                    </button>
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객 *</label>
+              {selectedCustomer ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-800">{selectedCustomer.name}</p>
+                    <p className="truncate text-xs text-slate-500">{selectedCustomer.phoneNumber || '연락처 없음'}</p>
                   </div>
-                ) : (
-                  <p className="rounded-lg border border-dashed border-slate-300 px-3.5 py-3 text-base text-slate-400 md:py-2 md:text-sm">
-                    아래 목록에서 고객을 검색해 선택하세요.
-                  </p>
-                )}
-                {isBlacklisted && (
-                  <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-                    <ShieldAlert size={14} className="mt-0.5 shrink-0" />
-                    블랙리스트 고객입니다{selectedCustomer?.blacklistReason ? ` (사유: ${selectedCustomer.blacklistReason})` : ''}. 계약
-                    등록이 불가합니다.
-                  </p>
-                )}
-                {isDormant && (
-                  <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                    휴면 상태 고객입니다. 등록 시 정상 거래 고객으로 전환됩니다.
-                  </p>
-                )}
-              </div>
-
-              {/* 고객 검색 — 고객 아래·창고 위 */}
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객 검색</label>
-                <CustomerListPicker
-                  customers={customers}
-                  selectedId={selectedCustomer?.id ?? null}
-                  onSelect={setSelectedCustomer}
-                  onQuickAdd={() => setCustOpen(true)}
-                  heightClass="h-64"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">창고 *</label>
-                <select
-                  value={warehouseId}
-                  onChange={(e) => {
-                    setWarehouseId(e.target.value)
-                    setSlotId(null) // 창고가 바뀌면 이전 자리 선택 초기화
-                  }}
-                  className={inputCls}
-                >
-                  <option value="">창고 선택…</option>
-                  {warehouses.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">컨테이너 위치 지정</label>
-                <LocationPickerField
-                  warehouseId={warehouseId ? Number(warehouseId) : null}
-                  value={slotId}
-                  onChange={setSlotId}
-                  onPickSlot={(s) => setFeeTier(s?.tier ?? null)}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 시작일 *</label>
-                  <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={inputCls} />
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCustomer(null)}
+                    className="shrink-0 rounded-md p-1 text-slate-400 transition hover:bg-white hover:text-slate-600"
+                    title="선택 해제"
+                  >
+                    <X size={15} />
+                  </button>
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">출고 예정일</label>
-                  <input
-                    type="date"
-                    value={expectedEndDate}
-                    min={storageStartDate || undefined}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
-                  />
-                  <OutboundDatePresets startDate={storageStartDate} onPick={setEndDate} className="mt-1.5" />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관료 *</label>
-                  <MoneyInput
-                    value={monthlyFee}
-                    onChange={setMonthlyFee}
-                    required
-                    placeholder="예: 300,000"
-                    className={cn(inputCls, 'pr-9', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
-                  {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
-                  <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
-                    {dailyFee != null ? won(dailyFee) : ''}
-                  </div>
-                  <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 방식 *</label>
-                  <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={inputCls}>
-                    <option value="PREPAID">선불 (당일 완납)</option>
-                    <option value="POSTPAID">후불</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 수단 *</label>
-                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={inputCls}>
-                    <option value="BANK_TRANSFER">계좌이체</option>
-                    <option value="CASH">현금</option>
-                    <option value="CARD">카드</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-slate-700">
-                    납기일
-                    {!dueTouched && (
-                      <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600">
-                        {paymentType === 'PREPAID' ? '보관 시작일 자동' : '보관 종료일 자동'}
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => {
-                      setDueDate(e.target.value)
-                      setDueTouched(true)
-                    }}
-                    className={inputCls}
-                  />
-                  {dueTouched && (
-                    <button
-                      type="button"
-                      onClick={() => setDueTouched(false)}
-                      className="mt-1 text-[11px] text-slate-400 underline-offset-2 hover:text-indigo-600 hover:underline"
-                    >
-                      결제 방식 기준으로 되돌리기
-                    </button>
-                  )}
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 용량 (톤)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min={0}
-                      step="1"
-                      value={capacityTons ?? ''}
-                      onChange={(e) => setCapacityTons(e.target.value === '' ? null : Number(e.target.value))}
-                      placeholder="예: 2.5"
-                      className={cn(inputCls, 'pr-10')}
-                    />
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 */}
-              {paymentMethod === 'BANK_TRANSFER' && (
-                <PaymentAccountPicker
-                  staffList={staffList}
-                  value={settlementUserId}
-                  onChange={setSettlementUserId}
-                />
-              )}
-
-              {periodError && (
-                <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                  {periodError}
+              ) : (
+                <p className="rounded-lg border border-dashed border-slate-300 px-3.5 py-3 text-base text-slate-400 md:py-2 md:text-sm">
+                  아래 목록에서 고객을 검색해 선택하세요.
                 </p>
               )}
+              {isBlacklisted && (
+                <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                  <ShieldAlert size={14} className="mt-0.5 shrink-0" />
+                  블랙리스트 고객입니다{selectedCustomer?.blacklistReason ? ` (사유: ${selectedCustomer.blacklistReason})` : ''}. 계약
+                  등록이 불가합니다.
+                </p>
+              )}
+              {isDormant && (
+                <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                  휴면 상태 고객입니다. 등록 시 정상 거래 고객으로 전환됩니다.
+                </p>
+              )}
+            </div>
 
+            {/* 고객 검색 — 고객 아래·창고 위 */}
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객 검색</label>
+              <CustomerListPicker
+                customers={customers}
+                selectedId={selectedCustomer?.id ?? null}
+                onSelect={setSelectedCustomer}
+                onQuickAdd={() => setCustOpen(true)}
+                heightClass="h-64"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">창고 *</label>
+              <select
+                value={warehouseId}
+                onChange={(e) => {
+                  setWarehouseId(e.target.value)
+                  setSlotId(null) // 창고가 바뀌면 이전 자리 선택 초기화
+                }}
+                className={inputCls}
+              >
+                <option value="">창고 선택…</option>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">컨테이너 위치 지정</label>
+              <LocationPickerField
+                warehouseId={warehouseId ? Number(warehouseId) : null}
+                value={slotId}
+                onChange={setSlotId}
+                onPickSlot={(s) => setFeeTier(s?.tier ?? null)}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">메모</label>
-                <textarea
-                  value={memo}
-                  onChange={(e) => setMemo(e.target.value)}
-                  rows={2}
-                  placeholder="계약 특이사항이나 부대 정보를 자유롭게 입력하세요."
-                  className={cn(inputCls, 'min-h-[64px] w-full resize-y leading-relaxed')}
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 시작일 *</label>
+                <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={inputCls} />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">출고 예정일</label>
+                <input
+                  type="date"
+                  value={expectedEndDate}
+                  min={storageStartDate || undefined}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+                />
+                <OutboundDatePresets startDate={storageStartDate} onPick={setEndDate} className="mt-1.5" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관료 *</label>
+                <MoneyInput
+                  value={monthlyFee}
+                  onChange={setMonthlyFee}
+                  required
+                  placeholder="예: 300,000"
+                  className={cn(inputCls, 'pr-9', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
                 />
               </div>
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
+                {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
+                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                  {dailyFee != null ? won(dailyFee) : ''}
+                </div>
+                <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 용량 (톤)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0}
+                    step="1"
+                    value={capacityTons ?? ''}
+                    onChange={(e) => setCapacityTons(e.target.value === '' ? null : Number(e.target.value))}
+                    placeholder="예: 2.5"
+                    className={cn(inputCls, 'pr-10')}
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 방식 *</label>
+              <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={inputCls}>
+                <option value="PREPAID">선불 (당일 완납)</option>
+                <option value="POSTPAID">후불</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 수단 *</label>
+              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={inputCls}>
+                <option value="BANK_TRANSFER">계좌이체</option>
+                <option value="CASH">현금</option>
+                <option value="CARD">카드</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-slate-700">
+                납기일
+                {!dueTouched && (
+                  <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600">
+                    {paymentType === 'PREPAID' ? '보관 시작일 자동' : '보관 종료일 자동'}
+                  </span>
+                )}
+              </label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => {
+                  setDueDate(e.target.value)
+                  setDueTouched(true)
+                }}
+                className={inputCls}
+              />
+              {dueTouched && (
+                <button
+                  type="button"
+                  onClick={() => setDueTouched(false)}
+                  className="mt-1 text-[11px] text-slate-400 underline-offset-2 hover:text-indigo-600 hover:underline"
+                >
+                  결제 방식 기준으로 되돌리기
+                </button>
+              )}
+            </div>
+
+            {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 */}
+            {paymentMethod === 'BANK_TRANSFER' && (
+              <PaymentAccountPicker
+                staffList={staffList}
+                value={settlementUserId}
+                onChange={setSettlementUserId}
+              />
+            )}
+
+            {periodError && (
+              <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                {periodError}
+              </p>
+            )}
+
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">메모</label>
+              <textarea
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                rows={2}
+                placeholder="계약 특이사항이나 부대 정보를 자유롭게 입력하세요."
+                className={cn(inputCls, 'min-h-[64px] w-full resize-y leading-relaxed')}
+              />
+            </div>
           </div>
 
           {formError && <p className="text-sm text-red-600">{formError}</p>}
@@ -1872,18 +1872,18 @@ function StatusChangeModal({
     try {
       const body = isRelease
         ? {
-            targetStatus: 'OUTBOUND' as const,
-            // 정상 출고: 예정일 그대로 / 중도 출고: 입력한 실제 출고일 + 소급 여부
-            actualEndDate: releaseKind === 'EARLY' ? actualEndDate : (target!.expectedEndDate ?? today()),
-            // 중도출고 + 소급 시 실사용 보관료(일수 × 하루 보관료)를 정산 금액으로 전달.
-            // 백엔드가 이 금액으로 원장 기본청구액을 재산정하고 보관기간 종료일을 실제 출고일로 마감한다.
-            settledAmount: releaseKind === 'EARLY' && applySettlement ? (usedAmount ?? undefined) : undefined,
-          }
+          targetStatus: 'OUTBOUND' as const,
+          // 정상 출고: 예정일 그대로 / 중도 출고: 입력한 실제 출고일 + 소급 여부
+          actualEndDate: releaseKind === 'EARLY' ? actualEndDate : (target!.expectedEndDate ?? today()),
+          // 중도출고 + 소급 시 실사용 보관료(일수 × 하루 보관료)를 정산 금액으로 전달.
+          // 백엔드가 이 금액으로 원장 기본청구액을 재산정하고 보관기간 종료일을 실제 출고일로 마감한다.
+          settledAmount: releaseKind === 'EARLY' && applySettlement ? (usedAmount ?? undefined) : undefined,
+        }
         : {
-            targetStatus: 'INBOUND' as const,
-            // 지연 입고일 때만 실제 입고일로 시작일 조정
-            actualStartDate: returnKind === 'LATE' ? actualStartDate : undefined,
-          }
+          targetStatus: 'INBOUND' as const,
+          // 지연 입고일 때만 실제 입고일로 시작일 조정
+          actualStartDate: returnKind === 'LATE' ? actualStartDate : undefined,
+        }
       const updated = await orderApi.changeStatus(target!.id, body)
       onDone(updated)
     } catch (err) {
