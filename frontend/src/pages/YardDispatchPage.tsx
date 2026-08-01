@@ -592,7 +592,8 @@ export default function YardDispatchPage() {
                             onClick={() => setSelectedTier(f.tier)}
                             className={cn(
                               'flex min-w-[4.5rem] flex-1 flex-col items-center rounded-2xl py-2 transition active:scale-[0.98]',
-                              active ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 ring-1 ring-slate-200',
+                              // [혼동 방지] 아래 컨테이너 칸의 '사용중' 색(파랑)과 겹치지 않도록 층 탭은 짙은 슬레이트 톤을 쓴다
+                              active ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-500 ring-1 ring-slate-200',
                             )}
                           >
                             <span className="text-lg font-extrabold">{f.tier}층</span>
