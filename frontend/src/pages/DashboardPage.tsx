@@ -210,24 +210,18 @@ export default function DashboardPage() {
           </div>
         ) : (
           <>
-            {/* [최상단] 긴급 알림 — 있을 때만 크게 노출 */}
+            {/* [최상단] 긴급 알림 — 있을 때만 노출. 화면을 압도하지 않는 차분한 톤 */}
             {urgentItems.length > 0 && (
               <Link
                 to={stats.overdue > 0 ? '/billing' : '/yard'}
-                className="relative block overflow-hidden rounded-2xl bg-red-600 px-5 py-4 shadow-lg shadow-red-600/25"
+                className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 transition active:bg-red-100"
               >
-                <span className="absolute right-4 top-4 flex h-3.5 w-3.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-70" />
-                  <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-white" />
-                </span>
-                <div className="flex items-center gap-3">
-                  <AlertTriangle size={28} className="shrink-0 text-white" />
-                  <div>
-                    <p className="text-lg font-bold text-white">지금 확인이 필요해요</p>
-                    <p className="mt-0.5 text-sm font-medium text-red-50">{urgentItems.join('  ·  ')}</p>
-                  </div>
+                <AlertTriangle size={20} className="shrink-0 text-red-500" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-red-700">지금 확인이 필요해요</p>
+                  <p className="truncate text-xs text-red-500">{urgentItems.join(' · ')}</p>
                 </div>
-                <p className="mt-2 text-right text-sm font-semibold text-red-100">눌러서 확인하기 ›</p>
+                <ChevronRight size={18} className="shrink-0 text-red-300" />
               </Link>
             )}
 
