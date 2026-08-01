@@ -334,14 +334,14 @@ export default function YardDispatchPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">컨테이너 관리</h2>
           <p className="mt-1 text-sm text-slate-500">
             {bulkMode ? '빈 자리를 눌러 미사용 지정을 켜고 끄세요. 다 고르면 저장을 누르세요.' : '격자를 클릭해 그 자리에서 입고·출고·이동을 즉시 처리합니다.'}
           </p>
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+        <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
           {selectedId != null && (
             bulkMode ? (
               <>
