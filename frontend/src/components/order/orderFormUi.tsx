@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode, type TouchEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import Modal from '@/components/ui/Modal'
@@ -195,6 +195,18 @@ export function CalendarField({
     setViewM(d.getMonth())
   }
 
+  // [스와이프 월 이동] 좌우로 훑으면 이전/다음 달 — 화살표 버튼과 동일한 동작을 손가락으로도
+  const touchStartX = useRef<number | null>(null)
+  function onSwipeStart(e: TouchEvent) {
+    touchStartX.current = e.touches[0].clientX
+  }
+  function onSwipeEnd(e: TouchEvent) {
+    if (touchStartX.current == null) return
+    const delta = e.changedTouches[0].clientX - touchStartX.current
+    if (Math.abs(delta) > 40) shiftMonth(delta > 0 ? -1 : 1)
+    touchStartX.current = null
+  }
+
   const firstWeekday = new Date(viewY, viewM, 1).getDay()
   const dayCount = new Date(viewY, viewM + 1, 0).getDate()
   const todayIso = toIso(now.getFullYear(), now.getMonth(), now.getDate())
@@ -211,7 +223,7 @@ export function CalendarField({
 
       {open && (
         <Modal open onClose={() => setOpen(false)} title="날짜 선택">
-          <div className="space-y-3">
+          <div className="space-y-3" onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd}>
             <div className="flex items-center justify-between">
               <button
                 type="button"
