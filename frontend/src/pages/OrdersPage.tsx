@@ -116,16 +116,27 @@ export default function OrdersPage() {
   const isAdmin = authStorage.getUser()?.role === 'ADMIN'
 
   // [대시보드 원터치 진입] 오늘의 입고/출고 카드에서 ?today=inbound|outbound 로 들어오면
-  // 아래 필터·기간 상태와 무관하게 "오늘 딱 그 항목"만 보여준다(대시보드 집계와 동일 기준).
+  // 상태 필터 칩과 조회 기간을 "오늘 하루"로 자동 입력해 그대로 조회한다 — 평소 조회와 같은
+  // 화면·같은 동선이라 별도 안내 문구 없이도 뭘 보고 있는지 필터 칩·날짜창에서 바로 보인다.
   const [searchParams, setSearchParams] = useSearchParams()
-  const todayFilter = searchParams.get('today') as 'inbound' | 'outbound' | null
 
   const [orders, setOrders] = useState<StorageOrder[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
-  const [filter, setFilter] = useState<FilterKey>('ALL')
+  const [filter, setFilter] = useState<FilterKey>(() => {
+    const t = searchParams.get('today')
+    return t === 'inbound' ? 'INBOUND' : t === 'outbound' ? 'OUTBOUND' : 'ALL'
+  })
   const [query, setQuery] = useState('') // 조회어(고객명·창고명)
-  const [range, setRange] = useState<{ from: string; to: string }>(() => defaultRange()) // 조회 기간(기본: 오늘로부터 한 달)
+  const [range, setRange] = useState<{ from: string; to: string }>(() =>
+    searchParams.get('today') ? { from: today(), to: today() } : defaultRange(),
+  ) // 조회 기간(기본: 오늘로부터 한 달, 원터치 진입 시 오늘 하루)
+
+  // 진입 시 한 번 적용한 뒤 쿼리스트링은 정리 — 이후는 화면의 필터 칩·날짜창이 상태의 유일한 출처
+  useEffect(() => {
+    if (searchParams.get('today')) setSearchParams({}, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -224,16 +235,6 @@ export default function OrdersPage() {
   }
 
   const visible = useMemo(() => {
-    // [오늘의 입출고 원터치 진입] 대시보드 집계와 정확히 같은 기준으로 "오늘 그 항목"만 보여준다.
-    if (todayFilter === 'inbound') {
-      const t = today()
-      return orders.filter((o) => o.storageStartDate === t)
-    }
-    if (todayFilter === 'outbound') {
-      const t = today()
-      return orders.filter((o) => o.actualEndDate === t || (o.expectedEndDate === t && o.status === 'INBOUND'))
-    }
-
     const q = query.trim().toLowerCase()
     const { from, to } = range
     return orders.filter((o) => {
@@ -248,7 +249,7 @@ export default function OrdersPage() {
       }
       return true
     })
-  }, [orders, filter, query, range, todayFilter])
+  }, [orders, filter, query, range])
 
   // [상태 처리 완료] 모달에서 처리된 결과를 해당 행만 즉시 반영 (새로고침 없음)
   function handleStatusChanged(updated: StorageOrder) {
@@ -313,20 +314,6 @@ export default function OrdersPage() {
       </div>
 
       <Fab actions={[{ label: '계약 등록', icon: Plus, onClick: () => setCreateOpen(true) }]} />
-
-      {/* [대시보드 원터치 진입] 오늘의 입고/출고 카드에서 넘어온 경우 — 평소 필터·기간과 다른 기준이라 명시적으로 안내 */}
-      {todayFilter && (
-        <div className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm text-indigo-700">
-          <span className="font-semibold">오늘 {todayFilter === 'inbound' ? '입고' : '출고'} 목록만 보고 있어요 ({visible.length}건)</span>
-          <button
-            type="button"
-            onClick={() => setSearchParams((prev) => { prev.delete('today'); return prev }, { replace: true })}
-            className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-indigo-600 shadow-sm transition hover:bg-indigo-100"
-          >
-            전체 보기
-          </button>
-        </div>
-      )}
 
       {/* 조회 기간 — 상태 필터(전체·입고·출고) + 사용자 지정 기간(기본: 오늘로부터 한 달) */}
       <div className="rounded-2xl bg-white p-2.5 shadow-soft ring-1 ring-slate-200/60">
