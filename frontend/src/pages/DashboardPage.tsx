@@ -231,31 +231,31 @@ export default function DashboardPage() {
               </Link>
             )}
 
-            {/* 오늘의 입출고 */}
+            {/* 오늘의 입출고 — 카드 자체가 큰 터치 버튼. 눌러서 계약관리의 '오늘 그 항목'으로 원터치 진입 */}
             <MobileCard title="오늘의 입출고" icon={CalendarDays}>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-blue-50 p-4 text-center">
+                <Link
+                  to="/orders?today=inbound"
+                  className="rounded-2xl bg-blue-50 p-4 text-center transition active:scale-[0.98] active:bg-blue-100"
+                >
                   <PackageOpen className="mx-auto text-blue-600" size={28} />
                   <p className="mt-1 text-4xl font-extrabold text-blue-700">{stats.todayInbound.length}</p>
                   <p className="text-sm font-semibold text-blue-600">입고</p>
-                </div>
-                <div className="rounded-2xl bg-orange-50 p-4 text-center">
+                </Link>
+                <Link
+                  to="/orders?today=outbound"
+                  className="rounded-2xl bg-orange-50 p-4 text-center transition active:scale-[0.98] active:bg-orange-100"
+                >
                   <Truck className="mx-auto text-orange-600" size={28} />
                   <p className="mt-1 text-4xl font-extrabold text-orange-700">{stats.todayOutbound.length}</p>
                   <p className="text-sm font-semibold text-orange-600">출고</p>
-                </div>
+                </Link>
               </div>
               {(stats.todayInbound.length > 0 || stats.todayOutbound.length > 0) && (
                 <p className="mt-3 text-sm leading-relaxed text-slate-500">
                   {[...stats.todayInbound, ...stats.todayOutbound].map((o) => o.customerName).join(', ')}
                 </p>
               )}
-              <Link
-                to="/yard"
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 text-base font-bold text-white shadow-sm transition active:scale-[0.99]"
-              >
-                컨테이너 관리에서 처리하기 <ArrowRight size={19} />
-              </Link>
             </MobileCard>
 
             {/* 현재 창고 잔여 공간 */}
