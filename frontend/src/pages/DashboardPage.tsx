@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
@@ -494,6 +494,65 @@ function MobileScheduleCard({
     const nm = d.getMonth() + 1
     setView({ year: ny, month: nm })
     setSelected(ny === year && nm === month ? todayDay : 1)
+    setSlideFrom(delta) // 넘어온 방향으로 슬라이드 애니메이션
+  }
+
+  /*
+   * ===== [스와이프 월 이동] =====
+   * 달력을 좌우로 밀어서 달을 넘긴다. 이 카드는 세로 스크롤 컨테이너 안에 있으므로
+   * '가로 제스처만' 골라내는 축 판정이 핵심이다. 잘못 만들면 페이지 스크롤이 씹힌다.
+   *
+   *  1) touchstart 에서 시작 좌표만 기록 (아직 아무 판단도 하지 않는다)
+   *  2) touchmove 에서 축을 한 번만 확정(axis lock):
+   *       |dx| > |dy| 이고 |dx| >= 10px  →  가로 제스처로 확정
+   *       그 외(세로가 우세)              →  이 터치는 스크롤에 양보하고 끝까지 무시
+   *     한 번 정해진 축은 손가락을 뗄 때까지 바뀌지 않는다. 손가락이 사선으로 움직여도
+   *     중간에 판정이 뒤집혀 스크롤과 스와이프가 번갈아 먹는 현상을 막기 위함이다.
+   *  3) touchend 에서 가로로 확정됐고 이동량이 임계값(48px)을 넘었을 때만 월 이동
+   *
+   * preventDefault 는 호출하지 않는다. 세로 스크롤을 절대 방해하지 않기 위해서이며,
+   * 가로 확정 시엔 어차피 브라우저가 세로 스크롤을 시작하지 않은 상태다.
+   */
+  const SWIPE_MIN = 48 // 월 이동을 발동시킬 최소 가로 이동량(px)
+  const touch = useRef<{ x: number; y: number; axis: 'none' | 'x' | 'y' } | null>(null)
+  // 스와이프 직후의 유령 클릭(날짜 선택) 차단 플래그
+  const swiped = useRef(false)
+  // 슬라이드 애니메이션 방향(-1: 이전 달, +1: 다음 달, 0: 없음)
+  const [slideFrom, setSlideFrom] = useState(0)
+
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0]
+    touch.current = { x: t.clientX, y: t.clientY, axis: 'none' }
+    swiped.current = false
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    const s = touch.current
+    if (!s || s.axis !== 'none') return // 축이 이미 확정됐으면 재판정하지 않는다
+    const t = e.touches[0]
+    const dx = Math.abs(t.clientX - s.x)
+    const dy = Math.abs(t.clientY - s.y)
+    if (dx < 10 && dy < 10) return // 아직 의도를 알 수 없는 미세 움직임 — 판정 보류
+    s.axis = dx > dy ? 'x' : 'y'
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    const s = touch.current
+    touch.current = null
+    if (!s || s.axis !== 'x') return // 세로 제스처(스크롤)였으면 아무것도 하지 않는다
+    const dx = e.changedTouches[0].clientX - s.x
+    if (Math.abs(dx) < SWIPE_MIN) return // 임계값 미달 — 실수로 스친 것으로 본다
+    swiped.current = true // 이어서 발생할 click(날짜 선택)을 무시하도록 표시
+    shiftMonth(dx < 0 ? 1 : -1) // 왼쪽으로 밀면 다음 달, 오른쪽으로 밀면 이전 달
+  }
+
+  /** 스와이프로 손가락을 뗀 직후 날짜 셀의 click 이 튀는 것을 막는다 */
+  function handleSelectDay(d: number) {
+    if (swiped.current) {
+      swiped.current = false
+      return
+    }
+    setSelected(d)
   }
 
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -560,6 +619,9 @@ function MobileScheduleCard({
             <button
               type="button"
               onClick={() => {
+                // 이번 달이 현재 보는 달보다 과거면 오른쪽에서, 미래면 왼쪽에서 들어오도록
+                const back = year * 12 + month < view.year * 12 + view.month
+                setSlideFrom(back ? -1 : 1)
                 setView({ year, month })
                 setSelected(todayDay)
               }}
@@ -578,15 +640,29 @@ function MobileScheduleCard({
           <ChevronRight size={20} />
         </button>
       </div>
-      <MiniCalendar
-        year={view.year}
-        month={view.month}
-        /* 오늘 강조는 이번 달을 보고 있을 때만 — 다른 달의 같은 날짜가 오늘로 보이는 오인을 막는다 */
-        todayDay={isCurrentMonth ? todayDay : undefined}
-        events={events}
-        selectedDay={selected}
-        onSelect={setSelected}
-      />
+      {/*
+        스와이프 영역 — 달력 그리드 전체가 제스처를 받는다.
+        touch-pan-y: 이 요소에서 세로 스크롤은 브라우저에 맡기고 가로 제스처만 JS가 처리한다고
+        선언해, 브라우저가 가로 패닝을 가로채지 않게 한다(스와이프 반응성의 핵심).
+      */}
+      <div className="touch-pan-y overflow-hidden" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+        <div
+          /* key 를 연-월로 두면 달이 바뀔 때마다 새 노드로 마운트돼 슬라이드 애니메이션이 매번 재생된다 */
+          key={`${view.year}-${view.month}`}
+          className={slideFrom === 0 ? undefined : slideFrom > 0 ? 'animate-cal-in-right' : 'animate-cal-in-left'}
+        >
+          <MiniCalendar
+            year={view.year}
+            month={view.month}
+            /* 오늘 강조는 이번 달을 보고 있을 때만 — 다른 달의 같은 날짜가 오늘로 보이는 오인을 막는다 */
+            todayDay={isCurrentMonth ? todayDay : undefined}
+            events={events}
+            selectedDay={selected}
+            onSelect={handleSelectDay}
+          />
+        </div>
+      </div>
+      <p className="mt-1.5 text-center text-[11px] text-slate-400 md:hidden">좌우로 밀어 달을 넘길 수 있습니다</p>
 
       {/* 선택한 날짜의 입고·출고 화주 */}
       <div className="mt-4 rounded-2xl bg-slate-50 p-4">

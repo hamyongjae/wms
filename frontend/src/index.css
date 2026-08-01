@@ -233,11 +233,33 @@ body {
   bottom: calc(var(--tabbar-total) + 16px + 56px + 12px);
 }
 
+/*
+ * 달력 월 전환 — 넘어온 방향에서 짧게 미끄러져 들어온다.
+ * 손가락이 민 방향과 화면이 움직이는 방향을 일치시켜야 조작이 '먹혔다'는 감각이 생긴다.
+ * 이동 폭은 12px로 짧게 — 크게 움직이면 월 이동이 화면 전환처럼 무겁게 느껴진다.
+ */
+@keyframes cal-in-right {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes cal-in-left {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.animate-cal-in-right {
+  animation: cal-in-right 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.animate-cal-in-left {
+  animation: cal-in-left 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 /* 접근성 — OS "동작 줄이기" 설정 시 애니메이션 제거 */
 @media (prefers-reduced-motion: reduce) {
   .animate-sheet-up,
   .animate-scrim-in,
-  .animate-dialog-in {
+  .animate-dialog-in,
+  .animate-cal-in-right,
+  .animate-cal-in-left {
     animation: none;
   }
   .card-hover,
