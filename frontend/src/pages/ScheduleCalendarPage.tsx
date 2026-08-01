@@ -28,6 +28,7 @@ import { cn } from '@/lib/cn'
 import { orderSync } from '@/lib/orderEvents'
 import { CreateOrderModal } from './OrdersPage'
 import EditOrderModal from '@/components/order/EditOrderModal'
+import Modal from '@/components/ui/Modal'
 
 type FilterMode = 'ALL' | CalendarEventType
 
@@ -66,6 +67,10 @@ const todayStr = () => {
   const n = new Date()
   return toDateStr(n.getFullYear(), n.getMonth(), n.getDate())
 }
+const dateLabel = (dateStr: string) => {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return `${y}년 ${m}월 ${d}일`
+}
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 // 'YYYY-MM-DD' → 'YYYY. MM. DD' (백엔드 LocalDate 직렬화 문자열을 안전하게 표기)
 const fmtDate = (s: string) => {
@@ -102,6 +107,18 @@ function buildMatrix(year: number, month0: number): Cell[] {
 export default function ScheduleCalendarPage() {
   const navigate = useNavigate()
   const isAdmin = authStorage.getUser()?.role === 'ADMIN'
+
+  // 이 화면 자체의 레이아웃 분기점(lg=1024px, 데스크톱 사이드패널 ↔ 하단 시트)과 동일한 기준.
+  // Modal은 body로 포탈되므로 CSS(lg:hidden)로는 표시 여부를 못 걸러 JS로 직접 판단해야 한다.
+  const [isNarrow, setIsNarrow] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)')
+    const onChange = (e: MediaQueryListEvent) => setIsNarrow(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
 
   const [cursor, setCursor] = useState(() => {
     const n = new Date()
@@ -409,30 +426,43 @@ export default function ScheduleCalendarPage() {
         </div>
       </div>
 
-      {/* 모바일 하단 시트 */}
-      {selectedDate && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-slate-900/30" onClick={() => setSelectedDate(null)} />
-          <div className="absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto rounded-t-2xl bg-white p-3 shadow-xl">
-            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-slate-200" />
-            <DetailPanel
-              dateStr={selectedDate}
-              events={selectedEvents}
-              isAdmin={isAdmin}
-              embedded
-              onClose={() => setSelectedDate(null)}
-              onAction={(msg) => {
-                setNotice(msg)
-                setRefreshKey((k) => k + 1)
-              }}
-              navigate={navigate}
-              onCreate={openCreateFor}
-              onEdit={openEdit}
-              onDelete={deleteEvent}
-              editLoadingId={editLoadingId}
-            />
-          </div>
-        </div>
+      {/* 모바일/태블릿(<lg) 상세 — 예전엔 이 페이지 안에 직접 그린 fixed 오버레이였는데,
+          DashboardLayout의 스크롤 컨테이너 안에 중첩된 position:fixed라 iOS에서 하단 탭 바에
+          가려지거나 잘리는 동일한 버그가 있었다(Modal에서 이미 한 번 고친 것과 같은 원인).
+          공용 Modal(= document.body로 포탈)로 바꿔 근본적으로 해결한다. */}
+      {isNarrow && (
+        <Modal
+          open={selectedDate != null}
+          onClose={() => setSelectedDate(null)}
+          title={selectedDate ? dateLabel(selectedDate) : ''}
+          footer={
+            selectedDate && (
+              <button
+                type="button"
+                onClick={() => openCreateFor(selectedDate)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-base font-bold text-white transition active:scale-[0.99]"
+              >
+                <Plus size={16} /> 계약 등록
+              </button>
+            )
+          }
+        >
+          <DetailPanel
+            dateStr={selectedDate}
+            events={selectedEvents}
+            isAdmin={isAdmin}
+            onAction={(msg) => {
+              setNotice(msg)
+              setRefreshKey((k) => k + 1)
+            }}
+            navigate={navigate}
+            onCreate={openCreateFor}
+            onEdit={openEdit}
+            onDelete={deleteEvent}
+            editLoadingId={editLoadingId}
+            bare
+          />
+        </Modal>
       )}
 
       {/* [계약 등록] 선택한 날짜 칸에서 열면 그 날짜가 보관 시작일에 미리 채워진다 */}
@@ -488,6 +518,7 @@ function DetailPanel({
   onEdit,
   onDelete,
   editLoadingId,
+  bare,
 }: {
   dateStr: string | null
   events: CalendarEvent[]
@@ -500,6 +531,9 @@ function DetailPanel({
   onEdit: (orderId: number) => void
   onDelete: (event: CalendarEvent) => void
   editLoadingId: number | null
+  /** Modal 안(모바일 바텀시트)에서 쓸 때 — Modal이 이미 제목·닫기 버튼을 그려주므로
+   *  이 컴포넌트는 상단 바 없이 이벤트 목록만 그린다(제목 중복 방지). */
+  bare?: boolean
 }) {
   if (!dateStr) {
     return (
@@ -511,8 +545,29 @@ function DetailPanel({
     )
   }
 
-  const [y, m, d] = dateStr.split('-').map(Number)
-  const label = `${y}년 ${m}월 ${d}일`
+  const list =
+    events.length === 0 ? (
+      <p className="px-4 py-8 text-center text-sm text-slate-400">이 날 예정된 일정이 없습니다.</p>
+    ) : (
+      <div className={cn('space-y-2', !bare && 'p-3')}>
+        {events.map((e) => (
+          <EventCard
+            key={`${e.type}-${e.id}`}
+            event={e}
+            isAdmin={isAdmin}
+            onAction={onAction}
+            navigate={navigate}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            editLoading={editLoadingId === e.id}
+          />
+        ))}
+      </div>
+    )
+
+  if (bare) return list
+
+  const label = dateLabel(dateStr)
 
   return (
     <div className={cn(!embedded && 'rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60')}>
@@ -537,24 +592,7 @@ function DetailPanel({
         </div>
       </div>
 
-      {events.length === 0 ? (
-        <p className="px-4 py-8 text-center text-sm text-slate-400">이 날 예정된 일정이 없습니다.</p>
-      ) : (
-        <div className="space-y-2 p-3">
-          {events.map((e) => (
-            <EventCard
-              key={`${e.type}-${e.id}`}
-              event={e}
-              isAdmin={isAdmin}
-              onAction={onAction}
-              navigate={navigate}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              editLoading={editLoadingId === e.id}
-            />
-          ))}
-        </div>
-      )}
+      {list}
     </div>
   )
 }
