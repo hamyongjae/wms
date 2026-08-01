@@ -12,8 +12,8 @@ import Modal from '@/components/ui/Modal'
  * md 이상에서는 렌더되지 않고 좌측 사이드바가 그 역할을 이어받는다(형태 승격 규칙).
  */
 
-// 하단 탭에 상시 노출할 주요 경로 (엄지 존의 4석)
-const PRIMARY_PATHS = ['/dashboard', '/orders', '/yard', '/billing']
+// 하단 탭에 상시 노출할 주요 경로 (엄지 존의 5석) — 메뉴명을 짧게 줄여 한 자리 더 확보했다
+const PRIMARY_PATHS = ['/dashboard', '/calendar', '/orders', '/yard', '/billing']
 
 export default function MobileTabBar() {
   const isAdmin = authStorage.getUser()?.role === 'ADMIN'
