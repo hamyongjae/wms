@@ -864,6 +864,7 @@ function EditOrderModal({
 }) {
   const [storageStartDate, setStartDate] = useState('')
   const [expectedEndDate, setEndDate] = useState('')
+  const [endDateUnknown, setEndDateUnknown] = useState(false) // 출고일 미정(장기 보관) 명시적 선택 — 등록 화면과 동일
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
   const [capacityTons, setCapacityTons] = useState('')
   const [memo, setMemo] = useState('')
@@ -885,6 +886,7 @@ function EditOrderModal({
     if (target) {
       setStartDate(target.storageStartDate ?? '')
       setEndDate(target.expectedEndDate ?? '')
+      setEndDateUnknown(target.expectedEndDate == null) // 기존에 미정이던 계약은 체크박스도 그 상태를 그대로 반영
       setMonthlyFee(target.monthlyFee)
       setCapacityTons(target.capacityTons != null ? String(target.capacityTons) : '')
       setMemo(target.memo ?? '')
@@ -994,141 +996,22 @@ function EditOrderModal({
   return (
     <Modal open onClose={onClose} title="계약 수정" widthClass="max-w-5xl">
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* 좌: 계약 정보 / 우: 컨테이너 위치 지정 (등록 팝업과 동일 템플릿) */}
-        <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_26rem]">
-          {/* ===== 좌측 폼 ===== */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
-              <div>
-                <span className="block text-xs text-slate-400">고객</span>
-                <span className="font-medium text-slate-700">{target.customerName}</span>
-              </div>
-              <div>
-                <span className="block text-xs text-slate-400">창고</span>
-                <span className="font-medium text-slate-700">{target.warehouseName}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 시작일 *</label>
-                <input
-                  type="date"
-                  value={storageStartDate}
-                  max={expectedEndDate || undefined}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  required
-                  className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">출고 예정일</label>
-                <input
-                  type="date"
-                  value={expectedEndDate}
-                  min={storageStartDate || undefined}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
-                />
-              </div>
-              
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관료 *</label>
-                <MoneyInput
-                  value={monthlyFee}
-                  onChange={setMonthlyFee}
-                  required
-                  placeholder="예: 300,000"
-                  className={cn(inputCls, 'pr-9', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 용량 (톤)</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={0}
-                    step="1"
-                    value={capacityTons}
-                    onChange={(e) => setCapacityTons(e.target.value)}
-                    placeholder="예: 2.5"
-                    className={cn(inputCls, 'pr-10')}
-                  />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
-                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
-                  {dailyFee != null ? won(dailyFee) : ''}
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 방식 *</label>
-                <select
-                  value={paymentType}
-                  onChange={(e) => setPaymentType(e.target.value as PaymentType)}
-                  className={inputCls}
-                >
-                  <option value="PREPAID">선불 (완납)</option>
-                  <option value="POSTPAID">후불 (입금예정)</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
-                {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
-                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
-                  {days != null ? `${days.toLocaleString()}일` : ''}
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
-              </div>
-              
-              <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 수단 *</label>
-                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={inputCls}>
-                  <option value="BANK_TRANSFER">계좌이체</option>
-                  <option value="CASH">현금</option>
-                  <option value="CARD">카드</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">납기일</label>
-                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} />
-              </div>
-            </div>
-
-            {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 — 등록 화면과 동일 */}
-            {paymentMethod === 'BANK_TRANSFER' && (
-              <PaymentAccountPicker staffList={staffList} value={settlementUserId} onChange={setSettlementUserId} />
-            )}
-
-            {periodError && (
-              <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                {periodError}
-              </p>
-            )}
-
+        {/* 단일 컬럼: 고객/창고(읽기전용) → 위치 → 일정 순 — 등록 팝업과 동일 템플릿 */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
             <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">메모 (특이사항)</label>
-              <textarea
-                value={memo}
-                onChange={(e) => setMemo(e.target.value)}
-                rows={2}
-                placeholder="계약 특이사항이나 부대 정보를 자유롭게 입력하세요."
-                className={cn(inputCls, 'min-h-[64px] w-full resize-y leading-relaxed')}
-              />
+              <span className="block text-xs text-slate-400">고객</span>
+              <span className="font-medium text-slate-700">{target.customerName}</span>
+            </div>
+            <div>
+              <span className="block text-xs text-slate-400">창고</span>
+              <span className="font-medium text-slate-700">{target.warehouseName}</span>
             </div>
           </div>
 
-          {/* ===== 우측 컨테이너 위치 지정 ===== */}
-          <div className="flex flex-col">
-            <div className="mb-1 flex items-center justify-between">
-              <label className="text-sm font-medium text-slate-700">컨테이너 위치</label>
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="block text-base font-semibold text-slate-700 md:text-sm md:font-medium">컨테이너 위치 지정</label>
               {locationChanged && (
                 <button
                   type="button"
@@ -1144,6 +1027,137 @@ function EditOrderModal({
               value={slotId}
               onChange={setSlotId}
               currentSlotId={currentSlotId}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 시작일 *</label>
+              <input
+                type="date"
+                value={storageStartDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                required
+                className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+              />
+            </div>
+            <div>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <label className="block text-base font-semibold text-slate-700 md:text-sm md:font-medium">출고 예정일</label>
+                <label className="flex cursor-pointer select-none items-center gap-1.5 text-xs text-slate-500">
+                  <input
+                    type="checkbox"
+                    checked={endDateUnknown}
+                    onChange={(e) => {
+                      setEndDateUnknown(e.target.checked)
+                      if (e.target.checked) setEndDate('') // 미정 선택 시 기존 입력값 제거
+                    }}
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  출고일 미정(장기 보관)
+                </label>
+              </div>
+              {endDateUnknown ? (
+                <div className="flex h-[46px] items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3.5 text-base font-semibold text-slate-500 md:h-[38px] md:text-sm">
+                  출고일 미정 · 장기 보관으로 등록됩니다
+                </div>
+              ) : (
+                <input
+                  type="date"
+                  value={expectedEndDate}
+                  min={storageStartDate || undefined}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+                />
+              )}
+            </div>
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관료 *</label>
+              <MoneyInput
+                value={monthlyFee}
+                onChange={setMonthlyFee}
+                required
+                placeholder="예: 300,000"
+                className={cn(inputCls, 'pr-9', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 용량 (톤)</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={capacityTons}
+                  onChange={(e) => setCapacityTons(e.target.value)}
+                  placeholder="예: 2.5"
+                  className={cn(inputCls, 'pr-10')}
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
+              {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
+              <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                {days != null ? `${days.toLocaleString()}일` : ''}
+              </div>
+              <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
+              <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                {dailyFee != null ? won(dailyFee) : ''}
+              </div>
+              <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 방식 *</label>
+              <select
+                value={paymentType}
+                onChange={(e) => setPaymentType(e.target.value as PaymentType)}
+                className={inputCls}
+              >
+                <option value="PREPAID">선불 (완납)</option>
+                <option value="POSTPAID">후불 (입금예정)</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 수단 *</label>
+              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={inputCls}>
+                <option value="BANK_TRANSFER">계좌이체</option>
+                <option value="CASH">현금</option>
+                <option value="CARD">카드</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">납기일</label>
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} />
+          </div>
+
+          {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 — 등록 화면과 동일 */}
+          {paymentMethod === 'BANK_TRANSFER' && (
+            <PaymentAccountPicker staffList={staffList} value={settlementUserId} onChange={setSettlementUserId} />
+          )}
+
+          {periodError && (
+            <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              {periodError}
+            </p>
+          )}
+
+          <div>
+            <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">메모</label>
+            <textarea
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              rows={2}
+              placeholder="계약 특이사항이나 부대 정보를 자유롭게 입력하세요."
+              className={cn(inputCls, 'min-h-[64px] w-full resize-y leading-relaxed')}
             />
           </div>
         </div>
@@ -1189,6 +1203,7 @@ export function CreateOrderModal({
   //   자동 프리필은 담당자가 확인 없이 저장할 여지를 만들어 계약 기간·납기 오류의 원인이 되므로 제거.
   const [storageStartDate, setStartDate] = useState('')
   const [expectedEndDate, setEndDate] = useState('')
+  const [endDateUnknown, setEndDateUnknown] = useState(false) // 출고일 미정(장기 보관) 명시적 선택
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
   const [capacityTons, setCapacityTons] = useState<number | null>(null) // 보관 용량(톤)
   const [paymentType, setPaymentType] = useState<PaymentType>('PREPAID')
@@ -1230,6 +1245,7 @@ export function CreateOrderModal({
       // 날짜 3종은 기본값 없이 초기화 — 담당자가 매 계약마다 명시적으로 입력한다
       setStartDate('')
       setEndDate('')
+      setEndDateUnknown(false)
       setMonthlyFee(null)
       setCapacityTons(null)
       setPaymentType('PREPAID')
@@ -1454,14 +1470,34 @@ export function CreateOrderModal({
                 <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={inputCls} />
               </div>
               <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">출고 예정일</label>
-                <input
-                  type="date"
-                  value={expectedEndDate}
-                  min={storageStartDate || undefined}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
-                />
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <label className="block text-base font-semibold text-slate-700 md:text-sm md:font-medium">출고 예정일</label>
+                  <label className="flex cursor-pointer select-none items-center gap-1.5 text-xs text-slate-500">
+                    <input
+                      type="checkbox"
+                      checked={endDateUnknown}
+                      onChange={(e) => {
+                        setEndDateUnknown(e.target.checked)
+                        if (e.target.checked) setEndDate('') // 미정 선택 시 기존 입력값 제거
+                      }}
+                      className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    출고일 미정(장기 보관)
+                  </label>
+                </div>
+                {endDateUnknown ? (
+                  <div className="flex h-[46px] items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3.5 text-base font-semibold text-slate-500 md:h-[38px] md:text-sm">
+                    출고일 미정 · 장기 보관으로 등록됩니다
+                  </div>
+                ) : (
+                  <input
+                    type="date"
+                    value={expectedEndDate}
+                    min={storageStartDate || undefined}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+                  />
+                )}
               </div>
               <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관료 *</label>
