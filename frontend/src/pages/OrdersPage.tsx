@@ -279,7 +279,7 @@ export default function OrdersPage() {
 
   // [작업 버튼 그룹] 데스크톱 테이블 · 모바일 카드가 동일 로직/규격을 공유 (중복 제거)
   const renderActions = (o: StorageOrder) => (
-    <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex flex-nowrap items-center justify-end gap-2">
       {o.status === 'INBOUND' ? (
         <RowAction label="출고" tooltip="출고 처리" tone="amber" onClick={() => setStatusTarget(o)} />
       ) : (
@@ -428,35 +428,35 @@ export default function OrdersPage() {
 
       {/* ===== 데스크톱: 테이블 (md 이상) ===== */}
       {!loading && !error && visible.length > 0 && (
-        <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60 md:block">
+        <div className="hidden overflow-x-auto rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60 md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
-                <th className="px-5 py-3 font-medium">고객</th>
-                <th className="px-5 py-3 font-medium">창고</th>
-                <th className="px-5 py-3 font-medium">위치</th>
-                <th className="px-5 py-3 font-medium">보관기간</th>
-                <th className="px-5 py-3 text-right font-medium">보관료</th>
-                <th className="px-5 py-3 font-medium">상태</th>
-                <th className="px-5 py-3 text-right font-medium">작업</th>
+                <th className="whitespace-nowrap px-5 py-3 font-medium">고객</th>
+                <th className="whitespace-nowrap px-5 py-3 font-medium">창고</th>
+                <th className="whitespace-nowrap px-5 py-3 font-medium">위치</th>
+                <th className="whitespace-nowrap px-5 py-3 font-medium">보관기간</th>
+                <th className="whitespace-nowrap px-5 py-3 text-right font-medium">보관료</th>
+                <th className="whitespace-nowrap px-5 py-3 font-medium">상태</th>
+                <th className="whitespace-nowrap px-5 py-3 text-right font-medium">작업</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {visible.map((o) => (
                 <tr key={o.id} className="transition hover:bg-slate-50">
-                  <td className="px-5 py-3 font-medium text-slate-800">{o.customerName}</td>
-                  <td className="px-5 py-3 text-slate-500">{o.warehouseName}</td>
-                  <td className="px-5 py-3 text-slate-500">
+                  <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">{o.customerName}</td>
+                  <td className="whitespace-nowrap px-5 py-3 text-slate-500">{o.warehouseName}</td>
+                  <td className="whitespace-nowrap px-5 py-3 text-slate-500">
                     <OrderLocationBadge locs={locationsByOrder.get(o.id) ?? []} />
                   </td>
-                  <td className="px-5 py-3 text-slate-500">
+                  <td className="whitespace-nowrap px-5 py-3 text-slate-500">
                     <DateRangeLabel start={o.storageStartDate} end={o.actualEndDate ?? o.expectedEndDate} size="sm" />
                   </td>
-                  <td className="px-5 py-3 text-right text-slate-700">{won(o.monthlyFee)}</td>
-                  <td className="px-5 py-3">
+                  <td className="whitespace-nowrap px-5 py-3 text-right text-slate-700">{won(o.monthlyFee)}</td>
+                  <td className="whitespace-nowrap px-5 py-3">
                     <OrderStatusBadge status={o.status} />
                   </td>
-                  <td className="px-5 py-3">{renderActions(o)}</td>
+                  <td className="whitespace-nowrap px-5 py-3">{renderActions(o)}</td>
                 </tr>
               ))}
             </tbody>
