@@ -1140,15 +1140,19 @@ export function CreateOrderModal({
               <GridField label="보관 시작일" required>
                 <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={gridInputCls} />
               </GridField>
-              <GridField label="출고 예정일">
-                {/* 체크박스 줄 전체가 터치 레이어 — 글자 어디를 눌러도 토글된다(다른 박스와 동일 h-11) */}
-                <UndecidedToggle
-                  checked={endDateUnknown}
-                  onChange={(v) => {
-                    setEndDateUnknown(v)
-                    if (v) setEndDate('') // 미정 선택 시 기존 입력값 제거
-                  }}
-                />
+              {/* '미정' 스위치는 라벨 줄 오른쪽에 — 입력창 높이를 다른 칸과 같게 유지한다 */}
+              <GridField
+                label="출고 예정일"
+                action={
+                  <UndecidedToggle
+                    checked={endDateUnknown}
+                    onChange={(v) => {
+                      setEndDateUnknown(v)
+                      if (v) setEndDate('') // 미정 선택 시 기존 입력값 제거
+                    }}
+                  />
+                }
+              >
                 {endDateUnknown ? (
                   <UndecidedPlaceholder />
                 ) : (

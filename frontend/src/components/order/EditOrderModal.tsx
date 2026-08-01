@@ -26,7 +26,6 @@ import {
   FormActions,
   GridField,
   gridInputCls,
-  gridLockedCls,
   gridReadonlyCls,
   inputCls,
   labelCls,
@@ -296,14 +295,18 @@ export default function EditOrderModal({
             />
           </GridField>
 
-          <GridField label="출고 예정일">
-            <UndecidedToggle
-              checked={endDateUnknown}
-              onChange={(v) => {
-                setEndDateUnknown(v)
-                if (v) setEndDate('') // 미정 선택 시 기존 입력값 제거
-              }}
-            />
+          <GridField
+            label="출고 예정일"
+            action={
+              <UndecidedToggle
+                checked={endDateUnknown}
+                onChange={(v) => {
+                  setEndDateUnknown(v)
+                  if (v) setEndDate('') // 미정 선택 시 기존 입력값 제거
+                }}
+              />
+            }
+          >
             {endDateUnknown ? (
               <UndecidedPlaceholder />
             ) : (
@@ -374,13 +377,12 @@ export default function EditOrderModal({
             </select>
           </GridField>
 
-          {/* 이미 입고된 컨테이너 번호는 시스템 채번값 — 규격은 같되 잠긴 상태로 오터치를 막는다 */}
-          {container && (
-            <GridField label="컨테이너 번호" hint="입고 시 자동 채번 — 변경 불가">
-              <div className={gridLockedCls}>{container.containerNo}</div>
-            </GridField>
-          )}
-
+          {/*
+            컨테이너 번호(시스템 채번값)는 화면에 노출하지 않는다.
+            현장에서 쓰는 식별자는 '화주명 + 자리(3층-7)'이고, 내부 채번 번호는 담당자가
+            판단에 쓰지 않는 값이라 항목만 늘려 폼을 무겁게 만든다.
+            저장 시에는 백엔드 필수값이므로 container 상태에서 그대로 실어 보낸다.
+          */}
           <GridField label="납기일">
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={gridInputCls} />
           </GridField>

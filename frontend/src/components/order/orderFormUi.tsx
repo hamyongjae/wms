@@ -32,13 +32,6 @@ export const gridInputCls =
 /** 계산 결과(보관일수·하루 보관료) — 규격은 입력 박스와 동일하되 강조색으로 '살아있는 값'임을 표시 */
 export const gridReadonlyCls =
   'flex h-11 min-w-0 items-center justify-end rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-sm font-semibold text-indigo-600'
-/**
- * 수정 불가한 고정 정보(예: 채번된 컨테이너 번호) — 높이·곡률은 입력 박스와 같아
- * 격자 정렬이 흐트러지지 않지만, 진한 회색 배경으로 "만질 수 없는 값"임을 구분한다.
- * div 라서 탭해도 키보드가 뜨지 않는다(오터치 원천 차단).
- */
-export const gridLockedCls =
-  'flex h-11 min-w-0 items-center rounded-lg border border-slate-200 bg-slate-100 px-2.5 text-sm font-semibold text-slate-500'
 export const gridLabelCls = 'mb-1 block truncate text-sm font-semibold text-slate-700'
 /** 전체 폭 라벨 (단일 컬럼 필드용) */
 export const labelCls = 'mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium'
@@ -48,24 +41,36 @@ export function FieldGrid({ children, className }: { children: ReactNode; classN
   return <div className={cn('grid grid-cols-2 gap-2.5', className)}>{children}</div>
 }
 
-/** 2열 격자 안의 한 칸 — 라벨 + 입력 요소 + (선택) 보조 설명 */
+/**
+ * 2열 격자 안의 한 칸 — 라벨 + 입력 요소 + (선택) 보조 설명.
+ *
+ * action: 라벨 줄 오른쪽 끝에 붙는 보조 스위치('출고일 미정' 등).
+ *   입력 요소 위나 아래가 아니라 라벨 줄에 두는 이유는 두 가지다.
+ *   1) 읽는 순서(라벨 → 입력값)를 끊지 않는다.
+ *   2) 입력 영역의 높이가 모든 칸에서 h-11로 같아져 2열 격자의 가로 정렬이 깨지지 않는다.
+ */
 export function GridField({
   label,
   required,
   hint,
+  action,
   children,
 }: {
   label: string
   required?: boolean
   hint?: string
+  action?: ReactNode
   children: ReactNode
 }) {
   return (
     <div className={gridCellCls}>
-      <label className={gridLabelCls}>
-        {label}
-        {required && ' *'}
-      </label>
+      <div className="mb-1 flex min-w-0 items-center justify-between gap-1">
+        <span className={cn(gridLabelCls, 'mb-0')}>
+          {label}
+          {required && ' *'}
+        </span>
+        {action}
+      </div>
       {children}
       {hint && <p className="mt-1 text-[11px] text-slate-400">{hint}</p>}
     </div>
@@ -104,20 +109,27 @@ export function ContextBar({ items }: { items: { label: string; value: ReactNode
 
 /**
  * [출고일 미정] 토글 — 장기 보관 계약처럼 종료일이 확정되지 않은 건을 표현한다.
+ * GridField 의 action 슬롯(라벨 줄 오른쪽)에 넣어 쓴다.
  *
- * 체크박스 줄 전체가 터치 레이어(h-11)라 글자 어디를 눌러도 토글되고,
- * 다른 입력 박스와 같은 높이라 2열 격자의 정렬이 깨지지 않는다.
+ * -my-1.5: 상하 여백을 음수 마진으로 상쇄해, 터치 영역은 넉넉히 키우면서도
+ *   라벨 줄 자체의 높이는 늘리지 않는다(다른 칸과의 정렬 유지).
+ * 켜지면 인디고 톤으로 반전돼, 폼을 훑을 때 '이 계약은 미정'이 한눈에 들어온다.
  */
 export function UndecidedToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="mb-1.5 flex h-11 w-full min-w-0 cursor-pointer select-none items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold text-slate-600 transition active:bg-slate-100">
+    <label
+      className={cn(
+        '-my-1.5 flex shrink-0 cursor-pointer select-none items-center gap-1 rounded-md px-1.5 py-1.5 text-xs font-semibold transition',
+        checked ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 active:bg-slate-100',
+      )}
+    >
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
         className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
       />
-      <span className="min-w-0 flex-1 truncate">출고일 미정</span>
+      미정
     </label>
   )
 }
