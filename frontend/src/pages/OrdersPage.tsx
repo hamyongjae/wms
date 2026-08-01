@@ -230,16 +230,25 @@ export default function OrdersPage() {
 
   // [필터 칩 개수 = 실제 조회 결과와 항상 일치] 조회어·날짜 조건은 그대로 두고 상태(전체/입고/출고)만 바꿔가며
   //   세어야, 칩에 적힌 숫자와 칩을 눌렀을 때 실제로 보이는 건수가 어긋나지 않는다.
+  //
+  // [필터 칩의 의미가 날짜 유무에 따라 바뀐다]
+  //   날짜 미지정: 칩 = 계약의 "현재 상태"(입고중/출고완료).
+  //   날짜 지정: 칩 = 그 날짜의 "이벤트 종류"(입고 예정/출고 예정·완료) — 아직 출고 처리 전이라
+  //     status가 INBOUND 그대로인 '출고 예정' 계약도 출고 칩에서 보여야 하므로, 현재 상태로 걸러버리면
+  //     "그 날 출고할 계약인데 아직 처리 전"인 건이 출고 칩에서 사라져 버린다(실제 리포트된 버그).
   function matchesFilter(o: StorageOrder, key: FilterKey): boolean {
-    if (key !== 'ALL' && o.status !== key) return false
     const q = query.trim().toLowerCase()
     if (q && !`${o.customerName} ${o.warehouseName}`.toLowerCase().includes(q)) return false
-    // [단일 날짜 조회] 비어있으면 전체. 값이 있으면 그 날짜에 입고 또는 출고 일정이 있는 계약만
+
     if (date) {
       const isInboundThatDay = o.storageStartDate === date
-      const isOutboundThatDay = o.actualEndDate === date || (o.expectedEndDate === date && o.status === 'INBOUND')
-      if (!isInboundThatDay && !isOutboundThatDay) return false
+      const isOutboundThatDay = o.actualEndDate === date || o.expectedEndDate === date
+      if (key === 'INBOUND') return isInboundThatDay
+      if (key === 'OUTBOUND') return isOutboundThatDay
+      return isInboundThatDay || isOutboundThatDay // ALL
     }
+
+    if (key !== 'ALL' && o.status !== key) return false
     return true
   }
 
