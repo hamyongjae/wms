@@ -582,7 +582,7 @@ export default function OrdersPage() {
  * "이 고객 정산 어떻게 돼가?"에 화면 한 장으로 답한다.
  * 회차(원장)별 기간·상태·수금/잔액을 시간순으로 보여주고, 그 자리에서 바로 입금을 기록한다.
  */
-function OrderBillingModal({ target, isAdmin, onClose }: { target: StorageOrder | null; isAdmin: boolean; onClose: () => void }) {
+export function OrderBillingModal({ target, isAdmin, onClose }: { target: StorageOrder | null; isAdmin: boolean; onClose: () => void }) {
   const [ledgers, setLedgers] = useState<BillingLedger[]>([])
   const [loading, setLoading] = useState(true)
   const [payTarget, setPayTarget] = useState<BillingLedger | null>(null) // 입금 기록 중인 회차

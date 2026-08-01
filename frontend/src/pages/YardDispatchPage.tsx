@@ -8,6 +8,8 @@ import {
   LogOut,
   ArrowRightLeft,
   Pencil,
+  Trash2,
+  Wallet,
   Boxes,
   Grid3x3,
   Square,
@@ -26,7 +28,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { extractOwner } from '@/lib/owner'
-import { CreateOrderModal } from './OrdersPage' // [통합] 계약등록 공용 폼(컨테이너 관리 입고에서 창고·자리 고정)
+import { CreateOrderModal, OrderBillingModal } from './OrdersPage' // [통합] 계약등록·정산 공용 폼(컨테이너 관리 입고에서 창고·자리 고정)
 import EditOrderModal from '@/components/order/EditOrderModal' // [통합] 계약수정 공용 폼(계약관리와 완전히 동일한 화면)
 
 /* ===== 타입 명세 ===== */
@@ -87,6 +89,7 @@ export default function YardDispatchPage() {
   const [inboundSlot, setInboundSlot] = useState<YardSlot | null>(null)
   const [actionSlot, setActionSlot] = useState<YardSlot | null>(null)
   const [editSlot, setEditSlot] = useState<YardSlot | null>(null)
+  const [billingOrder, setBillingOrder] = useState<StorageOrder | null>(null) // [통합] 정산 보기 — 계약관리와 동일한 정산 타임라인 팝업
   const [emptyActionSlot, setEmptyActionSlot] = useState<YardSlot | null>(null) // 빈 자리 옵션 시트(입고/운영전환)
   const [dragging, setDragging] = useState<{ containerId: number; fromSlotId: number; label: string } | null>(null)
   const [gridOpen, setGridOpen] = useState(false)
@@ -320,6 +323,20 @@ export default function YardDispatchPage() {
 
     } catch (err) {
       alert(errMsg(err, '출고에 실패했습니다.'))
+    }
+  }
+
+  // [통합] 계약 삭제 — 계약 관리의 삭제와 동일 동작(청구 원장·입금 내역도 함께 삭제)
+  async function handleDeleteContract(order: StorageOrder) {
+    if (!window.confirm(`'${order.customerName}' 계약을 삭제할까요?\n(연결된 청구 원장·입금 내역도 함께 삭제됩니다)`)) return
+    try {
+      await orderApi.remove(order.id)
+      setActionSlot(null)
+      setBanner(`'${order.customerName}' 계약을 삭제했습니다.`)
+      reload()
+      orderSync.emit() // 계약관리·캘린더·대시보드에 삭제 전파
+    } catch (err) {
+      alert(errMsg(err, '계약 삭제에 실패했습니다.'))
     }
   }
 
@@ -709,33 +726,45 @@ export default function YardDispatchPage() {
       )}
 
       {/* 적재 슬롯 액션 패널 */}
-      {actionSlot && (
-        <ActionPanel
-          slot={actionSlot}
-          container={actionSlot.containerId != null ? containersById.get(actionSlot.containerId) : undefined}
-          order={(() => {
-            const c = actionSlot.containerId != null ? containersById.get(actionSlot.containerId) : undefined
-            return c?.currentOrderId != null ? orderById.get(c.currentOrderId) : undefined
-          })()}
-          onClose={() => setActionSlot(null)}
-          onOutbound={() => handleOutbound(actionSlot)}
-          onMove={() => {
-            const s = actionSlot
-            if (s?.containerId != null) {
-              setDragging({
-                containerId: s.containerId,
-                fromSlotId: s.id,
-                label: extractOwner(containersById.get(s.containerId)?.memo) ?? s.containerNo ?? '컨테이너',
-              })
-            }
-            setActionSlot(null)
-          }}
-          onEdit={() => {
-            setEditSlot(actionSlot)
-            setActionSlot(null)
-          }}
-        />
-      )}
+      {actionSlot && (() => {
+        const actionContainer = actionSlot.containerId != null ? containersById.get(actionSlot.containerId) : undefined
+        const actionOrder = actionContainer?.currentOrderId != null ? orderById.get(actionContainer.currentOrderId) : undefined
+        return (
+          <ActionPanel
+            slot={actionSlot}
+            container={actionContainer}
+            order={actionOrder}
+            isAdmin={isAdmin}
+            onClose={() => setActionSlot(null)}
+            onOutbound={() => handleOutbound(actionSlot)}
+            onMove={() => {
+              const s = actionSlot
+              if (s?.containerId != null) {
+                setDragging({
+                  containerId: s.containerId,
+                  fromSlotId: s.id,
+                  label: extractOwner(containersById.get(s.containerId)?.memo) ?? s.containerNo ?? '컨테이너',
+                })
+              }
+              setActionSlot(null)
+            }}
+            onEdit={() => {
+              setEditSlot(actionSlot)
+              setActionSlot(null)
+            }}
+            onBilling={() => {
+              if (actionOrder) setBillingOrder(actionOrder)
+              setActionSlot(null)
+            }}
+            onDelete={() => {
+              if (actionOrder) handleDeleteContract(actionOrder)
+            }}
+          />
+        )
+      })()}
+
+      {/* [통합] 정산 보기 — 계약 관리의 '정산' 과 완전히 동일한 팝업 */}
+      <OrderBillingModal target={billingOrder} isAdmin={isAdmin} onClose={() => setBillingOrder(null)} />
 
       {/*
         [통합] 계약 수정 — 계약 관리의 '수정'과 완전히 동일한 팝업을 띄운다.
@@ -973,18 +1002,24 @@ function ActionPanel({
   slot,
   container,
   order,
+  isAdmin,
   onClose,
   onOutbound,
   onMove,
   onEdit,
+  onBilling,
+  onDelete,
 }: {
   slot: YardSlot
   container?: Container
   order?: StorageOrder
+  isAdmin: boolean
   onClose: () => void
   onOutbound: () => void
   onMove: () => void
   onEdit: () => void
+  onBilling: () => void
+  onDelete: () => void
 }) {
   const isMobile = useIsMobile()
   const start = order?.storageStartDate ?? container?.inboundDate
@@ -1038,14 +1073,32 @@ function ActionPanel({
         */}
         <button
           type="button"
+          onClick={onBilling}
+          disabled={!order}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-base font-bold text-white transition hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Wallet size={18} /> 정산 보기
+        </button>
+        <button
+          type="button"
           onClick={onEdit}
           disabled={!order}
           className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3.5 text-base font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
         >
           <Pencil size={18} /> 계약 수정
         </button>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={!order}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3.5 text-base font-semibold text-red-600 transition hover:bg-red-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-red-50"
+          >
+            <Trash2 size={18} /> 계약 삭제
+          </button>
+        )}
         {!order && (
-          <p className="text-center text-xs text-slate-400">계약에 배정되지 않은 컨테이너라 수정할 계약 정보가 없습니다.</p>
+          <p className="text-center text-xs text-slate-400">계약에 배정되지 않은 컨테이너라 수정·정산·삭제할 계약 정보가 없습니다.</p>
         )}
       </div>
     </Modal>
