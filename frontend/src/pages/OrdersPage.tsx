@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { isAxiosError } from 'axios'
 import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Truck, Wallet, Search } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
@@ -20,6 +20,7 @@ import { today, addDays, addMonths, getDurationDays } from '@/lib/dates'
 import Modal from '@/components/ui/Modal'
 import Fab from '@/components/ui/Fab'
 import MoneyInput from '@/components/ui/MoneyInput'
+import DateRangeLabel from '@/components/ui/DateRangeLabel'
 import CustomerListPicker from '@/components/customer/CustomerListPicker'
 import LocationPickerField from '@/components/yard/LocationPickerField'
 
@@ -69,7 +70,7 @@ const defaultRange = (): { from: string; to: string } => {
 }
 
 /* 모바일 카드: 라벨-값 한 줄 */
-function InfoRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function InfoRow({ label, value, strong }: { label: string; value: ReactNode; strong?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="shrink-0 text-sm font-medium text-slate-400">{label}</span>
@@ -449,9 +450,7 @@ export default function OrdersPage() {
                     <OrderLocationBadge locs={locationsByOrder.get(o.id) ?? []} />
                   </td>
                   <td className="px-5 py-3 text-slate-500">
-                    {o.storageStartDate}
-                    <span className="text-slate-300"> ~ </span>
-                    {o.actualEndDate ?? o.expectedEndDate ?? '미정'}
+                    <DateRangeLabel start={o.storageStartDate} end={o.actualEndDate ?? o.expectedEndDate} size="sm" />
                   </td>
                   <td className="px-5 py-3 text-right text-slate-700">{won(o.monthlyFee)}</td>
                   <td className="px-5 py-3">
@@ -493,7 +492,10 @@ export default function OrdersPage() {
                 {/* 핵심 정보 */}
                 <div className="mt-4 space-y-2.5">
                   <InfoRow label="보관료" value={won(o.monthlyFee)} strong />
-                  <InfoRow label="보관기간" value={`${md(o.storageStartDate)} ~ ${md(o.actualEndDate ?? o.expectedEndDate)}`} />
+                  <InfoRow
+                    label="보관기간"
+                    value={<DateRangeLabel start={o.storageStartDate} end={o.actualEndDate ?? o.expectedEndDate} format={md} />}
+                  />
                   <div className="flex items-center justify-between gap-3">
                     <span className="shrink-0 text-sm font-medium text-slate-400">위치</span>
                     <OrderLocationBadge locs={locs} />

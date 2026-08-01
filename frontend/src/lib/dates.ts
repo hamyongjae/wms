@@ -22,10 +22,14 @@ export function addMonths(dateStr: string, months: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-/** 두 날짜 사이 일수 (당일 포함) */
+/**
+ * 두 날짜 사이 일수 (당일 포함).
+ * 종료일이 없으면(출고 예정일 미정인 장기 계약) 시작일로 되돌리지 않고 '오늘'까지 진행 중인
+ * 것으로 보고 계산한다 — 그래야 오래전에 시작한 무기한 계약이 "1일"로 잘못 표시되지 않는다.
+ */
 export function getDurationDays(startDate: string, endDate: string | null | undefined): number {
   const start = new Date(`${startDate}T00:00:00Z`).getTime()
-  const end = new Date(`${endDate ?? startDate}T00:00:00Z`).getTime()
+  const end = new Date(`${endDate ?? today()}T00:00:00Z`).getTime()
   return Math.round((end - start) / 86_400_000) + 1
 }
 

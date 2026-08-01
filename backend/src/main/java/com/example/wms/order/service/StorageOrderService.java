@@ -184,8 +184,10 @@ public class StorageOrderService {
         SettlementType newType = request.getPaymentType() != null
                 ? request.getPaymentType() : order.getPaymentType();
         // 납기일: 명시값 우선, 없으면 결제 방식별 기본(선불=시작일/후불=종료일)
+        // [출고일 미정 방어] 종료일이 없으면 등록 때(createOrder)와 같은 규칙으로 시작일+7일을 임시 기준으로 삼는다.
+        //   시작일 그대로 쓰면 후불 계약의 납기일이 등록 당일이 되어 장기 계약이 즉시 연체로 보이는 문제가 있었다.
         LocalDate periodEnd = order.getExpectedEndDate() != null
-                ? order.getExpectedEndDate() : order.getStorageStartDate();
+                ? order.getExpectedEndDate() : order.getStorageStartDate().plusDays(7);
         LocalDate newDue = request.getDueDate() != null ? request.getDueDate()
                 : (newType == SettlementType.PREPAID ? order.getStorageStartDate() : periodEnd);
         order.setPaymentType(newType);

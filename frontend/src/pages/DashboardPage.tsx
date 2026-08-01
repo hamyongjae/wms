@@ -21,6 +21,7 @@ import { billingApi, type BillingLedger, type MonthlyRevenuePoint } from '@/api/
 import { yardApi, type WarehouseOccupancy, type YardSlot } from '@/api/yardApi'
 import { containerApi, type Container } from '@/api/containerApi'
 import StatCard from '@/components/ui/StatCard'
+import DateRangeLabel from '@/components/ui/DateRangeLabel'
 import RevenueBarChart, { type RevenuePoint } from '@/components/charts/RevenueBarChart'
 import WarehouseArt from '@/components/brand/WarehouseArt'
 import { authStorage } from '@/lib/auth'
@@ -33,11 +34,15 @@ const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const isActive = (s: StorageOrder['status']) => s === 'INBOUND'
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
 
-/** 계약 가격 표시: "보관료 / 보관일수" 형식 */
+/**
+ * 계약 가격 표시: "보관료 / 보관일수" 형식.
+ * 출고 예정일이 없는 장기 계약은 총 계약일수가 아니라 '오늘까지 진행된 일수'이므로
+ * 나중에 총액으로 오인하지 않도록 "(진행중)"을 덧붙인다.
+ */
 function formatContractPrice(monthlyFee: number, startDate: string, endDate: string | null | undefined): string {
   const durationDays = getDurationDays(startDate, endDate)
   if (durationDays <= 0) return won(monthlyFee)
-  return `${won(monthlyFee)} / ${durationDays}일`
+  return `${won(monthlyFee)} / ${durationDays}일${endDate ? '' : ' (진행중)'}`
 }
 
 /** 계약 id → 슬롯 위치 라벨 맵 파생 (Map 조인 — 렌더 중 반복 탐색 제거) */
@@ -448,7 +453,8 @@ export default function DashboardPage() {
                           <div className="min-w-0">
                             <p className="truncate font-medium text-slate-800">{o.customerName}</p>
                             <p className="text-xs text-slate-400">
-                              {o.warehouseName} {location && `· ${location}`} · {o.storageStartDate}~{o.actualEndDate ?? o.expectedEndDate ?? '미정'}
+                              {o.warehouseName} {location && `· ${location}`} ·{' '}
+                              <DateRangeLabel start={o.storageStartDate} end={o.actualEndDate ?? o.expectedEndDate} size="sm" />
                             </p>
                           </div>
                           <span className="shrink-0 whitespace-nowrap text-slate-600">{formatContractPrice(o.monthlyFee, o.storageStartDate, o.actualEndDate ?? o.expectedEndDate)}</span>
