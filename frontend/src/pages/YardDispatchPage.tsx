@@ -927,7 +927,7 @@ function MobileSlotTile({
                 : `${slot.locationLabel} · 빈 자리`
       }
       className={cn(
-        'relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-2xl border-2 text-center transition active:scale-95 disabled:opacity-50',
+        'relative flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border-2 text-center transition active:scale-95 disabled:opacity-50',
         bulkLocked
           ? 'border-slate-300 bg-slate-200 text-slate-400'
           : slot.occupied
@@ -944,11 +944,10 @@ function MobileSlotTile({
     >
       {slot.occupied ? (
         <>
-          {/* 자리 번호는 화주명 길이와 무관하게 항상 같은 자리(상단 고정)에 표시 */}
-          <span className="absolute inset-x-0 top-1.5 text-center text-[11px] font-bold leading-none opacity-80 tabular-nums">
+          {/* 자리 번호 + 화주명을 한 블록으로 묶어 칸 정중앙에 정렬 (길어도 겹치지 않게 일반 흐름으로 배치) */}
+          <span className="shrink-0 text-center text-[11px] font-bold leading-none opacity-80 tabular-nums">
             {slot.columnNo}번
           </span>
-          {/* 화주명 — 길어도 자르지 않고 2줄까지 줄바꿈 */}
           <span className="line-clamp-2 max-w-full break-words px-1.5 text-center text-xs font-extrabold leading-tight">
             {extractOwner(container?.memo) ?? container?.containerNo ?? '—'}
           </span>
