@@ -300,7 +300,6 @@ export default function OrdersPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">계약 관리</h2>
-          <p className="mt-0.5 text-sm text-slate-500">보관 계약을 등록하고 입고·출고 일정을 관리합니다.</p>
         </div>
         {/* 데스크톱: 상단 버튼 / 모바일: 하단 FAB(엄지 존)이 대신한다 */}
         <button
