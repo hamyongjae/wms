@@ -93,9 +93,81 @@ export default function YardDispatchPage() {
   const [gridOpen, setGridOpen] = useState(false)
   const [banner, setBanner] = useState<string | null>(null)
   const [selectedTier, setSelectedTier] = useState<number | null>(null) // 모바일: 상단 탭에서 선택한 층
+  // [미사용 일괄 관리] 모드 진입 시 팝업 없이 격자 터치만으로 여러 자리를 미사용↔사용 토글, 마지막에 한 번에 저장
+  const [bulkMode, setBulkMode] = useState(false)
+  const [pendingActive, setPendingActive] = useState<Map<number, boolean>>(new Map()) // slotId → 저장 대기 중인 active값(원래 값과 같으면 제거)
+  const [bulkSaving, setBulkSaving] = useState(false)
   const isMobile = useIsMobile()
 
   const reload = () => setRefreshKey((k) => k + 1)
+
+  // 창고를 바꾸면 이전 창고의 미저장 편집은 의미가 없으므로 정리한다 (저장 완료 시 정리는 handleBulkSave에서 별도 처리)
+  useEffect(() => {
+    setBulkMode(false)
+    setPendingActive(new Map())
+  }, [selectedId])
+
+  // [안전장치] 편집 도중 다른 곳에서 해당 자리가 실제로 입고돼 버리면(다른 작업자·다른 탭)
+  //   더 이상 미사용으로 지정할 수 없으므로 대기 중이던 변경을 조용히 취소한다.
+  useEffect(() => {
+    setPendingActive((prev) => {
+      if (prev.size === 0) return prev
+      const occupiedIds = new Set(slots.filter((s) => s.occupied).map((s) => s.id))
+      let changed = false
+      const next = new Map(prev)
+      for (const id of prev.keys()) {
+        if (occupiedIds.has(id)) {
+          next.delete(id)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [slots])
+
+  // 슬롯의 "저장하면 적용될" 사용 여부 — 편집 중 대기 변경이 있으면 그 값을, 없으면 서버 값을 사용
+  function effectiveActive(slot: YardSlot): boolean {
+    return pendingActive.get(slot.id) ?? slot.active !== false
+  }
+
+  // 편집 모드에서 빈 자리를 터치할 때마다 미사용↔사용 토글 (팝업 없음, 즉시 반영은 저장 시)
+  function handleBulkToggle(slot: YardSlot) {
+    if (slot.occupied) return // 이중 방어 — 버튼도 disabled 처리되어 있음
+    setPendingActive((prev) => {
+      const next = new Map(prev)
+      const flipped = !effectiveActive(slot)
+      const original = slot.active !== false
+      if (flipped === original) next.delete(slot.id) // 원래 상태로 되돌아오면 변경 목록에서 제외
+      else next.set(slot.id, flipped)
+      return next
+    })
+  }
+
+  async function handleBulkSave() {
+    if (pendingActive.size === 0) {
+      setBulkMode(false)
+      return
+    }
+    setBulkSaving(true)
+    try {
+      const entries = [...pendingActive.entries()]
+      await Promise.all(entries.map(([id, active]) => yardApi.setSlotActive(id, active)))
+      setBanner(`자리 ${entries.length}곳의 운영 상태를 저장했습니다.`)
+      setPendingActive(new Map())
+      setBulkMode(false)
+      reload()
+    } catch (err) {
+      alert(errMsg(err, '일부 자리 저장에 실패했습니다. 화면을 새로고침한 뒤 다시 시도하세요.'))
+      reload() // 부분 성공/실패가 섞였을 수 있으니 서버 기준으로 다시 맞춘다
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  function handleBulkCancel() {
+    setPendingActive(new Map())
+    setBulkMode(false)
+  }
 
   useEffect(() => {
     warehouseApi
@@ -265,19 +337,63 @@ export default function YardDispatchPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">컨테이너 관리</h2>
-          <p className="mt-1 text-sm text-slate-500">격자를 클릭해 그 자리에서 입고·출고·이동을 즉시 처리합니다.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {bulkMode ? '빈 자리를 눌러 미사용 지정을 켜고 끄세요. 다 고르면 저장을 누르세요.' : '격자를 클릭해 그 자리에서 입고·출고·이동을 즉시 처리합니다.'}
+          </p>
         </div>
-        {/* 자리 생성 버튼 (모바일·데스크톱 공통 · 상단) */}
-        {isAdmin && selectedId != null && (
-          <button
-            type="button"
-            onClick={() => setGridOpen(true)}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
-          >
-            <Plus size={16} /> 자리 생성
-          </button>
-        )}
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          {selectedId != null && (
+            bulkMode ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleBulkCancel}
+                  disabled={bulkSaving}
+                  className="rounded-lg border border-slate-300 px-3.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkSave}
+                  disabled={bulkSaving}
+                  className="flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60"
+                >
+                  {bulkSaving ? '저장 중…' : pendingActive.size > 0 ? `저장 (${pendingActive.size}곳)` : '완료'}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setDragging(null) // 이동 모드와 동시 진행 방지
+                  setBulkMode(true)
+                }}
+                className="flex items-center gap-1.5 rounded-lg border-2 border-red-300 bg-red-50 px-3.5 py-2 text-sm font-bold text-red-700 transition hover:bg-red-100"
+              >
+                <Ban size={16} /> 미사용 컨테이너 관리
+              </button>
+            )
+          )}
+          {/* 자리 생성 버튼 (모바일·데스크톱 공통 · 상단) */}
+          {isAdmin && selectedId != null && !bulkMode && (
+            <button
+              type="button"
+              onClick={() => setGridOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+            >
+              <Plus size={16} /> 자리 생성
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* 편집 모드 안내 띠 — 화면에 얇게 둘러 "지금은 일반 조회가 아니라 편집 중"임을 계속 인지시킨다 */}
+      {bulkMode && (
+        <div className="rounded-xl border-2 border-red-300 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700">
+          미사용 관리 모드 — 사용 중인 자리는 눌러도 반응하지 않습니다.
+        </div>
+      )}
 
       {/* 창고 탭 + 검색 */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -286,12 +402,14 @@ export default function YardDispatchPage() {
             <button
               key={w.id}
               type="button"
+              disabled={bulkMode && w.id !== selectedId}
+              title={bulkMode && w.id !== selectedId ? '미사용 관리 모드를 완료하거나 취소한 뒤 창고를 바꿀 수 있습니다.' : undefined}
               onClick={() => {
                 setSelectedId(w.id)
                 setDragging(null)
               }}
               className={cn(
-                'rounded-full border px-4 py-1.5 text-sm font-medium transition',
+                'rounded-full border px-4 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40',
                 w.id === selectedId
                   ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
                   : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
@@ -385,7 +503,12 @@ export default function YardDispatchPage() {
             <StatCard label="미사용" value={fmt(kpi.inactive)} icon={Ban} tone="slate" />
           </div>
 
-          <section className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-200/60 sm:p-6">
+          <section
+            className={cn(
+              'rounded-2xl bg-white p-4 shadow-soft ring-1 sm:p-6 transition-shadow',
+              bulkMode ? 'ring-2 ring-red-300' : 'ring-slate-200/60',
+            )}
+          >
             <div className="mb-4 flex items-center justify-end">
               <Legend />
             </div>
@@ -400,10 +523,16 @@ export default function YardDispatchPage() {
                       slot={s}
                       container={s.containerId != null ? containersById.get(s.containerId) : undefined}
                       highlighted={matchSlot(s)}
-                      dragActive={dragging != null}
+                      dragActive={!bulkMode && dragging != null}
                       isDragSource={dragging?.fromSlotId === s.id}
-                      onClick={() => (s.occupied ? setActionSlot(s) : setEmptyActionSlot(s))}
+                      bulkMode={bulkMode}
+                      effectiveInactive={!effectiveActive(s)}
+                      onClick={() => {
+                        if (bulkMode) return handleBulkToggle(s)
+                        return s.occupied ? setActionSlot(s) : setEmptyActionSlot(s)
+                      }}
                       onDragStartCell={() => {
+                        if (bulkMode) return
                         if (s.occupied && s.containerId != null) {
                           setDragging({
                             containerId: s.containerId,
@@ -463,11 +592,14 @@ export default function YardDispatchPage() {
                             slot={s}
                             container={s.containerId != null ? containersById.get(s.containerId) : undefined}
                             highlighted={matchSlot(s)}
-                            dragging={dragging != null}
+                            dragging={!bulkMode && dragging != null}
+                            bulkMode={bulkMode}
+                            effectiveInactive={!effectiveActive(s)}
                             onClick={() => {
-                              if (s.occupied) setActionSlot(s)
-                              else if (dragging) handleDropMove(s)
-                              else setEmptyActionSlot(s)
+                              if (bulkMode) return handleBulkToggle(s)
+                              if (s.occupied) return setActionSlot(s)
+                              if (dragging) return handleDropMove(s)
+                              return setEmptyActionSlot(s)
                             }}
                           />
                         ))}
@@ -650,6 +782,8 @@ function SlotCell({
   highlighted,
   dragActive,
   isDragSource,
+  bulkMode,
+  effectiveInactive,
   onClick,
   onDragStartCell,
   onDropCell,
@@ -660,34 +794,42 @@ function SlotCell({
   highlighted: boolean
   dragActive: boolean
   isDragSource: boolean
+  bulkMode: boolean
+  effectiveInactive: boolean // 미사용 일괄 편집 중 대기 변경까지 반영한 최종 상태
   onClick: () => void
   onDragStartCell: () => void
   onDropCell: () => void
   onDragEndCell: () => void
 }) {
   const owner = extractOwner(container?.memo)
-  const inactive = !slot.occupied && slot.active === false // 미사용(운영 중지)
+  const inactive = !slot.occupied && effectiveInactive // 미사용(운영 중지) — 저장 전 대기 상태 포함
+  const bulkLocked = bulkMode && slot.occupied // 편집 모드에선 사용 중인 자리는 절대 터치 불가
   const cellLabel = slot.occupied ? (owner ?? slot.containerNo ?? `${slot.tier}층`) : ''
   const dropTarget = dragActive && !slot.occupied && !inactive // 미사용 자리는 이동 대상 불가
-  const tooltip = slot.occupied
-    ? [
-        owner ? `화주 ${owner}` : null,
-        `번호 ${slot.containerNo}`,
-        container ? `용량 ${container.capacityTon}톤` : null,
-        container?.inboundDate ? `입고일 ${container.inboundDate}` : null,
-        container?.expectedOutboundDate ? `출고예정 ${container.expectedOutboundDate}` : null,
-        '끌어서 빈 슬롯으로 이동',
-      ]
-        .filter(Boolean)
-        .join('\n')
-    : inactive
-      ? `${slot.locationLabel} · 미사용(운영 중지) — 클릭해 관리`
-      : `${slot.locationLabel} · 빈 슬롯 (클릭해 관리)`
+  const tooltip = bulkLocked
+    ? `${slot.locationLabel} · 사용 중 — 편집 모드에서는 변경 불가`
+    : slot.occupied
+      ? [
+          owner ? `화주 ${owner}` : null,
+          `번호 ${slot.containerNo}`,
+          container ? `용량 ${container.capacityTon}톤` : null,
+          container?.inboundDate ? `입고일 ${container.inboundDate}` : null,
+          container?.expectedOutboundDate ? `출고예정 ${container.expectedOutboundDate}` : null,
+          '끌어서 빈 슬롯으로 이동',
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : bulkMode
+        ? `${slot.locationLabel} · 눌러서 미사용 지정 ${inactive ? '해제' : '켜기'}`
+        : inactive
+          ? `${slot.locationLabel} · 미사용(운영 중지) — 클릭해 관리`
+          : `${slot.locationLabel} · 빈 슬롯 (클릭해 관리)`
 
   return (
     <button
       type="button"
-      draggable={slot.occupied}
+      draggable={slot.occupied && !bulkMode}
+      disabled={bulkLocked}
       onClick={onClick}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = 'move'
@@ -710,15 +852,17 @@ function SlotCell({
       title={tooltip}
       className={cn(
         // [프리미엄 타일] 라운드 + 은은한 그라데이션 + 소프트 섀도 + 호버 리프트 (금융 앱 타일 감성)
-        'flex h-9 w-16 items-center justify-center rounded-lg text-[11px] font-medium',
+        'relative flex h-9 w-16 items-center justify-center rounded-lg text-[11px] font-medium',
         'transition-[transform,box-shadow,background-color,border-color] duration-200 ease-out',
-        slot.occupied
-          ? 'cursor-grab bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-[0_2px_8px_rgba(43,51,63,0.18)] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(43,51,63,0.22)] active:translate-y-0 active:cursor-grabbing'
-          : inactive
-            ? 'cursor-pointer border-2 border-slate-400 bg-slate-200 text-slate-500 hover:bg-slate-300'
-            : dropTarget
-              ? 'border-2 border-dashed border-[#5C7C6B] bg-[#E9EFEA] text-[#5C7C6B]'
-              : 'border border-dashed border-slate-200 bg-slate-50/60 text-slate-300 hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-white hover:text-indigo-500 hover:shadow-[0_4px_12px_rgba(43,51,63,0.08)]',
+        bulkLocked
+          ? 'cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400 opacity-60'
+          : slot.occupied
+            ? 'cursor-grab bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-[0_2px_8px_rgba(43,51,63,0.18)] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(43,51,63,0.22)] active:translate-y-0 active:cursor-grabbing'
+            : inactive
+              ? 'cursor-pointer border-2 border-slate-400 bg-slate-200 text-slate-500 hover:bg-slate-300'
+              : dropTarget
+                ? 'border-2 border-dashed border-[#5C7C6B] bg-[#E9EFEA] text-[#5C7C6B]'
+                : 'border border-dashed border-slate-200 bg-slate-50/60 text-slate-300 hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-white hover:text-indigo-500 hover:shadow-[0_4px_12px_rgba(43,51,63,0.08)]',
         isDragSource && 'opacity-40',
         // [선택 강조] 브래스 링 — 화면당 한 번의 포인트
         highlighted && 'animate-pulse ring-2 ring-[#B08D57] ring-offset-1',
@@ -726,10 +870,14 @@ function SlotCell({
     >
       {slot.occupied ? (
         <span className="truncate px-1">{cellLabel}</span>
-      ) : inactive ? (
-        <Ban size={12} />
       ) : (
         <span className="text-slate-400">{slot.columnNo}</span>
+      )}
+      {/* 미사용 지정 — 블록 전체를 덮는 X 레이어 (편집 중 대기 상태도 즉시 반영) */}
+      {inactive && (
+        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-slate-600/70">
+          <X size={16} strokeWidth={3} className="text-white" />
+        </div>
       )}
     </button>
   )
@@ -745,41 +893,52 @@ function MobileSlotTile({
   container,
   highlighted,
   dragging,
+  bulkMode,
+  effectiveInactive,
   onClick,
 }: {
   slot: YardSlot
   container?: Container
   highlighted: boolean
   dragging: boolean
+  bulkMode: boolean
+  effectiveInactive: boolean // 미사용 일괄 편집 중 대기 변경까지 반영한 최종 상태
   onClick: () => void
 }) {
-  const inactive = !slot.occupied && slot.active === false
+  const inactive = !slot.occupied && effectiveInactive
   const maint = container?.status === 'MAINTENANCE'
   const dropTarget = dragging && !slot.occupied && !inactive
+  const bulkLocked = bulkMode && slot.occupied // 편집 모드에선 사용 중인 자리는 절대 터치 불가 — 톤다운 + 비활성화
 
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={dragging && inactive} // 이동 모드에선 미사용 자리는 타겟이 될 수 없다 (데스크톱 격자와 동일 규칙)
+      disabled={bulkLocked || (dragging && inactive)} // 이동 모드에선 미사용 자리는 타겟이 될 수 없다 (데스크톱 격자와 동일 규칙)
       title={
-        slot.occupied
-          ? `${slot.locationLabel} · ${extractOwner(container?.memo) ?? '사용중'}`
-          : inactive
-            ? `${slot.locationLabel} · 미사용(운영 중지)`
-            : `${slot.locationLabel} · 빈 자리`
+        bulkLocked
+          ? `${slot.locationLabel} · 사용 중 — 편집 모드에서는 변경 불가`
+          : slot.occupied
+            ? `${slot.locationLabel} · ${extractOwner(container?.memo) ?? '사용중'}`
+            : bulkMode
+              ? `${slot.locationLabel} · 눌러서 미사용 지정 ${inactive ? '해제' : '켜기'}`
+              : inactive
+                ? `${slot.locationLabel} · 미사용(운영 중지)`
+                : `${slot.locationLabel} · 빈 자리`
       }
       className={cn(
-        'relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-2xl border-2 text-center transition active:scale-95 disabled:opacity-40',
-        slot.occupied
-          ? maint
-            ? 'border-amber-600 bg-amber-500 text-white shadow-sm'
-            : 'border-indigo-700 bg-indigo-600 text-white shadow-sm'
-          : inactive
-            ? 'border-slate-400 bg-slate-300 text-slate-600'
-            : dropTarget
-              ? 'border-indigo-400 bg-indigo-50 text-indigo-600'
-              : 'border-dashed border-slate-300 bg-slate-50 text-slate-400',
+        'relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-2xl border-2 text-center transition active:scale-95 disabled:opacity-50',
+        bulkLocked
+          ? 'border-slate-300 bg-slate-200 text-slate-400'
+          : slot.occupied
+            ? maint
+              ? 'border-amber-600 bg-amber-500 text-white shadow-sm'
+              : 'border-indigo-700 bg-indigo-600 text-white shadow-sm'
+            : inactive
+              ? 'border-slate-400 bg-slate-300 text-slate-600'
+              : dropTarget
+                ? 'border-indigo-400 bg-indigo-50 text-indigo-600'
+                : 'border-dashed border-slate-300 bg-slate-50 text-slate-400',
         highlighted && 'ring-4 ring-[#B08D57] ring-offset-1',
       )}
     >
@@ -793,20 +952,21 @@ function MobileSlotTile({
           <span className="line-clamp-2 max-w-full break-words px-1.5 text-center text-xs font-extrabold leading-tight">
             {extractOwner(container?.memo) ?? container?.containerNo ?? '—'}
           </span>
-          {maint && (
+          {maint && !bulkLocked && (
             <span className="absolute inset-x-0 bottom-1 text-center text-[9px] font-bold leading-none opacity-80">점검</span>
           )}
-        </>
-      ) : inactive ? (
-        <>
-          <Ban size={20} />
-          <span className="text-[10px] font-bold leading-none opacity-80">중지</span>
         </>
       ) : (
         <>
           <span className="text-lg font-extrabold leading-none tabular-nums">{slot.columnNo}</span>
           <span className="text-[10px] font-bold leading-none opacity-80">{dropTarget ? '이동' : '공실'}</span>
         </>
+      )}
+      {/* 미사용 지정 — 블록 전체를 덮는 큼직한 X 레이어. 편집 모드에서 탭할 때마다 즉시 켜지고 꺼진다. */}
+      {inactive && (
+        <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-slate-600/75">
+          <X size={32} strokeWidth={3} className="text-white" />
+        </div>
       )}
     </button>
   )

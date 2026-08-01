@@ -11,7 +11,6 @@ import {
   CalendarClock,
   CalendarDays,
   Warehouse,
-  Bell,
   ChevronRight,
   Loader2,
   type LucideIcon,
@@ -177,7 +176,7 @@ export default function DashboardPage() {
 
   const hasRevenue = revenueChart.some((p) => p.billed > 0 || p.collected > 0)
 
-  // ===== [모바일 전용] 파생 데이터: 지연 출고·잔여 공간·달력 이벤트·주요 알림 =====
+  // ===== [모바일 전용] 파생 데이터: 지연 출고·잔여 공간·달력 이벤트 =====
   const mobile = useMemo(() => {
     const t = today()
     const [yy, mm, dd] = t.split('-').map(Number)
@@ -204,17 +203,7 @@ export default function DashboardPage() {
       add(o.actualEndDate ?? o.expectedEndDate, 'out')
     }
 
-    // 주요 알림 (심각도 순)
-    type Noti = { id: string; text: string; sub?: string; tone: 'red' | 'amber' | 'blue'; to: string }
-    const notis: Noti[] = []
-    if (stats.overdue > 0)
-      notis.push({ id: 'overdue', text: `연체 청구 ${stats.overdue}건`, sub: '납기가 지난 미납 청구가 있어요', tone: 'red', to: '/billing' })
-    if (delayedOut.length > 0)
-      notis.push({ id: 'delayed', text: `출고 지연 ${delayedOut.length}건`, sub: delayedOut.slice(0, 3).map((o) => o.customerName).join(', '), tone: 'amber', to: '/yard' })
-    if (stats.dueSoon > 0)
-      notis.push({ id: 'duesoon', text: `이번 주 납기 도래 ${stats.dueSoon}건`, sub: `${won(stats.dueSoonAmount)} 입금 예정`, tone: 'blue', to: '/billing' })
-
-    return { year: yy, month: mm, todayDay: dd, delayedOut, remaining, cal, notis }
+    return { year: yy, month: mm, todayDay: dd, delayedOut, remaining, cal }
   }, [orders, stats])
 
   // 상단 긴급 배너에 띄울 항목(연체·출고 지연)
@@ -317,28 +306,6 @@ export default function DashboardPage() {
               events={mobile.cal}
             />
 
-            {/* 주요 알림 */}
-            <MobileCard title="주요 알림" icon={Bell}>
-              {mobile.notis.length === 0 ? (
-                <p className="py-3 text-center text-base text-slate-400">특별한 알림이 없습니다 😊</p>
-              ) : (
-                <div className="space-y-2.5">
-                  {mobile.notis.map((n) => (
-                    <Link
-                      key={n.id}
-                      to={n.to}
-                      className={`flex items-center justify-between rounded-2xl border p-4 ${NOTI_TONE[n.tone]}`}
-                    >
-                      <div className="min-w-0">
-                        <p className="text-base font-bold">{n.text}</p>
-                        {n.sub && <p className="mt-0.5 truncate text-sm opacity-80">{n.sub}</p>}
-                      </div>
-                      <ChevronRight size={22} className="shrink-0 opacity-60" />
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </MobileCard>
           </>
         )}
       </div>
@@ -503,12 +470,6 @@ function MobileCard({
       {children}
     </section>
   )
-}
-
-const NOTI_TONE: Record<'red' | 'amber' | 'blue', string> = {
-  red: 'border-red-200 bg-red-50 text-red-700',
-  amber: 'border-amber-200 bg-amber-50 text-amber-700',
-  blue: 'border-blue-200 bg-blue-50 text-blue-700',
 }
 
 /* ===== 모바일 입출고 일정 카드 (달력 + 선택일 화주) ===== */

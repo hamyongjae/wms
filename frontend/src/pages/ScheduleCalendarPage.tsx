@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { isAxiosError } from 'axios'
 import {
@@ -158,6 +158,25 @@ export default function ScheduleCalendarPage() {
     setSelectedDate(todayStr())
   }
 
+  // [스와이프로 달력 넘기기] 세로 스크롤과 헷갈리지 않도록, 가로 이동이 세로 이동보다
+  // 뚜렷하고(가로>세로*1.5) 일정 거리(48px) 이상일 때만 달을 넘긴다. 손을 뗄 때 한 번만 판정.
+  const SWIPE_THRESHOLD = 48
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  function onCalendarTouchStart(e: TouchEvent) {
+    const t = e.touches[0]
+    touchStartRef.current = { x: t.clientX, y: t.clientY }
+  }
+  function onCalendarTouchEnd(e: TouchEvent) {
+    const start = touchStartRef.current
+    touchStartRef.current = null
+    if (!start) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - start.x
+    const dy = t.clientY - start.y
+    if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dx) < Math.abs(dy) * 1.5) return
+    moveMonth(dx < 0 ? 1 : -1) // 왼쪽으로 밀면 다음 달, 오른쪽으로 밀면 이전 달
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-5">
       <div>
@@ -218,7 +237,11 @@ export default function ScheduleCalendarPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         {/* 달력 */}
         <div className="lg:col-span-3">
-          <div className="overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60">
+          <div
+            className="overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60 touch-pan-y"
+            onTouchStart={onCalendarTouchStart}
+            onTouchEnd={onCalendarTouchEnd}
+          >
             <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/70">
               {WEEKDAYS.map((w, i) => (
                 <div
