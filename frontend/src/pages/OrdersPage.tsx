@@ -228,20 +228,26 @@ export default function OrdersPage() {
     }
   }
 
-  const visible = useMemo(() => {
+  // [필터 칩 개수 = 실제 조회 결과와 항상 일치] 조회어·날짜 조건은 그대로 두고 상태(전체/입고/출고)만 바꿔가며
+  //   세어야, 칩에 적힌 숫자와 칩을 눌렀을 때 실제로 보이는 건수가 어긋나지 않는다.
+  function matchesFilter(o: StorageOrder, key: FilterKey): boolean {
+    if (key !== 'ALL' && o.status !== key) return false
     const q = query.trim().toLowerCase()
-    return orders.filter((o) => {
-      if (filter !== 'ALL' && o.status !== filter) return false
-      if (q && !`${o.customerName} ${o.warehouseName}`.toLowerCase().includes(q)) return false
-      // [단일 날짜 조회] 비어있으면 전체. 값이 있으면 그 날짜에 입고 또는 출고 일정이 있는 계약만
-      if (date) {
-        const isInboundThatDay = o.storageStartDate === date
-        const isOutboundThatDay = o.actualEndDate === date || (o.expectedEndDate === date && o.status === 'INBOUND')
-        if (!isInboundThatDay && !isOutboundThatDay) return false
-      }
-      return true
-    })
-  }, [orders, filter, query, date])
+    if (q && !`${o.customerName} ${o.warehouseName}`.toLowerCase().includes(q)) return false
+    // [단일 날짜 조회] 비어있으면 전체. 값이 있으면 그 날짜에 입고 또는 출고 일정이 있는 계약만
+    if (date) {
+      const isInboundThatDay = o.storageStartDate === date
+      const isOutboundThatDay = o.actualEndDate === date || (o.expectedEndDate === date && o.status === 'INBOUND')
+      if (!isInboundThatDay && !isOutboundThatDay) return false
+    }
+    return true
+  }
+
+  const visible = useMemo(
+    () => orders.filter((o) => matchesFilter(o, filter)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [orders, filter, query, date],
+  )
 
   // [상태 처리 완료] 모달에서 처리된 결과를 해당 행만 즉시 반영 (새로고침 없음)
   function handleStatusChanged(updated: StorageOrder) {
@@ -311,10 +317,7 @@ export default function OrdersPage() {
         {/* 데스크톱: 작은 필터 칩 */}
         <div className="hidden flex-wrap items-center gap-1.5 md:flex">
           {FILTERS.map((f) => {
-            const count =
-              f.key === 'ALL'
-                ? orders.length
-                : orders.filter((o) => o.status === f.key).length
+            const count = orders.filter((o) => matchesFilter(o, f.key)).length
             return (
               <button
                 key={f.key}
@@ -333,11 +336,10 @@ export default function OrdersPage() {
           })}
         </div>
 
-        {/* 모바일: 큰 상태 퀵탭 — 한 번 터치로 원하는 상태만 보기 */}
-        <div className="grid grid-cols-3 gap-2 md:hidden">
+        {/* 모바일: 상태 퀵탭 — 한 번 터치로 원하는 상태만 보기 */}
+        <div className="grid grid-cols-3 gap-1.5 md:hidden">
           {FILTERS.map((f) => {
-            const count =
-              f.key === 'ALL' ? orders.length : orders.filter((o) => o.status === f.key).length
+            const count = orders.filter((o) => matchesFilter(o, f.key)).length
             const active = filter === f.key
             return (
               <button
@@ -345,12 +347,12 @@ export default function OrdersPage() {
                 type="button"
                 onClick={() => setFilter(f.key)}
                 className={cn(
-                  'flex flex-col items-center rounded-2xl py-3 text-base font-bold transition active:scale-[0.98]',
-                  active ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-500 ring-1 ring-slate-200',
+                  'flex flex-col items-center rounded-xl py-2 text-sm font-bold transition active:scale-[0.98]',
+                  active ? 'bg-slate-800 text-white shadow-sm' : 'bg-white text-slate-500 ring-1 ring-slate-200',
                 )}
               >
                 {f.label}
-                <span className={cn('mt-0.5 text-sm font-semibold', active ? 'text-white/80' : 'text-slate-400')}>{count}</span>
+                <span className={cn('mt-0.5 text-xs font-semibold', active ? 'text-white/80' : 'text-slate-400')}>{count}</span>
               </button>
             )
           })}
