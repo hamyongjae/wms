@@ -143,6 +143,33 @@ export default function YardDispatchPage() {
   // [실시간 동기화] 계약관리에서 상태 전환·삭제 시 슬롯/컨테이너를 다시 불러온다.
   useEffect(() => orderSync.subscribe(() => setRefreshKey((k) => k + 1)), [])
 
+  // 배경 자동 갱신 전용 — 로딩 스피너·검색 상태(query/matchedIds)를 건드리지 않고 격자만 조용히 최신화한다.
+  //   (전체 refreshKey 갱신은 검색어·하이라이트를 초기화하므로, 다른 작업자의 변경까지 그 경로로 반영하면
+  //    현장에서 화주명을 검색해 놓은 상태가 1분마다 초기화되는 부작용이 생긴다)
+  async function silentRefresh() {
+    if (selectedId == null) return
+    try {
+      const [sl, cs, os] = await Promise.all([
+        yardApi.slots(selectedId),
+        containerApi.list({ warehouseId: selectedId }),
+        orderApi.list().catch(() => [] as StorageOrder[]),
+      ])
+      setSlots(sl)
+      setContainersById(new Map(cs.map((c) => [c.id, c])))
+      setOrders(os)
+    } catch {
+      // 배경 갱신 실패는 조용히 무시 — 다음 주기에 재시도
+    }
+  }
+
+  // [현장 자동 갱신] 다른 작업자가 입고·출고한 변경도 새로고침 없이 반영 (탭이 보일 때만, 계약관리와 동일 주기)
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') void silentRefresh()
+    }, 60000)
+    return () => clearInterval(id)
+  }, [selectedId])
+
   const floors = useMemo(() => groupByFloor(slots), [slots])
   // 컨테이너에 연결된 계약(정산) 조회용 — 화주 카드에 보관기간·보관료를 매핑한다
   const orderById = useMemo(() => new Map(orders.map((o) => [o.id, o])), [orders])
@@ -427,82 +454,23 @@ export default function YardDispatchPage() {
                       })}
                     </div>
 
-                    {/* 선택한 층의 컨테이너 카드 — 화주명·보관기간·보관료 */}
+                    {/* 선택한 층의 격자 — 화면 폭과 무관하게 한 줄 5칸 고정. 상세는 탭하면 하단 시트로. */}
                     {activeFloor && (
-                      <div className="space-y-2.5">
-                        {activeFloor.cells.map((s) => {
-                          const c = s.containerId != null ? containersById.get(s.containerId) : undefined
-                          const owner = extractOwner(c?.memo)
-                          const matched = matchSlot(s)
-                          if (s.occupied) {
-                            const maint = c?.status === 'MAINTENANCE'
-                            const order = c?.currentOrderId != null ? orderById.get(c.currentOrderId) : undefined
-                            const start = order?.storageStartDate ?? c?.inboundDate
-                            const end = order?.actualEndDate ?? order?.expectedEndDate ?? c?.expectedOutboundDate
-                            const fee = order?.monthlyFee
-                            return (
-                              <button
-                                key={s.id}
-                                type="button"
-                                onClick={() => setActionSlot(s)}
-                                className={cn(
-                                  'w-full rounded-2xl border-2 border-l-[6px] bg-white p-4 text-left shadow-sm transition active:scale-[0.99]',
-                                  maint ? 'border-amber-200 border-l-amber-500' : 'border-emerald-200 border-l-emerald-500',
-                                  matched && 'ring-2 ring-amber-400',
-                                )}
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="truncate text-lg font-extrabold text-slate-800">{owner ?? '컨테이너'}</span>
-                                  <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-0.5 text-base font-bold text-slate-700">{s.locationLabel}{maint ? ' · 점검' : ''}</span>
-                                </div>
-                                <div className="mt-2.5 space-y-1.5">
-                                  <div className="flex items-center justify-between gap-2 text-sm">
-                                    <span className="shrink-0 font-medium text-slate-400">보관기간</span>
-                                    <span className="font-semibold text-slate-600">{fmtDate(start)} ~ {fmtDate(end)}</span>
-                                  </div>
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="shrink-0 text-sm font-medium text-slate-400">보관료</span>
-                                    <span className="text-lg font-extrabold text-indigo-600">{fee != null ? `${fmt(fee)}원` : '—'}</span>
-                                  </div>
-                                </div>
-                              </button>
-                            )
-                          }
-                          // 미사용(운영 중지) — 고대비 표시. 이동 대상 불가.
-                          if (s.active === false) {
-                            return (
-                              <button
-                                key={s.id}
-                                type="button"
-                                disabled={dragging != null}
-                                onClick={() => setEmptyActionSlot(s)}
-                                className="flex w-full items-center justify-between gap-2 rounded-2xl border-2 border-slate-400 bg-slate-200 px-4 py-3 transition active:scale-[0.99] disabled:opacity-50"
-                              >
-                                <span className="flex min-w-0 items-center gap-1.5 truncate text-base font-extrabold text-slate-600">
-                                  <Ban size={16} className="shrink-0" /> {s.locationLabel} · 사용 안 함
-                                </span>
-                                <span className="shrink-0 rounded-lg bg-slate-500 px-3 py-1 text-xs font-bold text-white">운영 중지</span>
-                              </button>
-                            )
-                          }
-                          // 빈 자리(공실) — 이동 모드면 이동 타겟, 아니면 옵션 시트(입고/운영전환)
-                          return (
-                            <button
-                              key={s.id}
-                              type="button"
-                              onClick={() => (dragging ? handleDropMove(s) : setEmptyActionSlot(s))}
-                              className={cn(
-                                'flex w-full items-center justify-between gap-2 rounded-2xl border-2 border-dashed px-4 py-3 transition active:scale-[0.99]',
-                                dragging ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 bg-slate-50',
-                              )}
-                            >
-                              <span className={cn('truncate text-sm font-bold', dragging ? 'text-indigo-700' : 'text-slate-400')}>
-                                {s.locationLabel} · {dragging ? '여기로 이동' : '빈 자리'}
-                              </span>
-                              <span className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-bold text-white">{dragging ? '선택' : '자리 관리'}</span>
-                            </button>
-                          )
-                        })}
+                      <div className="grid grid-cols-5 gap-2.5">
+                        {activeFloor.cells.map((s) => (
+                          <MobileSlotTile
+                            key={s.id}
+                            slot={s}
+                            container={s.containerId != null ? containersById.get(s.containerId) : undefined}
+                            highlighted={matchSlot(s)}
+                            dragging={dragging != null}
+                            onClick={() => {
+                              if (s.occupied) setActionSlot(s)
+                              else if (dragging) handleDropMove(s)
+                              else setEmptyActionSlot(s)
+                            }}
+                          />
+                        ))}
                       </div>
                     )}
                   </div>
@@ -619,6 +587,10 @@ export default function YardDispatchPage() {
         <ActionPanel
           slot={actionSlot}
           container={actionSlot.containerId != null ? containersById.get(actionSlot.containerId) : undefined}
+          order={(() => {
+            const c = actionSlot.containerId != null ? containersById.get(actionSlot.containerId) : undefined
+            return c?.currentOrderId != null ? orderById.get(c.currentOrderId) : undefined
+          })()}
           onClose={() => setActionSlot(null)}
           onOutbound={() => handleOutbound(actionSlot)}
           onMove={() => {
@@ -763,11 +735,73 @@ function SlotCell({
   )
 }
 
+/**
+ * 모바일 전용 격자 타일 — 화면 폭과 무관하게 한 줄에 정확히 5칸(부모의 grid-cols-5)이
+ * 놓이도록 정사각형으로 고정한다. 노안 사용자를 위해 상세 텍스트 대신 상태색 + 큰 숫자만
+ * 담고, 나머지 정보(화주·기간·보관료)는 탭 한 번으로 열리는 하단 시트(ActionPanel)에 둔다.
+ */
+function MobileSlotTile({
+  slot,
+  container,
+  highlighted,
+  dragging,
+  onClick,
+}: {
+  slot: YardSlot
+  container?: Container
+  highlighted: boolean
+  dragging: boolean
+  onClick: () => void
+}) {
+  const inactive = !slot.occupied && slot.active === false
+  const maint = container?.status === 'MAINTENANCE'
+  const dropTarget = dragging && !slot.occupied && !inactive
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={dragging && inactive} // 이동 모드에선 미사용 자리는 타겟이 될 수 없다 (데스크톱 격자와 동일 규칙)
+      title={
+        slot.occupied
+          ? `${slot.locationLabel} · ${extractOwner(container?.memo) ?? '사용중'}`
+          : inactive
+            ? `${slot.locationLabel} · 미사용(운영 중지)`
+            : `${slot.locationLabel} · 빈 자리`
+      }
+      className={cn(
+        'flex aspect-square flex-col items-center justify-center gap-0.5 rounded-2xl border-2 text-center transition active:scale-95 disabled:opacity-40',
+        slot.occupied
+          ? maint
+            ? 'border-amber-600 bg-amber-500 text-white shadow-sm'
+            : 'border-indigo-700 bg-indigo-600 text-white shadow-sm'
+          : inactive
+            ? 'border-slate-400 bg-slate-300 text-slate-600'
+            : dropTarget
+              ? 'border-indigo-400 bg-indigo-50 text-indigo-600'
+              : 'border-dashed border-slate-300 bg-slate-50 text-slate-400',
+        highlighted && 'ring-4 ring-[#B08D57] ring-offset-1',
+      )}
+    >
+      {slot.occupied ? (
+        <span className="text-lg font-extrabold leading-none tabular-nums">{container?.containerNo ?? slot.columnNo}</span>
+      ) : inactive ? (
+        <Ban size={20} />
+      ) : (
+        <span className="text-lg font-extrabold leading-none tabular-nums">{slot.columnNo}</span>
+      )}
+      <span className="text-[10px] font-bold leading-none opacity-80">
+        {slot.occupied ? (maint ? '점검' : '사용중') : inactive ? '중지' : dropTarget ? '이동' : '공실'}
+      </span>
+    </button>
+  )
+}
 
 /* ===== 적재 슬롯 액션 패널 ===== */
 function ActionPanel({
   slot,
   container,
+  order,
   onClose,
   onOutbound,
   onMove,
@@ -775,75 +809,66 @@ function ActionPanel({
 }: {
   slot: YardSlot
   container?: Container
+  order?: StorageOrder
   onClose: () => void
   onOutbound: () => void
   onMove: () => void
   onEdit: () => void
 }) {
   const isMobile = useIsMobile()
+  const start = order?.storageStartDate ?? container?.inboundDate
+  const end = order?.actualEndDate ?? order?.expectedEndDate ?? container?.expectedOutboundDate
+  const fee = order?.monthlyFee
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-sm flex-col bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <div>
-            <h3 className="text-base font-semibold text-slate-800">{extractOwner(container?.memo) ?? '컨테이너'}</h3>
-            <p className="text-xs text-slate-500">{slot.locationLabel}</p>
+    <Modal open onClose={onClose} title={`${extractOwner(container?.memo) ?? '컨테이너'} · ${slot.locationLabel}`}>
+      <div className="space-y-3">
+        <dl className="grid grid-cols-2 gap-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-sm">
+          <div className="col-span-2">
+            <dt className="text-xs text-slate-400">화주(고객)</dt>
+            <dd className="font-semibold text-slate-800">{extractOwner(container?.memo) ?? '—'}</dd>
           </div>
-          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
-            <X size={18} />
-          </button>
-        </div>
+          <Info label="보관기간">{start ? `${fmtDate(start)} ~ ${fmtDate(end)}` : '—'}</Info>
+          <Info label="보관료">{fee != null ? `${fmt(fee)}원` : '—'}</Info>
+          <Info label="용량">{container ? `${container.capacityTon}톤` : '—'}</Info>
+          <Info label="상태">{container ? (CONTAINER_STATUS_KO[container.status] ?? container.status) : '—'}</Info>
+          <div className="col-span-2">
+            <dt className="text-xs text-slate-400">특이사항</dt>
+            <dd className="text-slate-700">{stripOwnerTag(container?.memo) || '—'}</dd>
+          </div>
+        </dl>
 
-        <div className="space-y-3 px-6 py-5">
-          <dl className="grid grid-cols-2 gap-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-sm">
-            <div className="col-span-2">
-              <dt className="text-xs text-slate-400">화주(고객)</dt>
-              <dd className="font-semibold text-slate-800">{extractOwner(container?.memo) ?? '—'}</dd>
-            </div>
-            <Info label="용량">{container ? `${container.capacityTon}톤` : '—'}</Info>
-            <Info label="상태">{container ? (CONTAINER_STATUS_KO[container.status] ?? container.status) : '—'}</Info>
-            <Info label="보관 입고일">{container?.inboundDate ?? '—'}</Info>
-            <Info label="출고 예정일">{container?.expectedOutboundDate ?? '—'}</Info>
-            <div className="col-span-2">
-              <dt className="text-xs text-slate-400">특이사항</dt>
-              <dd className="text-slate-700">{stripOwnerTag(container?.memo) || '—'}</dd>
-            </div>
-          </dl>
+        {/* 데스크톱은 드래그로 이동, 모바일은 아래 '다른 자리로 이동' 버튼 사용 */}
+        {!isMobile && (
+          <p className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+            <ArrowRightLeft size={13} /> 이동은 맵에서 컨테이너를 빈 슬롯으로 <b>드래그</b>하세요.
+          </p>
+        )}
 
-          {/* 데스크톱은 드래그로 이동, 모바일은 아래 '다른 자리로 이동' 버튼 사용 */}
-          {!isMobile && (
-            <p className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              <ArrowRightLeft size={13} /> 이동은 맵에서 컨테이너를 빈 슬롯으로 <b>드래그</b>하세요.
-            </p>
-          )}
-
+        <button
+          type="button"
+          onClick={onOutbound}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3.5 text-base font-bold text-white transition hover:bg-amber-600 active:scale-[0.99]"
+        >
+          <LogOut size={18} /> 즉시 출고 처리
+        </button>
+        {isMobile && (
           <button
             type="button"
-            onClick={onOutbound}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3.5 text-base font-bold text-white transition hover:bg-amber-600 active:scale-[0.99]"
+            onClick={onMove}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3.5 text-base font-bold text-white transition active:scale-[0.99]"
           >
-            <LogOut size={18} /> 즉시 출고 처리
+            <ArrowRightLeft size={18} /> 다른 자리로 이동
           </button>
-          {isMobile && (
-            <button
-              type="button"
-              onClick={onMove}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3.5 text-base font-bold text-white transition active:scale-[0.99]"
-            >
-              <ArrowRightLeft size={18} /> 다른 자리로 이동
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onEdit}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3.5 text-base font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99]"
-          >
-            <Pencil size={18} /> 보관 정보 수정
-          </button>
-        </div>
+        )}
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3.5 text-base font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99]"
+        >
+          <Pencil size={18} /> 보관 정보 수정
+        </button>
       </div>
-    </div>
+    </Modal>
   )
 }
 
