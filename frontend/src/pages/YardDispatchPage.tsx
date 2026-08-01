@@ -28,7 +28,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { extractOwner } from '@/lib/owner'
-import { CreateOrderModal, OrderBillingModal } from './OrdersPage' // [통합] 계약등록·정산 공용 폼(컨테이너 관리 입고에서 창고·자리 고정)
+import { CreateOrderModal, OrderBillingModal, StatusChangeModal } from './OrdersPage' // [통합] 계약등록·정산·출고 공용 폼(컨테이너 관리 입고에서 창고·자리 고정)
 import EditOrderModal from '@/components/order/EditOrderModal' // [통합] 계약수정 공용 폼(계약관리와 완전히 동일한 화면)
 
 /* ===== 타입 명세 ===== */
@@ -90,6 +90,7 @@ export default function YardDispatchPage() {
   const [actionSlot, setActionSlot] = useState<YardSlot | null>(null)
   const [editSlot, setEditSlot] = useState<YardSlot | null>(null)
   const [billingOrder, setBillingOrder] = useState<StorageOrder | null>(null) // [통합] 정산 보기 — 계약관리와 동일한 정산 타임라인 팝업
+  const [statusTarget, setStatusTarget] = useState<StorageOrder | null>(null) // [통합] 출고 처리 — 계약관리와 동일한 정상/중도 출고 선택 팝업
   const [emptyActionSlot, setEmptyActionSlot] = useState<YardSlot | null>(null) // 빈 자리 옵션 시트(입고/운영전환)
   const [dragging, setDragging] = useState<{ containerId: number; fromSlotId: number; label: string } | null>(null)
   const [gridOpen, setGridOpen] = useState(false)
@@ -309,22 +310,8 @@ export default function YardDispatchPage() {
   }
 
   /* ===== 액션 ===== */
-
-  async function handleOutbound(slot: YardSlot) {
-    if (slot.containerId == null) return
-    const owner = extractOwner(containersById.get(slot.containerId)?.memo) ?? '컨테이너'
-    if (!window.confirm(`${owner} 컨테이너를 출고(슬롯 비움)할까요?`)) return
-    try {
-      await containerApi.outbound({ containerId: slot.containerId })
-      setActionSlot(null)
-      setBanner(`${owner} 출고 완료`)
-      reload()
-      orderSync.emit() // 계약관리·캘린더에 출고 전파
-
-    } catch (err) {
-      alert(errMsg(err, '출고에 실패했습니다.'))
-    }
-  }
+  // [통합] 출고 처리는 계약관리와 완전히 동일한 정상/중도 출고 선택 팝업(StatusChangeModal)을 쓴다.
+  //   즉시 무조건 출고 처리하던 이전 방식은 정산 금액을 소급 반영하지 못해 제거했다.
 
   // [통합] 계약 삭제 — 계약 관리의 삭제와 동일 동작(청구 원장·입금 내역도 함께 삭제)
   async function handleDeleteContract(order: StorageOrder) {
@@ -736,7 +723,10 @@ export default function YardDispatchPage() {
             order={actionOrder}
             isAdmin={isAdmin}
             onClose={() => setActionSlot(null)}
-            onOutbound={() => handleOutbound(actionSlot)}
+            onOutbound={() => {
+              if (actionOrder) setStatusTarget(actionOrder)
+              setActionSlot(null)
+            }}
             onMove={() => {
               const s = actionSlot
               if (s?.containerId != null) {
@@ -765,6 +755,18 @@ export default function YardDispatchPage() {
 
       {/* [통합] 정산 보기 — 계약 관리의 '정산' 과 완전히 동일한 팝업 */}
       <OrderBillingModal target={billingOrder} isAdmin={isAdmin} onClose={() => setBillingOrder(null)} />
+
+      {/* [통합] 출고 처리 — 계약 관리의 '출고'와 완전히 동일한 정상/중도 출고 선택 팝업 */}
+      <StatusChangeModal
+        target={statusTarget}
+        onClose={() => setStatusTarget(null)}
+        onDone={(updated) => {
+          setStatusTarget(null)
+          setBanner(`${updated.customerName} 출고 처리 완료`)
+          reload()
+          orderSync.emit() // 계약관리·캘린더·대시보드에 전파
+        }}
+      />
 
       {/*
         [통합] 계약 수정 — 계약 관리의 '수정'과 완전히 동일한 팝업을 띄운다.
@@ -1053,9 +1055,10 @@ function ActionPanel({
         <button
           type="button"
           onClick={onOutbound}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3.5 text-base font-bold text-white transition hover:bg-amber-600 active:scale-[0.99]"
+          disabled={!order}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3.5 text-base font-bold text-white transition hover:bg-amber-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-amber-500"
         >
-          <LogOut size={18} /> 즉시 출고 처리
+          <LogOut size={18} /> 출고
         </button>
         {isMobile && (
           <button
@@ -1098,7 +1101,7 @@ function ActionPanel({
           </button>
         )}
         {!order && (
-          <p className="text-center text-xs text-slate-400">계약에 배정되지 않은 컨테이너라 수정·정산·삭제할 계약 정보가 없습니다.</p>
+          <p className="text-center text-xs text-slate-400">계약에 배정되지 않은 컨테이너라 출고·정산·수정·삭제할 계약 정보가 없습니다.</p>
         )}
       </div>
     </Modal>

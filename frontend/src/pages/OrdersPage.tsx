@@ -1411,7 +1411,7 @@ function QuickCustomerModal({
 type ReleaseKind = 'NORMAL' | 'EARLY'
 type ReturnKind = 'NORMAL' | 'LATE'
 
-function StatusChangeModal({
+export function StatusChangeModal({
   target,
   onClose,
   onDone,
