@@ -10,6 +10,9 @@ import {
   Bell,
   ArrowRightLeft,
   CheckCircle2,
+  Plus,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
 import {
   getMonthEvents,
@@ -17,9 +20,14 @@ import {
   type CalendarEventType,
 } from '@/api/calendarApi'
 import { billingApi } from '@/api/billingApi'
+import { orderApi, type StorageOrder } from '@/api/orderApi'
+import { customerApi, type Customer } from '@/api/customerApi'
+import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { orderSync } from '@/lib/orderEvents'
+import { CreateOrderModal } from './OrdersPage'
+import EditOrderModal from '@/components/order/EditOrderModal'
 
 type FilterMode = 'ALL' | CalendarEventType
 
@@ -106,6 +114,50 @@ export default function ScheduleCalendarPage() {
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
+
+  // [계약 등록/수정] 계약관리에서 쓰는 팝업을 그대로 재사용한다.
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createDate, setCreateDate] = useState<string | undefined>(undefined)
+  const [editTarget, setEditTarget] = useState<StorageOrder | null>(null)
+  const [editLoadingId, setEditLoadingId] = useState<number | null>(null)
+
+  useEffect(() => {
+    customerApi.list().then(setCustomers).catch(() => setCustomers([]))
+    warehouseApi.list().then(setWarehouses).catch(() => setWarehouses([]))
+  }, [])
+
+  function openCreateFor(dateStr: string) {
+    setCreateDate(dateStr)
+    setCreateOpen(true)
+  }
+
+  // [상세 조회 후 수정 팝업] 캘린더 이벤트는 요약 정보뿐이라, 계약관리와 동일한 수정 폼을
+  //   그대로 쓰려면 그 계약의 전체 정보를 한 번 불러와야 한다.
+  async function openEdit(orderId: number) {
+    setEditLoadingId(orderId)
+    try {
+      const order = await orderApi.get(orderId)
+      setEditTarget(order)
+    } catch (err) {
+      setNotice(isAxiosError(err) ? (err.response?.data?.message ?? '계약 정보를 불러오지 못했습니다.') : '계약 정보를 불러오지 못했습니다.')
+    } finally {
+      setEditLoadingId(null)
+    }
+  }
+
+  async function deleteEvent(event: CalendarEvent) {
+    if (!window.confirm(`'${event.customerName}' 계약을 삭제할까요?\n(연결된 청구 원장·입금 내역도 함께 삭제됩니다)`)) return
+    try {
+      await orderApi.remove(event.id)
+      setNotice(`'${event.customerName}' 계약을 삭제했습니다.`)
+      setRefreshKey((k) => k + 1)
+      orderSync.emit() // 계약관리·대시보드 등 다른 화면도 함께 갱신
+    } catch (err) {
+      setNotice(isAxiosError(err) ? (err.response?.data?.message ?? '계약 삭제에 실패했습니다.') : '계약 삭제에 실패했습니다.')
+    }
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -349,6 +401,10 @@ export default function ScheduleCalendarPage() {
               setRefreshKey((k) => k + 1)
             }}
             navigate={navigate}
+            onCreate={openCreateFor}
+            onEdit={openEdit}
+            onDelete={deleteEvent}
+            editLoadingId={editLoadingId}
           />
         </div>
       </div>
@@ -370,10 +426,51 @@ export default function ScheduleCalendarPage() {
                 setRefreshKey((k) => k + 1)
               }}
               navigate={navigate}
+              onCreate={openCreateFor}
+              onEdit={openEdit}
+              onDelete={deleteEvent}
+              editLoadingId={editLoadingId}
             />
           </div>
         </div>
       )}
+
+      {/* [계약 등록] 선택한 날짜 칸에서 열면 그 날짜가 보관 시작일에 미리 채워진다 */}
+      <CreateOrderModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        customers={customers}
+        warehouses={warehouses}
+        defaultStartDate={createDate}
+        onCustomerAdded={(c) =>
+          setCustomers((prev) => {
+            const i = prev.findIndex((x) => x.id === c.id)
+            if (i >= 0) {
+              const next = [...prev]
+              next[i] = c
+              return next
+            }
+            return [...prev, c]
+          })
+        }
+        onDone={() => {
+          setCreateOpen(false)
+          setNotice('계약을 등록했습니다.')
+          setRefreshKey((k) => k + 1)
+          orderSync.emit()
+        }}
+      />
+
+      {/* [계약 수정] 이벤트 카드의 '수정'에서 전체 정보를 불러온 뒤 연다 */}
+      <EditOrderModal
+        target={editTarget}
+        onClose={() => setEditTarget(null)}
+        onDone={() => {
+          setEditTarget(null)
+          setNotice('계약을 수정했습니다.')
+          setRefreshKey((k) => k + 1)
+        }}
+      />
     </div>
   )
 }
@@ -387,6 +484,10 @@ function DetailPanel({
   onClose,
   onAction,
   navigate,
+  onCreate,
+  onEdit,
+  onDelete,
+  editLoadingId,
 }: {
   dateStr: string | null
   events: CalendarEvent[]
@@ -395,6 +496,10 @@ function DetailPanel({
   onClose?: () => void
   onAction: (msg: string) => void
   navigate: (to: string) => void
+  onCreate: (dateStr: string) => void
+  onEdit: (orderId: number) => void
+  onDelete: (event: CalendarEvent) => void
+  editLoadingId: number | null
 }) {
   if (!dateStr) {
     return (
@@ -416,11 +521,20 @@ function DetailPanel({
           <p className="text-sm font-semibold text-slate-800">{label}</p>
           <p className="text-xs text-slate-400">일정 {events.length}건</p>
         </div>
-        {embedded && onClose && (
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X size={18} />
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onCreate(dateStr)}
+            className="flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700"
+          >
+            <Plus size={13} /> 계약 등록
           </button>
-        )}
+          {embedded && onClose && (
+            <button type="button" onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600">
+              <X size={18} />
+            </button>
+          )}
+        </div>
       </div>
 
       {events.length === 0 ? (
@@ -428,7 +542,16 @@ function DetailPanel({
       ) : (
         <div className="space-y-2 p-3">
           {events.map((e) => (
-            <EventCard key={`${e.type}-${e.id}`} event={e} isAdmin={isAdmin} onAction={onAction} navigate={navigate} />
+            <EventCard
+              key={`${e.type}-${e.id}`}
+              event={e}
+              isAdmin={isAdmin}
+              onAction={onAction}
+              navigate={navigate}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              editLoading={editLoadingId === e.id}
+            />
           ))}
         </div>
       )}
@@ -442,11 +565,17 @@ function EventCard({
   isAdmin,
   onAction,
   navigate,
+  onEdit,
+  onDelete,
+  editLoading,
 }: {
   event: CalendarEvent
   isAdmin: boolean
   onAction: (msg: string) => void
   navigate: (to: string) => void
+  onEdit: (orderId: number) => void
+  onDelete: (event: CalendarEvent) => void
+  editLoading: boolean
 }) {
   const [busy, setBusy] = useState(false)
   const meta = TYPE_META[event.type]
@@ -534,6 +663,18 @@ function EventCard({
 
       {/* 유형별 퀵 액션 */}
       <div className="mt-3 flex flex-wrap gap-1.5">
+        {(event.type === 'INBOUND' || event.type === 'OUTBOUND') && (
+          <>
+            <QuickBtn onClick={() => onEdit(event.id)} disabled={editLoading} icon={<Pencil size={13} />}>
+              {editLoading ? '불러오는 중…' : '수정'}
+            </QuickBtn>
+            {isAdmin && (
+              <QuickBtn onClick={() => onDelete(event)} icon={<Trash2 size={13} />} tone="red">
+                삭제
+              </QuickBtn>
+            )}
+          </>
+        )}
         {event.type === 'OUTBOUND' && (
           <QuickBtn onClick={() => navigate('/billing')} icon={<ArrowRightLeft size={13} />}>
             중도 출고 정산
@@ -575,12 +716,14 @@ function QuickBtn({
   icon: ReactNode
   children: ReactNode
   disabled?: boolean
-  tone?: 'slate' | 'emerald'
+  tone?: 'slate' | 'emerald' | 'red'
 }) {
   const cls =
     tone === 'emerald'
       ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+      : tone === 'red'
+        ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+        : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
   return (
     <button
       type="button"

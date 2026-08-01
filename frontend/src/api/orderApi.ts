@@ -70,6 +70,10 @@ export const orderApi = {
     })
     return data.content
   },
+  async get(id: number): Promise<StorageOrder> {
+    const { data } = await api.get<StorageOrder>(`/api/orders/${id}`)
+    return data
+  },
   async create(body: OrderCreate): Promise<StorageOrder> {
     const { data } = await api.post<StorageOrder>('/api/orders', body)
     return data

@@ -866,6 +866,7 @@ export function CreateOrderModal({
   onCustomerAdded,
   onDone,
   fixedSlot,
+  defaultStartDate,
 }: {
   open: boolean
   onClose: () => void
@@ -875,6 +876,9 @@ export function CreateOrderModal({
   onDone: () => void
   // [통합] 컨테이너 관리에서 빈 자리 입고로 열 때: 이 슬롯의 창고·자리로 자동 고정(변경 불가)
   fixedSlot?: { id: number; warehouseId: number; warehouseName: string; locationLabel: string; tier: number } | null
+  // [일정 화면 진입] 특정 날짜 칸에서 "계약 등록"으로 열 때만 그 날짜를 보관 시작일에 미리 채운다.
+  //   그 외 경로는 기존 원칙(수동 입력)을 그대로 유지한다.
+  defaultStartDate?: string
 }) {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [warehouseId, setWarehouseId] = useState('')
@@ -923,7 +927,8 @@ export function CreateOrderModal({
         setSlotId(null)
       }
       // 날짜 3종은 기본값 없이 초기화 — 담당자가 매 계약마다 명시적으로 입력한다
-      setStartDate('')
+      // (예외: 일정 화면에서 특정 날짜 칸을 짚어 등록을 열었을 때만 그 날짜를 보관 시작일에 미리 채운다)
+      setStartDate(defaultStartDate ?? '')
       setEndDate('')
       setEndDateUnknown(false)
       setMonthlyFee(null)
@@ -936,7 +941,7 @@ export function CreateOrderModal({
       setFormError(null)
       setDormantConfirm(false)
     }
-  }, [open, warehouses, fixedSlot])
+  }, [open, warehouses, fixedSlot, defaultStartDate])
 
   // [수납 계좌] 직원 목록 로드 (계좌이체 시 담당 직원 선택용) — 권한 없으면 빈 목록
   useEffect(() => {
