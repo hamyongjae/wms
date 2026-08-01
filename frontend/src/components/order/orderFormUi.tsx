@@ -28,11 +28,12 @@ export const inputCls =
  */
 export const gridCellCls = 'min-w-0'
 export const gridInputCls =
-  'h-12 w-full min-w-0 rounded-lg border border-slate-300 px-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+  'h-12 w-full min-w-0 rounded-lg border border-slate-300 px-2.5 text-base outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 md:text-sm'
 /** 계산 결과(보관일수·하루 보관료) — 규격은 입력 박스와 동일하되 강조색으로 '살아있는 값'임을 표시 */
 export const gridReadonlyCls =
-  'flex h-12 min-w-0 items-center justify-end rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-sm font-semibold text-indigo-600'
-export const gridLabelCls = 'mb-1 block truncate text-sm font-semibold text-slate-700'
+  'flex h-12 min-w-0 items-center justify-end rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-base font-semibold text-indigo-600 md:text-sm'
+/** 단일 컬럼 라벨(labelCls)과 크기를 통일 — 2열/전체 폭 구간을 오가도 글자 크기가 흔들리지 않는다 */
+export const gridLabelCls = 'mb-1 block truncate text-base font-semibold text-slate-700 md:text-sm'
 /** 전체 폭 라벨 (단일 컬럼 필드용) */
 export const labelCls = 'mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium'
 
