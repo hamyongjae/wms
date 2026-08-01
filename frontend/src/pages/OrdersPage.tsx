@@ -28,6 +28,14 @@ import LocationPickerField from '@/components/yard/LocationPickerField'
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3.5 py-3 text-base outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 md:px-3 md:py-2 md:text-sm'
 
+// [2열 콤팩트 폼 전용] 계약 등록/수정 팝업의 가로 2열 구간(날짜·보관료·결제 등)만 쓰는 규격.
+//   좁은 반쪽 폭에서 겹침·넘침이 없도록 높이(h-11)·테두리·곡률·여백을 모든 박스에 동일하게 고정한다.
+const gridInputCls =
+  'h-11 w-full rounded-lg border border-slate-300 px-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+const gridReadonlyCls =
+  'flex h-11 items-center justify-end rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-sm font-semibold text-indigo-600'
+const gridLabelCls = 'mb-1 block truncate text-sm font-semibold text-slate-700'
+
 /**
  * [단순 이진 상태 시각화]
  *
@@ -1030,21 +1038,21 @@ function EditOrderModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 시작일 *</label>
+              <label className={gridLabelCls}>보관 시작일 *</label>
               <input
                 type="date"
                 value={storageStartDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 required
-                className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+                className={cn(gridInputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">출고 예정일</label>
-              {/* 체크박스 전체 줄을 큼직한 독립 터치 레이어로 — 글자 어디를 눌러도 토글된다 */}
-              <label className="mb-2 flex w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs font-semibold text-slate-600 transition active:bg-slate-100 sm:text-sm">
+              <label className={gridLabelCls}>출고 예정일</label>
+              {/* 체크박스 전체 줄을 독립 터치 레이어로 — 글자 어디를 눌러도 토글된다. 다른 박스와 동일 규격(h-11) */}
+              <label className="mb-1.5 flex h-11 w-full cursor-pointer select-none items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold text-slate-600 transition active:bg-slate-100">
                 <input
                   type="checkbox"
                   checked={endDateUnknown}
@@ -1054,11 +1062,11 @@ function EditOrderModal({
                   }}
                   className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                출고일 미정(장기 보관)
+                <span className="truncate">출고일 미정</span>
               </label>
               {endDateUnknown ? (
-                <div className="flex h-[46px] items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3.5 text-base font-semibold text-slate-400 md:h-[38px] md:text-sm">
-                  출고일 미정 · 장기 보관으로 등록됩니다
+                <div className="flex h-11 items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold leading-tight text-slate-400">
+                  미정 · 장기 보관
                 </div>
               ) : (
                 <input
@@ -1066,22 +1074,22 @@ function EditOrderModal({
                   value={expectedEndDate}
                   min={storageStartDate || undefined}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+                  className={cn(gridInputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
                 />
               )}
             </div>
             <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관료 *</label>
+              <label className={gridLabelCls}>보관료 *</label>
               <MoneyInput
                 value={monthlyFee}
                 onChange={setMonthlyFee}
                 required
                 placeholder="예: 300,000"
-                className={cn(inputCls, 'pr-9', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
+                className={cn(gridInputCls, 'pr-8', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 용량 (톤)</label>
+              <label className={gridLabelCls}>보관 용량 (톤)</label>
               <div className="relative">
                 <input
                   type="number"
@@ -1090,42 +1098,38 @@ function EditOrderModal({
                   value={capacityTons}
                   onChange={(e) => setCapacityTons(e.target.value)}
                   placeholder="예: 2.5"
-                  className={cn(inputCls, 'pr-10')}
+                  className={cn(gridInputCls, 'pr-8')}
                 />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">톤</span>
               </div>
             </div>
             <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
+              <label className={gridLabelCls}>보관일수</label>
               {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
-              <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
-                {days != null ? `${days.toLocaleString()}일` : ''}
-              </div>
+              <div className={gridReadonlyCls}>{days != null ? `${days.toLocaleString()}일` : ''}</div>
               <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
             </div>
             <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
-              <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
-                {dailyFee != null ? won(dailyFee) : ''}
-              </div>
+              <label className={gridLabelCls}>하루 보관료</label>
+              <div className={gridReadonlyCls}>{dailyFee != null ? won(dailyFee) : ''}</div>
               <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 방식 *</label>
+              <label className={gridLabelCls}>결제 방식 *</label>
               <select
                 value={paymentType}
                 onChange={(e) => setPaymentType(e.target.value as PaymentType)}
-                className={inputCls}
+                className={gridInputCls}
               >
                 <option value="PREPAID">선불 (완납)</option>
                 <option value="POSTPAID">후불 (입금예정)</option>
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 수단 *</label>
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={inputCls}>
+              <label className={gridLabelCls}>결제 수단 *</label>
+              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={gridInputCls}>
                 <option value="BANK_TRANSFER">계좌이체</option>
                 <option value="CASH">현금</option>
                 <option value="CARD">카드</option>
@@ -1463,15 +1467,15 @@ export function CreateOrderModal({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 시작일 *</label>
-                <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={inputCls} />
+                <label className={gridLabelCls}>보관 시작일 *</label>
+                <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={gridInputCls} />
               </div>
               <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">출고 예정일</label>
-                {/* 체크박스 전체 줄을 큼직한 독립 터치 레이어로 — 글자 어디를 눌러도 토글된다 */}
-                <label className="mb-2 flex w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs font-semibold text-slate-600 transition active:bg-slate-100 sm:text-sm">
+                <label className={gridLabelCls}>출고 예정일</label>
+                {/* 체크박스 전체 줄을 독립 터치 레이어로 — 글자 어디를 눌러도 토글된다. 다른 박스와 동일 규격(h-11) */}
+                <label className="mb-1.5 flex h-11 w-full cursor-pointer select-none items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold text-slate-600 transition active:bg-slate-100">
                   <input
                     type="checkbox"
                     checked={endDateUnknown}
@@ -1481,11 +1485,11 @@ export function CreateOrderModal({
                     }}
                     className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  출고일 미정(장기 보관)
+                  <span className="truncate">출고일 미정</span>
                 </label>
                 {endDateUnknown ? (
-                  <div className="flex h-[46px] items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3.5 text-base font-semibold text-slate-400 md:h-[38px] md:text-sm">
-                    출고일 미정 · 장기 보관으로 등록됩니다
+                  <div className="flex h-11 items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold leading-tight text-slate-400">
+                    미정 · 장기 보관
                   </div>
                 ) : (
                   <input
@@ -1493,22 +1497,22 @@ export function CreateOrderModal({
                     value={expectedEndDate}
                     min={storageStartDate || undefined}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className={cn(inputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
+                    className={cn(gridInputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
                   />
                 )}
               </div>
               <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관료 *</label>
+                <label className={gridLabelCls}>보관료 *</label>
                 <MoneyInput
                   value={monthlyFee}
                   onChange={setMonthlyFee}
                   required
                   placeholder="예: 300,000"
-                  className={cn(inputCls, 'pr-9', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
+                  className={cn(gridInputCls, 'pr-8', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 용량 (톤)</label>
+                <label className={gridLabelCls}>보관 용량 (톤)</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -1517,39 +1521,35 @@ export function CreateOrderModal({
                     value={capacityTons ?? ''}
                     onChange={(e) => setCapacityTons(e.target.value === '' ? null : Number(e.target.value))}
                     placeholder="예: 2.5"
-                    className={cn(inputCls, 'pr-10')}
+                    className={cn(gridInputCls, 'pr-8')}
                   />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
+                  <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">톤</span>
                 </div>
               </div>
               <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
+                <label className={gridLabelCls}>보관일수</label>
                 {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
-                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
-                  {days != null ? `${days.toLocaleString()}일` : ''}
-                </div>
+                <div className={gridReadonlyCls}>{days != null ? `${days.toLocaleString()}일` : ''}</div>
                 <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
               </div>
               <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
+                <label className={gridLabelCls}>하루 보관료</label>
                 {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
-                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
-                  {dailyFee != null ? won(dailyFee) : ''}
-                </div>
+                <div className={gridReadonlyCls}>{dailyFee != null ? won(dailyFee) : ''}</div>
                 <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 방식 *</label>
-                <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={inputCls}>
+                <label className={gridLabelCls}>결제 방식 *</label>
+                <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={gridInputCls}>
                   <option value="PREPAID">선불 (당일 완납)</option>
                   <option value="POSTPAID">후불</option>
                 </select>
               </div>
               <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">결제 수단 *</label>
-                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={inputCls}>
+                <label className={gridLabelCls}>결제 수단 *</label>
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={gridInputCls}>
                   <option value="BANK_TRANSFER">계좌이체</option>
                   <option value="CASH">현금</option>
                   <option value="CARD">카드</option>
