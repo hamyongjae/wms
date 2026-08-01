@@ -383,10 +383,11 @@ export default function EditOrderModal({
             판단에 쓰지 않는 값이라 항목만 늘려 폼을 무겁게 만든다.
             저장 시에는 백엔드 필수값이므로 container 상태에서 그대로 실어 보낸다.
           */}
-          <GridField label="납기일">
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={gridInputCls} />
-          </GridField>
         </FieldGrid>
+        {/* 짝이 없는 단독 필드라 2열 그리드에 반쪽으로 남기지 않고 전체 폭으로 — 다른 단독 필드(메모 등)와 통일 */}
+        <Field label="납기일">
+          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} />
+        </Field>
 
         {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 */}
         {paymentMethod === 'BANK_TRANSFER' && (

@@ -21,24 +21,24 @@ export const inputCls =
 
 /**
  * [2열 콤팩트 폼 전용] 계약 등록/수정 팝업의 가로 2열 구간(날짜·보관료·결제 등) 규격.
- *   좁은 반쪽 폭에서 겹침·넘침이 없도록 높이(h-11)·테두리·곡률·여백을 모든 박스에 동일하게 고정한다.
+ *   좁은 반쪽 폭에서 겹침·넘침이 없도록 높이(h-12)·테두리·곡률·여백을 모든 박스에 동일하게 고정한다.
  * min-w-0: 그리드 트랙은 minmax(0,1fr)라 넓어지지 않지만, 그리드 "아이템" 자체는 기본값이
  *   min-width:auto(콘텐츠 기준)라 셀 안의 네이티브 date input·긴 텍스트가 트랙 폭을 무시하고
  *   오른쪽으로 삐져나간다. 셀 div와 그 안의 입력 요소 모두에 min-w-0을 명시해야 실제로 줄어든다.
  */
 export const gridCellCls = 'min-w-0'
 export const gridInputCls =
-  'h-11 w-full min-w-0 rounded-lg border border-slate-300 px-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+  'h-12 w-full min-w-0 rounded-lg border border-slate-300 px-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
 /** 계산 결과(보관일수·하루 보관료) — 규격은 입력 박스와 동일하되 강조색으로 '살아있는 값'임을 표시 */
 export const gridReadonlyCls =
-  'flex h-11 min-w-0 items-center justify-end rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-sm font-semibold text-indigo-600'
+  'flex h-12 min-w-0 items-center justify-end rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-sm font-semibold text-indigo-600'
 export const gridLabelCls = 'mb-1 block truncate text-sm font-semibold text-slate-700'
 /** 전체 폭 라벨 (단일 컬럼 필드용) */
 export const labelCls = 'mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium'
 
-/** 2열 격자 컨테이너 — 등록·수정이 같은 간격(gap-2.5)을 공유한다 */
+/** 2열 격자 컨테이너 — 등록·수정이 같은 간격(gap-3)을 공유한다 */
 export function FieldGrid({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('grid grid-cols-2 gap-2.5', className)}>{children}</div>
+  return <div className={cn('grid grid-cols-2 gap-3', className)}>{children}</div>
 }
 
 /**
@@ -47,7 +47,7 @@ export function FieldGrid({ children, className }: { children: ReactNode; classN
  * action: 라벨 줄 오른쪽 끝에 붙는 보조 스위치('출고일 미정' 등).
  *   입력 요소 위나 아래가 아니라 라벨 줄에 두는 이유는 두 가지다.
  *   1) 읽는 순서(라벨 → 입력값)를 끊지 않는다.
- *   2) 입력 영역의 높이가 모든 칸에서 h-11로 같아져 2열 격자의 가로 정렬이 깨지지 않는다.
+ *   2) 입력 영역의 높이가 모든 칸에서 h-12로 같아져 2열 격자의 가로 정렬이 깨지지 않는다.
  */
 export function GridField({
   label,
@@ -137,7 +137,7 @@ export function UndecidedToggle({ checked, onChange }: { checked: boolean; onCha
 /** '출고일 미정'이 켜졌을 때 날짜 입력창 자리를 대신하는 톤다운 표시 */
 export function UndecidedPlaceholder() {
   return (
-    <div className="flex h-11 min-w-0 items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold leading-tight text-slate-400">
+    <div className="flex h-12 min-w-0 items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold leading-tight text-slate-400">
       미정 · 장기 보관
     </div>
   )
