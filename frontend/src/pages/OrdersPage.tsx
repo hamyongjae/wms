@@ -1198,6 +1198,15 @@ export function CreateOrderModal({
                 <div className={gridReadonlyCls}>{dailyFee != null ? won(dailyFee) : ''}</div>
               </GridField>
             </FieldGrid>
+
+            {/* 날짜 오류는 그 원인이 되는 날짜 필드 바로 아래에 둔다 — 아래로 스크롤해야 보이면 놓치기 쉽다 */}
+            {periodError && (
+              <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                {periodError}
+              </p>
+            )}
+
             <FieldGrid>
               <GridField label="결제 방식" required>
                 <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={gridInputCls}>
@@ -1224,13 +1233,6 @@ export function CreateOrderModal({
                 value={settlementUserId}
                 onChange={setSettlementUserId}
               />
-            )}
-
-            {periodError && (
-              <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                {periodError}
-              </p>
             )}
 
             <div>
