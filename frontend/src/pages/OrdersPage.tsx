@@ -1538,12 +1538,12 @@ export function StatusChangeModal({
                 )}
                 <div>
                   <label className={labelCls}>실제 출고일</label>
-                  <input
-                    type="date"
+                  <CalendarField
                     value={actualEndDate}
+                    onChange={setActualEndDate}
                     min={target.storageStartDate}
                     max={target.expectedEndDate ?? undefined}
-                    onChange={(e) => setActualEndDate(e.target.value)}
+                    format={ymdKorean}
                     className={inputCls}
                   />
                   <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 종료일 범위 내에서 선택할 수 있습니다.</p>
@@ -1556,7 +1556,7 @@ export function StatusChangeModal({
                 {applySettlement && (
                   <div className="space-y-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
                     <p className="text-xs text-slate-500">
-                      실사용 기간 <span className="font-medium text-slate-700">{target.storageStartDate} ~ {actualEndDate} ({usedDays}일)</span>
+                      실사용 기간 <span className="font-medium text-slate-700">{ymdKorean(target.storageStartDate)} ~ {actualEndDate ? ymdKorean(actualEndDate) : ''} ({usedDays}일)</span>
                     </p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
