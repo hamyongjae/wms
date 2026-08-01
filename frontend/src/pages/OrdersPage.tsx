@@ -77,16 +77,6 @@ const ymdKorean = (iso: string) => {
   return `${y}년 ${m}월 ${d}일`
 }
 
-const ymd = (d: Date): string =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-// [조회 기간 기본값] 오늘로부터 한 달 전 ~ 오늘
-const defaultRange = (): { from: string; to: string } => {
-  const to = new Date()
-  const from = new Date(to)
-  from.setMonth(from.getMonth() - 1)
-  return { from: ymd(from), to: ymd(to) }
-}
-
 /* 모바일 카드: 라벨-값 한 줄 */
 function InfoRow({ label, value, strong }: { label: string; value: ReactNode; strong?: boolean }) {
   return (
@@ -133,9 +123,8 @@ export default function OrdersPage() {
     return t === 'inbound' ? 'INBOUND' : t === 'outbound' ? 'OUTBOUND' : 'ALL'
   })
   const [query, setQuery] = useState('') // 조회어(고객명·창고명)
-  const [range, setRange] = useState<{ from: string; to: string }>(() =>
-    searchParams.get('today') ? { from: today(), to: today() } : defaultRange(),
-  ) // 조회 기간(기본: 오늘로부터 한 달, 원터치 진입 시 오늘 하루)
+  // [단일 날짜 조회] 비워두면 전체 계약, 날짜를 고르면 그 날짜에 입고 또는 출고 일정이 있는 계약만
+  const [date, setDate] = useState<string>(() => searchParams.get('today') ? today() : '')
 
   // 진입 시 한 번 적용한 뒤 쿼리스트링은 정리 — 이후는 화면의 필터 칩·날짜창이 상태의 유일한 출처
   useEffect(() => {
@@ -241,20 +230,18 @@ export default function OrdersPage() {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const { from, to } = range
     return orders.filter((o) => {
       if (filter !== 'ALL' && o.status !== filter) return false
       if (q && !`${o.customerName} ${o.warehouseName}`.toLowerCase().includes(q)) return false
-      // [기간] 계약 보관기간이 조회 기간과 겹치면 표시 (from/to 비어있으면 전체)
-      if (from || to) {
-        const start = o.storageStartDate
-        const end = o.actualEndDate ?? o.expectedEndDate ?? '9999-12-31'
-        if (from && end < from) return false // 조회 시작 전에 이미 끝난 계약
-        if (to && start > to) return false // 조회 종료 후에 시작하는 계약
+      // [단일 날짜 조회] 비어있으면 전체. 값이 있으면 그 날짜에 입고 또는 출고 일정이 있는 계약만
+      if (date) {
+        const isInboundThatDay = o.storageStartDate === date
+        const isOutboundThatDay = o.actualEndDate === date || (o.expectedEndDate === date && o.status === 'INBOUND')
+        if (!isInboundThatDay && !isOutboundThatDay) return false
       }
       return true
     })
-  }, [orders, filter, query, range])
+  }, [orders, filter, query, date])
 
   // [상태 처리 완료] 모달에서 처리된 결과를 해당 행만 즉시 반영 (새로고침 없음)
   function handleStatusChanged(updated: StorageOrder) {
@@ -370,21 +357,23 @@ export default function OrdersPage() {
         </div>
 
         <div className="mt-2 flex items-center gap-2">
+          {/* [단일 날짜 조회] 비워두면 전체 계약, 날짜를 고르면 그 날짜의 입고·출고 일정만 */}
           <CalendarField
-            value={range.from}
-            onChange={(v) => setRange((r) => ({ ...r, from: v }))}
-            max={range.to || undefined}
+            value={date}
+            onChange={setDate}
             format={ymdKorean}
-            className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:flex-none"
+            placeholder="날짜로 조회 (미입력 시 전체)"
+            className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           />
-          <span className="shrink-0 text-slate-400">~</span>
-          <CalendarField
-            value={range.to}
-            onChange={(v) => setRange((r) => ({ ...r, to: v }))}
-            min={range.from || undefined}
-            format={ymdKorean}
-            className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:flex-none"
-          />
+          {date && (
+            <button
+              type="button"
+              onClick={() => setDate('')}
+              className="shrink-0 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50"
+            >
+              전체 보기
+            </button>
+          )}
         </div>
       </div>
 
@@ -426,10 +415,10 @@ export default function OrdersPage() {
             <FileText size={22} />
           </div>
           <p className="mt-4 text-base font-semibold text-slate-700">
-            {query.trim() || filter !== 'ALL' || range.from || range.to ? '조회 결과가 없습니다' : '계약이 없습니다'}
+            {query.trim() || filter !== 'ALL' || date ? '조회 결과가 없습니다' : '계약이 없습니다'}
           </p>
           <p className="mt-1 text-sm text-slate-400">
-            {query.trim() || filter !== 'ALL' || range.from || range.to ? '다른 기간·조건으로 다시 조회해 보세요.' : '"계약 등록"으로 첫 보관 계약을 추가하세요.'}
+            {query.trim() || filter !== 'ALL' || date ? '다른 날짜·조건으로 다시 조회해 보세요.' : '"계약 등록"으로 첫 보관 계약을 추가하세요.'}
           </p>
         </div>
       )}
