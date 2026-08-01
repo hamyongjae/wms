@@ -30,10 +30,14 @@ const inputCls =
 
 // [2열 콤팩트 폼 전용] 계약 등록/수정 팝업의 가로 2열 구간(날짜·보관료·결제 등)만 쓰는 규격.
 //   좁은 반쪽 폭에서 겹침·넘침이 없도록 높이(h-11)·테두리·곡률·여백을 모든 박스에 동일하게 고정한다.
+// min-w-0: 그리드 트랙은 minmax(0,1fr)라 넓어지지 않지만, 그리드 "아이템" 자체는 기본값이
+//   min-width:auto(콘텐츠 기준)라 셀 안의 네이티브 date input·긴 텍스트가 트랙 폭을 무시하고
+//   오른쪽으로 삐져나간다. 셀 div와 그 안의 입력 요소 모두에 min-w-0을 명시해야 실제로 줄어든다.
+const gridCellCls = 'min-w-0'
 const gridInputCls =
-  'h-11 w-full rounded-lg border border-slate-300 px-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+  'h-11 w-full min-w-0 rounded-lg border border-slate-300 px-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
 const gridReadonlyCls =
-  'flex h-11 items-center justify-end rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-sm font-semibold text-indigo-600'
+  'flex h-11 min-w-0 items-center justify-end rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-sm font-semibold text-indigo-600'
 const gridLabelCls = 'mb-1 block truncate text-sm font-semibold text-slate-700'
 
 /**
@@ -1059,7 +1063,7 @@ function EditOrderModal({
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">
-            <div>
+            <div className={gridCellCls}>
               <label className={gridLabelCls}>보관 시작일 *</label>
               <input
                 type="date"
@@ -1069,10 +1073,10 @@ function EditOrderModal({
                 className={cn(gridInputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
               />
             </div>
-            <div>
+            <div className={gridCellCls}>
               <label className={gridLabelCls}>출고 예정일</label>
               {/* 체크박스 전체 줄을 독립 터치 레이어로 — 글자 어디를 눌러도 토글된다. 다른 박스와 동일 규격(h-11) */}
-              <label className="mb-1.5 flex h-11 w-full cursor-pointer select-none items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold text-slate-600 transition active:bg-slate-100">
+              <label className="mb-1.5 flex h-11 w-full min-w-0 cursor-pointer select-none items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold text-slate-600 transition active:bg-slate-100">
                 <input
                   type="checkbox"
                   checked={endDateUnknown}
@@ -1082,10 +1086,10 @@ function EditOrderModal({
                   }}
                   className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                <span className="truncate">출고일 미정</span>
+                <span className="min-w-0 flex-1 truncate">출고일 미정</span>
               </label>
               {endDateUnknown ? (
-                <div className="flex h-11 items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold leading-tight text-slate-400">
+                <div className="flex h-11 min-w-0 items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold leading-tight text-slate-400">
                   미정 · 장기 보관
                 </div>
               ) : (
@@ -1098,7 +1102,7 @@ function EditOrderModal({
                 />
               )}
             </div>
-            <div>
+            <div className={gridCellCls}>
               <label className={gridLabelCls}>보관료 *</label>
               <MoneyInput
                 value={monthlyFee}
@@ -1108,9 +1112,9 @@ function EditOrderModal({
                 className={cn(gridInputCls, 'pr-8', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
               />
             </div>
-            <div>
+            <div className={gridCellCls}>
               <label className={gridLabelCls}>보관 용량 (톤)</label>
-              <div className="relative">
+              <div className="relative min-w-0">
                 <input
                   type="number"
                   min={0}
@@ -1123,20 +1127,20 @@ function EditOrderModal({
                 <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">톤</span>
               </div>
             </div>
-            <div>
+            <div className={gridCellCls}>
               <label className={gridLabelCls}>보관일수</label>
               {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
               <div className={gridReadonlyCls}>{days != null ? `${days.toLocaleString()}일` : ''}</div>
               <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
             </div>
-            <div>
+            <div className={gridCellCls}>
               <label className={gridLabelCls}>하루 보관료</label>
               <div className={gridReadonlyCls}>{dailyFee != null ? won(dailyFee) : ''}</div>
               <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2.5">
-            <div>
+            <div className={gridCellCls}>
               <label className={gridLabelCls}>결제 방식 *</label>
               <select
                 value={paymentType}
@@ -1147,7 +1151,7 @@ function EditOrderModal({
                 <option value="POSTPAID">후불 (입금예정)</option>
               </select>
             </div>
-            <div>
+            <div className={gridCellCls}>
               <label className={gridLabelCls}>결제 수단 *</label>
               <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={gridInputCls}>
                 <option value="BANK_TRANSFER">계좌이체</option>
@@ -1499,14 +1503,14 @@ export function CreateOrderModal({
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
-              <div>
+              <div className={gridCellCls}>
                 <label className={gridLabelCls}>보관 시작일 *</label>
                 <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={gridInputCls} />
               </div>
-              <div>
+              <div className={gridCellCls}>
                 <label className={gridLabelCls}>출고 예정일</label>
                 {/* 체크박스 전체 줄을 독립 터치 레이어로 — 글자 어디를 눌러도 토글된다. 다른 박스와 동일 규격(h-11) */}
-                <label className="mb-1.5 flex h-11 w-full cursor-pointer select-none items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold text-slate-600 transition active:bg-slate-100">
+                <label className="mb-1.5 flex h-11 w-full min-w-0 cursor-pointer select-none items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold text-slate-600 transition active:bg-slate-100">
                   <input
                     type="checkbox"
                     checked={endDateUnknown}
@@ -1516,10 +1520,10 @@ export function CreateOrderModal({
                     }}
                     className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span className="truncate">출고일 미정</span>
+                  <span className="min-w-0 flex-1 truncate">출고일 미정</span>
                 </label>
                 {endDateUnknown ? (
-                  <div className="flex h-11 items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold leading-tight text-slate-400">
+                  <div className="flex h-11 min-w-0 items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold leading-tight text-slate-400">
                     미정 · 장기 보관
                   </div>
                 ) : (
@@ -1532,7 +1536,7 @@ export function CreateOrderModal({
                   />
                 )}
               </div>
-              <div>
+              <div className={gridCellCls}>
                 <label className={gridLabelCls}>보관료 *</label>
                 <MoneyInput
                   value={monthlyFee}
@@ -1542,9 +1546,9 @@ export function CreateOrderModal({
                   className={cn(gridInputCls, 'pr-8', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
                 />
               </div>
-              <div>
+              <div className={gridCellCls}>
                 <label className={gridLabelCls}>보관 용량 (톤)</label>
-                <div className="relative">
+                <div className="relative min-w-0">
                   <input
                     type="number"
                     min={0}
@@ -1557,13 +1561,13 @@ export function CreateOrderModal({
                   <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">톤</span>
                 </div>
               </div>
-              <div>
+              <div className={gridCellCls}>
                 <label className={gridLabelCls}>보관일수</label>
                 {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
                 <div className={gridReadonlyCls}>{days != null ? `${days.toLocaleString()}일` : ''}</div>
                 <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
               </div>
-              <div>
+              <div className={gridCellCls}>
                 <label className={gridLabelCls}>하루 보관료</label>
                 {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
                 <div className={gridReadonlyCls}>{dailyFee != null ? won(dailyFee) : ''}</div>
@@ -1571,14 +1575,14 @@ export function CreateOrderModal({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2.5">
-              <div>
+              <div className={gridCellCls}>
                 <label className={gridLabelCls}>결제 방식 *</label>
                 <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={gridInputCls}>
                   <option value="PREPAID">선불 (당일 완납)</option>
                   <option value="POSTPAID">후불</option>
                 </select>
               </div>
-              <div>
+              <div className={gridCellCls}>
                 <label className={gridLabelCls}>결제 수단 *</label>
                 <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={gridInputCls}>
                   <option value="BANK_TRANSFER">계좌이체</option>
