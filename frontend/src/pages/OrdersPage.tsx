@@ -14,7 +14,6 @@ import { cn } from '@/lib/cn'
 import { validateContractPeriod } from '@/lib/dateValidation'
 import { calcDailyFee, storageDays } from '@/lib/fee'
 import { extractOwner } from '@/lib/owner'
-import { nextContainerNo } from '@/lib/containerNo'
 import { orderSync } from '@/lib/orderEvents'
 import { today, addDays, addMonths, getDurationDays } from '@/lib/dates'
 import Modal from '@/components/ui/Modal'
@@ -23,22 +22,21 @@ import MoneyInput from '@/components/ui/MoneyInput'
 import DateRangeLabel from '@/components/ui/DateRangeLabel'
 import CustomerListPicker from '@/components/customer/CustomerListPicker'
 import LocationPickerField from '@/components/yard/LocationPickerField'
+import EditOrderModal from '@/components/order/EditOrderModal'
+import PaymentAccountPicker from '@/components/order/PaymentAccountPicker'
+import { placeContainerAtSlot } from '@/lib/containerPlacement'
+import {
+  FieldGrid,
+  FormActions,
+  GridField,
+  gridInputCls,
+  gridReadonlyCls,
+  inputCls,
+  labelCls,
+  UndecidedPlaceholder,
+  UndecidedToggle,
+} from '@/components/order/orderFormUi'
 
-// 모바일에서 손가락 오작동·노안 대응으로 크게(py-3, text-base), 데스크톱은 기존 크기(md:py-2, md:text-sm)
-const inputCls =
-  'w-full rounded-lg border border-slate-300 px-3.5 py-3 text-base outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 md:px-3 md:py-2 md:text-sm'
-
-// [2열 콤팩트 폼 전용] 계약 등록/수정 팝업의 가로 2열 구간(날짜·보관료·결제 등)만 쓰는 규격.
-//   좁은 반쪽 폭에서 겹침·넘침이 없도록 높이(h-11)·테두리·곡률·여백을 모든 박스에 동일하게 고정한다.
-// min-w-0: 그리드 트랙은 minmax(0,1fr)라 넓어지지 않지만, 그리드 "아이템" 자체는 기본값이
-//   min-width:auto(콘텐츠 기준)라 셀 안의 네이티브 date input·긴 텍스트가 트랙 폭을 무시하고
-//   오른쪽으로 삐져나간다. 셀 div와 그 안의 입력 요소 모두에 min-w-0을 명시해야 실제로 줄어든다.
-const gridCellCls = 'min-w-0'
-const gridInputCls =
-  'h-11 w-full min-w-0 rounded-lg border border-slate-300 px-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-const gridReadonlyCls =
-  'flex h-11 min-w-0 items-center justify-end rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-sm font-semibold text-indigo-600'
-const gridLabelCls = 'mb-1 block truncate text-sm font-semibold text-slate-700'
 
 /**
  * [단순 이진 상태 시각화]
@@ -109,31 +107,6 @@ function MobileBtn({ label, onClick, tone = 'default' }: { label: string; onClic
       {label}
     </button>
   )
-}
-
-/**
- * 특정 계약(주문)에 컨테이너를 만들어 지정 슬롯에 적재·배정하는 파이프라인.
- * 컨테이너 생성 → 계약 배정(assign) → 슬롯 적재(inbound). 화주명은 memo 태그로 함께 남긴다.
- */
-async function placeContainerAtSlot(
-  orderId: number,
-  warehouseId: number,
-  slotId: number,
-  opts: { customerName?: string; inboundDate?: string; outboundDate?: string },
-) {
-  // 컨테이너 번호는 '업체 전체'에서 유일해야 하므로 전 창고 컨테이너를 기준으로 채번한다.
-  const existing = await containerApi.list({})
-  const no = nextContainerNo(new Set(existing.map((c) => c.containerNo)))
-  const memo = opts.customerName ? `[${opts.customerName}]` : undefined
-  const created = await containerApi.create({
-    warehouseId,
-    containerNo: no,
-    memo,
-    inboundDate: opts.inboundDate,
-    expectedOutboundDate: opts.outboundDate,
-  })
-  await containerApi.assign(created.id, orderId)
-  await containerApi.inbound({ containerId: created.id, targetSlotId: slotId })
 }
 
 export default function OrdersPage() {
@@ -564,11 +537,8 @@ export default function OrdersPage() {
       <EditOrderModal
         target={editTarget}
         onClose={() => setEditTarget(null)}
-        onDone={() => {
-          setEditTarget(null)
-          reload()
-          orderSync.emit() // 위치·기간·보관료 변경을 야적장/캘린더/매출 화면에 실시간 전파
-        }}
+        /* 재조회는 EditOrderModal 이 emit 하는 orderSync 를 이 페이지가 구독해 처리한다(중복 호출 없음) */
+        onDone={() => setEditTarget(null)}
       />
 
       <StatusChangeModal
@@ -864,337 +834,6 @@ function OrderBillingModal({ target, isAdmin, onClose }: { target: StorageOrder 
   )
 }
 
-/* ===== 계약 수정 (출고예정일·월보관료·보관용량(톤)·메모) ===== */
-function EditOrderModal({
-  target,
-  onClose,
-  onDone,
-}: {
-  target: StorageOrder | null
-  onClose: () => void
-  onDone: () => void
-}) {
-  const [storageStartDate, setStartDate] = useState('')
-  const [expectedEndDate, setEndDate] = useState('')
-  const [endDateUnknown, setEndDateUnknown] = useState(false) // 출고일 미정(장기 보관) 명시적 선택 — 등록 화면과 동일
-  const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
-  const [capacityTons, setCapacityTons] = useState('')
-  const [memo, setMemo] = useState('')
-  // [청구 조건] 등록 화면과 동일한 필드 — 결제 방식/수단/입금계좌/납기일
-  const [paymentType, setPaymentType] = useState<PaymentType>('POSTPAID')
-  const [paymentMethod, setPaymentMethod] = useState<OrderPaymentMethod>('BANK_TRANSFER')
-  const [settlementUserId, setSettlementUserId] = useState<number | null>(null)
-  const [staffList, setStaffList] = useState<Staff[]>([])
-  const [dueDate, setDueDate] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-  // 위치: 선택 슬롯 / 현재(원래) 슬롯·컨테이너
-  const [slotId, setSlotId] = useState<number | null>(null)
-  const [currentSlotId, setCurrentSlotId] = useState<number | null>(null)
-  const [currentContainerId, setCurrentContainerId] = useState<number | null>(null)
-  // [보관료 수동 입력] 층 단가 기반 자동 재계산은 제거 — 저장된 금액은 사용자가 직접 고치기 전까지 절대 변하지 않는다.
-
-  useEffect(() => {
-    if (target) {
-      setStartDate(target.storageStartDate ?? '')
-      setEndDate(target.expectedEndDate ?? '')
-      setEndDateUnknown(target.expectedEndDate == null) // 기존에 미정이던 계약은 체크박스도 그 상태를 그대로 반영
-      setMonthlyFee(target.monthlyFee)
-      setCapacityTons(target.capacityTons != null ? String(target.capacityTons) : '')
-      setMemo(target.memo ?? '')
-      setPaymentType(target.paymentType ?? 'POSTPAID')
-      setPaymentMethod(target.paymentMethod ?? 'BANK_TRANSFER')
-      setSettlementUserId(target.settlementUserId ?? null)
-      setDueDate(target.dueDate ?? '')
-      setFormError(null)
-    }
-  }, [target])
-
-  // [입금 계좌] 담당 직원 목록 (계좌이체 시 선택용)
-  useEffect(() => {
-    if (!target) return
-    let alive = true
-    staffApi.list().then((s) => alive && setStaffList(s)).catch(() => alive && setStaffList([]))
-    return () => {
-      alive = false
-    }
-  }, [target])
-
-  // 이 계약에 배정·적재된 컨테이너의 현재 자리를 조회 (수정 모드 강조/이동 기준)
-  useEffect(() => {
-    if (!target) return
-    let alive = true
-    setSlotId(null)
-    setCurrentSlotId(null)
-    setCurrentContainerId(null)
-    Promise.all([containerApi.list({ warehouseId: target.warehouseId }), yardApi.slots(target.warehouseId)])
-      .then(([containers, slots]) => {
-        if (!alive) return
-        const ct = containers.find((c) => c.currentOrderId === target.id)
-        if (!ct) return
-        setCurrentContainerId(ct.id)
-        const slot = slots.find((s) => s.containerId === ct.id)
-        if (slot) {
-          setCurrentSlotId(slot.id)
-          setSlotId(slot.id)
-        }
-      })
-      .catch(() => undefined)
-    return () => {
-      alive = false
-    }
-  }, [target])
-
-  if (!target) return null
-
-  // [정합성] 보관 시작일이 계약 종료일보다 미래가 될 수 없다 (당일 허용)
-  const periodError = validateContractPeriod(storageStartDate, expectedEndDate)
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (periodError) {
-      setFormError(periodError)
-      return
-    }
-    if (monthlyFee == null || monthlyFee <= 0) {
-      setFormError('월 보관료를 입력하세요.')
-      return
-    }
-    setFormError(null)
-    setSubmitting(true)
-    try {
-      await orderApi.update(target!.id, {
-        storageStartDate: storageStartDate || undefined,
-        expectedEndDate: expectedEndDate || undefined,
-        monthlyFee: monthlyFee!,
-        capacityTons: capacityTons ? Number(capacityTons) : undefined,
-        paymentType,
-        paymentMethod,
-        settlementUserId: paymentMethod === 'BANK_TRANSFER' ? (settlementUserId ?? undefined) : undefined,
-        dueDate: dueDate || undefined,
-        memo: memo || undefined,
-      })
-      // 위치 변경 반영 (이동 / 신규 배정 / 미지정 해제)
-      if (slotId !== currentSlotId) {
-        try {
-          if (currentSlotId != null && slotId != null && currentContainerId != null) {
-            await containerApi.move({ containerId: currentContainerId, targetSlotId: slotId })
-          } else if (currentSlotId == null && slotId != null) {
-            await placeContainerAtSlot(target!.id, target!.warehouseId, slotId, {
-              customerName: target!.customerName,
-              inboundDate: storageStartDate || undefined,
-              outboundDate: expectedEndDate || undefined,
-            })
-          } else if (currentSlotId != null && slotId == null && currentContainerId != null) {
-            await containerApi.outbound({ containerId: currentContainerId })
-          }
-        } catch (e) {
-          window.alert(`계약은 저장됐지만 위치 변경에 실패했습니다.\n(${errMsg(e, '원인 미상')})`)
-        }
-      }
-      onDone()
-    } catch (err) {
-      setFormError(errMsg(err, '계약 수정에 실패했습니다.'))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const locationChanged = slotId !== currentSlotId
-  // 읽기 전용 파생값 — 입력 필드를 덮어쓰지 않고 표기만 한다
-  const days = storageDays(storageStartDate, expectedEndDate)
-  const dailyFee = calcDailyFee(monthlyFee, storageStartDate, expectedEndDate)
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title="계약 수정"
-      widthClass="max-w-5xl"
-      footer={
-        <div className="flex gap-2 md:justify-end">
-          <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-3.5 text-base font-semibold text-slate-600 transition active:bg-slate-50 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-slate-50">
-            취소
-          </button>
-          <button
-            type="submit"
-            form="edit-order-form"
-            disabled={submitting || periodError != null}
-            className="flex-1 rounded-xl bg-indigo-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99] disabled:opacity-60 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-indigo-700"
-          >
-            {submitting ? '저장 중…' : '수정 완료'}
-          </button>
-        </div>
-      }
-    >
-      <form id="edit-order-form" onSubmit={handleSubmit} className="space-y-4">
-        {/* 단일 컬럼: 고객/창고(읽기전용) → 위치 → 일정 순 — 등록 팝업과 동일 템플릿 */}
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
-            <div>
-              <span className="block text-xs text-slate-400">고객</span>
-              <span className="font-medium text-slate-700">{target.customerName}</span>
-            </div>
-            <div>
-              <span className="block text-xs text-slate-400">창고</span>
-              <span className="font-medium text-slate-700">{target.warehouseName}</span>
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="block text-base font-semibold text-slate-700 md:text-sm md:font-medium">컨테이너 위치 지정</label>
-              {locationChanged && (
-                <button
-                  type="button"
-                  onClick={() => setSlotId(currentSlotId)}
-                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
-                >
-                  되돌리기
-                </button>
-              )}
-            </div>
-            <LocationPickerField
-              warehouseId={target.warehouseId}
-              value={slotId}
-              onChange={setSlotId}
-              currentSlotId={currentSlotId}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className={gridCellCls}>
-              <label className={gridLabelCls}>보관 시작일 *</label>
-              <input
-                type="date"
-                value={storageStartDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                required
-                className={cn(gridInputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
-              />
-            </div>
-            <div className={gridCellCls}>
-              <label className={gridLabelCls}>출고 예정일</label>
-              {/* 체크박스 전체 줄을 독립 터치 레이어로 — 글자 어디를 눌러도 토글된다. 다른 박스와 동일 규격(h-11) */}
-              <label className="mb-1.5 flex h-11 w-full min-w-0 cursor-pointer select-none items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold text-slate-600 transition active:bg-slate-100">
-                <input
-                  type="checkbox"
-                  checked={endDateUnknown}
-                  onChange={(e) => {
-                    setEndDateUnknown(e.target.checked)
-                    if (e.target.checked) setEndDate('') // 미정 선택 시 기존 입력값 제거
-                  }}
-                  className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span className="min-w-0 flex-1 truncate">출고일 미정</span>
-              </label>
-              {endDateUnknown ? (
-                <div className="flex h-11 min-w-0 items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold leading-tight text-slate-400">
-                  미정 · 장기 보관
-                </div>
-              ) : (
-                <input
-                  type="date"
-                  value={expectedEndDate}
-                  min={storageStartDate || undefined}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className={cn(gridInputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
-                />
-              )}
-            </div>
-            <div className={gridCellCls}>
-              <label className={gridLabelCls}>보관료 *</label>
-              <MoneyInput
-                value={monthlyFee}
-                onChange={setMonthlyFee}
-                required
-                placeholder="예: 300,000"
-                className={cn(gridInputCls, 'pr-8', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
-              />
-            </div>
-            <div className={gridCellCls}>
-              <label className={gridLabelCls}>보관 용량 (톤)</label>
-              <div className="relative min-w-0">
-                <input
-                  type="number"
-                  min={0}
-                  step="1"
-                  value={capacityTons}
-                  onChange={(e) => setCapacityTons(e.target.value)}
-                  placeholder="예: 2.5"
-                  className={cn(gridInputCls, 'pr-8')}
-                />
-                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">톤</span>
-              </div>
-            </div>
-            <div className={gridCellCls}>
-              <label className={gridLabelCls}>보관일수</label>
-              {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
-              <div className={gridReadonlyCls}>{days != null ? `${days.toLocaleString()}일` : ''}</div>
-              <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
-            </div>
-            <div className={gridCellCls}>
-              <label className={gridLabelCls}>하루 보관료</label>
-              <div className={gridReadonlyCls}>{dailyFee != null ? won(dailyFee) : ''}</div>
-              <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className={gridCellCls}>
-              <label className={gridLabelCls}>결제 방식 *</label>
-              <select
-                value={paymentType}
-                onChange={(e) => setPaymentType(e.target.value as PaymentType)}
-                className={gridInputCls}
-              >
-                <option value="PREPAID">선불 (완납)</option>
-                <option value="POSTPAID">후불 (입금예정)</option>
-              </select>
-            </div>
-            <div className={gridCellCls}>
-              <label className={gridLabelCls}>결제 수단 *</label>
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={gridInputCls}>
-                <option value="BANK_TRANSFER">계좌이체</option>
-                <option value="CASH">현금</option>
-                <option value="CARD">카드</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">납기일</label>
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} />
-          </div>
-
-          {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 — 등록 화면과 동일 */}
-          {paymentMethod === 'BANK_TRANSFER' && (
-            <PaymentAccountPicker staffList={staffList} value={settlementUserId} onChange={setSettlementUserId} />
-          )}
-
-          {periodError && (
-            <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-              {periodError}
-            </p>
-          )}
-
-          <div>
-            <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">메모</label>
-            <textarea
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-              rows={2}
-              placeholder="계약 특이사항이나 부대 정보를 자유롭게 입력하세요."
-              className={cn(inputCls, 'min-h-[64px] w-full resize-y leading-relaxed')}
-            />
-          </div>
-        </div>
-
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
-      </form>
-    </Modal>
-  )
-}
-
 /* ===== 계약 등록 ===== */
 export function CreateOrderModal({
   open,
@@ -1390,19 +1029,14 @@ export function CreateOrderModal({
         title="계약 등록"
         widthClass="max-w-5xl"
         footer={
-          <div className="flex gap-2 md:justify-end">
-            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-3.5 text-base font-semibold text-slate-600 transition active:bg-slate-50 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-slate-50">
-              취소
-            </button>
-            <button
-              type="submit"
-              form="create-order-form"
-              disabled={submitting || isBlacklisted || periodError != null}
-              className="flex-1 rounded-xl bg-indigo-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99] disabled:opacity-60 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-indigo-700"
-            >
-              {submitting ? '등록 중…' : '등록 완료'}
-            </button>
-          </div>
+          <FormActions
+            formId="create-order-form"
+            onCancel={onClose}
+            submitting={submitting}
+            disabled={isBlacklisted || periodError != null}
+            submitLabel="등록 완료"
+            submittingLabel="등록 중…"
+          />
         }
       >
         <form id="create-order-form" onSubmit={handleSubmit} className="space-y-4">
@@ -1413,7 +1047,7 @@ export function CreateOrderModal({
             {fixedSlot ? (
               /* [통합] 컨테이너 관리에서 입고: 창고·자리 자동 고정(변경 불가) */
               <div>
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">창고 · 위치</label>
+                <label className={labelCls}>창고 · 위치</label>
                 <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3.5 py-3">
                   <span className="text-base font-semibold text-slate-800 md:text-sm">
                     {fixedSlot.warehouseName} · {fixedSlot.locationLabel}
@@ -1424,7 +1058,7 @@ export function CreateOrderModal({
             ) : (
               <>
                 <div>
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">창고 *</label>
+                  <label className={labelCls}>창고 *</label>
                   <select
                     value={warehouseId}
                     onChange={(e) => {
@@ -1443,7 +1077,7 @@ export function CreateOrderModal({
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">컨테이너 위치 지정</label>
+                  <label className={labelCls}>컨테이너 위치 지정</label>
                   <LocationPickerField
                     warehouseId={warehouseId ? Number(warehouseId) : null}
                     value={slotId}
@@ -1454,7 +1088,7 @@ export function CreateOrderModal({
             )}
             
             <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객 *</label>
+              <label className={labelCls}>고객 *</label>
               {selectedCustomer ? (
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
                   <div className="min-w-0">
@@ -1492,7 +1126,7 @@ export function CreateOrderModal({
 
             {/* 고객 검색 — 고객 아래·창고 위 */}
             <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객 검색</label>
+              <label className={labelCls}>고객 검색</label>
               <CustomerListPicker
                 customers={customers}
                 selectedId={selectedCustomer?.id ?? null}
@@ -1502,30 +1136,21 @@ export function CreateOrderModal({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className={gridCellCls}>
-                <label className={gridLabelCls}>보관 시작일 *</label>
+            <FieldGrid>
+              <GridField label="보관 시작일" required>
                 <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={gridInputCls} />
-              </div>
-              <div className={gridCellCls}>
-                <label className={gridLabelCls}>출고 예정일</label>
-                {/* 체크박스 전체 줄을 독립 터치 레이어로 — 글자 어디를 눌러도 토글된다. 다른 박스와 동일 규격(h-11) */}
-                <label className="mb-1.5 flex h-11 w-full min-w-0 cursor-pointer select-none items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold text-slate-600 transition active:bg-slate-100">
-                  <input
-                    type="checkbox"
-                    checked={endDateUnknown}
-                    onChange={(e) => {
-                      setEndDateUnknown(e.target.checked)
-                      if (e.target.checked) setEndDate('') // 미정 선택 시 기존 입력값 제거
-                    }}
-                    className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span className="min-w-0 flex-1 truncate">출고일 미정</span>
-                </label>
+              </GridField>
+              <GridField label="출고 예정일">
+                {/* 체크박스 줄 전체가 터치 레이어 — 글자 어디를 눌러도 토글된다(다른 박스와 동일 h-11) */}
+                <UndecidedToggle
+                  checked={endDateUnknown}
+                  onChange={(v) => {
+                    setEndDateUnknown(v)
+                    if (v) setEndDate('') // 미정 선택 시 기존 입력값 제거
+                  }}
+                />
                 {endDateUnknown ? (
-                  <div className="flex h-11 min-w-0 items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold leading-tight text-slate-400">
-                    미정 · 장기 보관
-                  </div>
+                  <UndecidedPlaceholder />
                 ) : (
                   <input
                     type="date"
@@ -1535,9 +1160,8 @@ export function CreateOrderModal({
                     className={cn(gridInputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
                   />
                 )}
-              </div>
-              <div className={gridCellCls}>
-                <label className={gridLabelCls}>보관료 *</label>
+              </GridField>
+              <GridField label="보관료" required>
                 <MoneyInput
                   value={monthlyFee}
                   onChange={setMonthlyFee}
@@ -1545,9 +1169,8 @@ export function CreateOrderModal({
                   placeholder="예: 300,000"
                   className={cn(gridInputCls, 'pr-8', monthlyFee != null && monthlyFee > 0 && 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100')}
                 />
-              </div>
-              <div className={gridCellCls}>
-                <label className={gridLabelCls}>보관 용량 (톤)</label>
+              </GridField>
+              <GridField label="보관 용량 (톤)">
                 <div className="relative min-w-0">
                   <input
                     type="number"
@@ -1560,42 +1183,34 @@ export function CreateOrderModal({
                   />
                   <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">톤</span>
                 </div>
-              </div>
-              <div className={gridCellCls}>
-                <label className={gridLabelCls}>보관일수</label>
-                {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
+              </GridField>
+              {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
+              <GridField label="보관일수" hint="보관 시작일 ~ 출고 예정일 (당일 포함)">
                 <div className={gridReadonlyCls}>{days != null ? `${days.toLocaleString()}일` : ''}</div>
-                <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
-              </div>
-              <div className={gridCellCls}>
-                <label className={gridLabelCls}>하루 보관료</label>
-                {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
+              </GridField>
+              {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
+              <GridField label="하루 보관료" hint="보관료 ÷ 보관일수 (당일 포함)">
                 <div className={gridReadonlyCls}>{dailyFee != null ? won(dailyFee) : ''}</div>
-                <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className={gridCellCls}>
-                <label className={gridLabelCls}>결제 방식 *</label>
+              </GridField>
+            </FieldGrid>
+            <FieldGrid>
+              <GridField label="결제 방식" required>
                 <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={gridInputCls}>
                   <option value="PREPAID">선불 (당일 완납)</option>
                   <option value="POSTPAID">후불</option>
                 </select>
-              </div>
-              <div className={gridCellCls}>
-                <label className={gridLabelCls}>결제 수단 *</label>
+              </GridField>
+              <GridField label="결제 수단" required>
                 <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)} className={gridInputCls}>
                   <option value="BANK_TRANSFER">계좌이체</option>
                   <option value="CASH">현금</option>
                   <option value="CARD">카드</option>
                 </select>
-              </div>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">납기일</label>
-              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} />
-            </div>
-
+              </GridField>
+              <GridField label="납기일">
+                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={gridInputCls} />
+              </GridField>
+            </FieldGrid>
             {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 */}
             {paymentMethod === 'BANK_TRANSFER' && (
               <PaymentAccountPicker
@@ -1613,7 +1228,7 @@ export function CreateOrderModal({
             )}
 
             <div>
-              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">메모</label>
+              <label className={labelCls}>메모</label>
               <textarea
                 value={memo}
                 onChange={(e) => setMemo(e.target.value)}
@@ -1714,19 +1329,19 @@ function QuickCustomerModal({
     <Modal open={open} onClose={onClose} title="새 고객 등록">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">고객명 *</label>
+          <label className={labelCls}>고객명 *</label>
           <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus className={inputCls} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">유형</label>
+            <label className={labelCls}>유형</label>
             <select value={customerType} onChange={(e) => setType(e.target.value as CustomerType)} className={inputCls}>
               <option value="INDIVIDUAL">개인</option>
               <option value="CORPORATE">기업</option>
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">연락처</label>
+            <label className={labelCls}>연락처</label>
             <input value={phoneNumber} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
           </div>
         </div>
@@ -1880,7 +1495,7 @@ function StatusChangeModal({
                   </p>
                 )}
                 <div>
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">실제 출고일</label>
+                  <label className={labelCls}>실제 출고일</label>
                   <input
                     type="date"
                     value={actualEndDate}
@@ -1937,7 +1552,7 @@ function StatusChangeModal({
             />
             {returnKind === 'LATE' && (
               <div className="rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200/70">
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">실제 입고일</label>
+                <label className={labelCls}>실제 입고일</label>
                 <input
                   type="date"
                   value={actualStartDate}
@@ -2082,54 +1697,6 @@ function RadioRow({
   )
 }
 
-/* ===== 계좌이체 시 입금 계좌(담당 직원) 지정 =====
- * 직원 정보에 등록된 주거래 계좌를 동적으로 불러와, 타이핑 없이 선택만으로 수납 계좌를 매핑한다.
- */
-function PaymentAccountPicker({
-  staffList,
-  value,
-  onChange,
-}: {
-  staffList: Staff[]
-  value: number | null
-  onChange: (id: number | null) => void
-}) {
-  // 계좌가 등록된 직원만 후보로 (계좌 없는 직원은 매핑 불가)
-  const withAccount = staffList.filter((s) => s.accountNumber)
-  const selected = withAccount.find((s) => s.id === value) ?? null
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-      <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">입금 계좌 (담당 직원)</label>
-      {withAccount.length === 0 ? (
-        <p className="text-xs text-slate-400">
-          계좌가 등록된 직원이 없습니다. 직원 관리 화면에서 주거래 계좌를 먼저 등록하세요.
-        </p>
-      ) : (
-        <>
-          <select
-            value={value ?? ''}
-            onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-            className={inputCls}
-          >
-            <option value="">계좌 미지정</option>
-            {withAccount.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} · {s.bankName ?? ''} {s.accountNumber}
-              </option>
-            ))}
-          </select>
-          {selected && (
-            <div className="mt-2 rounded-lg bg-white px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200">
-              <span className="font-medium text-slate-800">{selected.bankName}</span> {selected.accountNumber}
-              <span className="ml-1 text-slate-400">· 예금주 {selected.accountHolder ?? selected.name}</span>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
 
 function errMsg(err: unknown, fallback: string): string {
   return isAxiosError(err) ? (err.response?.data?.message ?? fallback) : fallback

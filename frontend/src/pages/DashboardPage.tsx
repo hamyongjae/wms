@@ -662,7 +662,6 @@ function MobileScheduleCard({
           />
         </div>
       </div>
-      <p className="mt-1.5 text-center text-[11px] text-slate-400 md:hidden">좌우로 밀어 달을 넘길 수 있습니다</p>
 
       {/* 선택한 날짜의 입고·출고 화주 */}
       <div className="mt-4 rounded-2xl bg-slate-50 p-4">

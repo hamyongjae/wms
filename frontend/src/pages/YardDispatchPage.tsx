@@ -27,8 +27,8 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { extractOwner } from '@/lib/owner'
-import { validateInOut, todayStr } from '@/lib/dateValidation'
 import { CreateOrderModal } from './OrdersPage' // [통합] 계약등록 공용 폼(컨테이너 관리 입고에서 창고·자리 고정)
+import EditOrderModal from '@/components/order/EditOrderModal' // [통합] 계약수정 공용 폼(계약관리와 완전히 동일한 화면)
 
 /* ===== 타입 명세 ===== */
 // 좌표 + 컨테이너가 결합된 슬롯 (백엔드 YardSlotResponse와 매칭)
@@ -245,6 +245,23 @@ export default function YardDispatchPage() {
   const floors = useMemo(() => groupByFloor(slots), [slots])
   // 컨테이너에 연결된 계약(정산) 조회용 — 화주 카드에 보관기간·보관료를 매핑한다
   const orderById = useMemo(() => new Map(orders.map((o) => [o.id, o])), [orders])
+
+  /**
+   * [컨테이너 관리 → 계약 수정 컨텍스트 결합]
+   * 격자에서 고른 '자리'를 계약 수정 팝업이 이해하는 형태로 옮긴다.
+   *   자리(slot) → 적재된 컨테이너(container) → 그 컨테이너가 물고 있는 계약(order)
+   * 이 사슬이 끊긴 자리(배정 없는 컨테이너 등)는 수정할 계약이 없으므로 팝업을 열지 않는다.
+   */
+  const editTarget = useMemo(() => {
+    if (!editSlot || editSlot.containerId == null) return null
+    const container = containersById.get(editSlot.containerId)
+    const order = container?.currentOrderId != null ? orderById.get(container.currentOrderId) : undefined
+    if (!order) return null
+    return {
+      order,
+      hint: { slotId: editSlot.id, locationLabel: editSlot.locationLabel, container },
+    }
+  }, [editSlot, containersById, orderById])
   const kpi = useMemo(() => {
     const total = slots.length
     const occupied = slots.filter((s) => s.occupied).length
@@ -743,16 +760,19 @@ export default function YardDispatchPage() {
         />
       )}
 
-      {/* 보관 정보 수정 */}
-      {editSlot && editSlot.containerId != null && (
-        <EditModal
-          slot={editSlot}
-          container={containersById.get(editSlot.containerId)}
+      {/*
+        [통합] 계약 수정 — 계약 관리의 '수정'과 완전히 동일한 팝업을 띄운다.
+        격자에서 이미 아는 자리·컨테이너를 hint 로 넘겨 조회 대기 없이 즉시 바인딩한다.
+      */}
+      {editTarget && (
+        <EditOrderModal
+          target={editTarget.order}
+          hint={editTarget.hint}
           onClose={() => setEditSlot(null)}
+          /* 격자 재조회는 EditOrderModal 이 emit 하는 orderSync 구독으로 자동 처리된다 */
           onDone={() => {
             setEditSlot(null)
-            setBanner('보관 정보 수정 완료')
-            reload()
+            setBanner('계약 수정 완료')
           }}
         />
       )}
@@ -1034,101 +1054,23 @@ function ActionPanel({
             <ArrowRightLeft size={18} /> 다른 자리로 이동
           </button>
         )}
+        {/*
+          [통합] 계약 관리의 '수정'과 동일한 팝업을 연다.
+          계약이 연결되지 않은 컨테이너는 고칠 원장이 없으므로 눌리지 않게 막고 이유를 밝힌다
+          (누르고 아무 일도 안 일어나는 것이 현장에서 가장 혼란스럽다).
+        */}
         <button
           type="button"
           onClick={onEdit}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3.5 text-base font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99]"
+          disabled={!order}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3.5 text-base font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
         >
-          <Pencil size={18} /> 보관 정보 수정
+          <Pencil size={18} /> 계약 수정
         </button>
+        {!order && (
+          <p className="text-center text-xs text-slate-400">계약에 배정되지 않은 컨테이너라 수정할 계약 정보가 없습니다.</p>
+        )}
       </div>
-    </Modal>
-  )
-}
-
-/* ===== 보관 정보 수정 ===== */
-function EditModal({
-  slot,
-  container,
-  onClose,
-  onDone,
-}: {
-  slot: YardSlot
-  container?: Container
-  onClose: () => void
-  onDone: () => void
-}) {
-  const [capacityTon, setCapacityTon] = useState(container?.capacityTon ?? 5)
-  // 특이사항 편집은 [화주] 태그를 뺀 본문만 다룬다(저장 시 태그를 다시 붙임)
-  const [memo, setMemo] = useState(stripOwnerTag(container?.memo))
-  const [inboundDate, setInboundDate] = useState(container?.inboundDate ?? '')
-  const [expectedOutboundDate, setExpectedOutboundDate] = useState(container?.expectedOutboundDate ?? '')
-  const [submitting, setSubmitting] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-
-  const dateError = validateInOut(inboundDate, expectedOutboundDate)
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (slot.containerId == null) return
-    if (dateError) return setFormError(dateError)
-    setFormError(null)
-    setSubmitting(true)
-    try {
-      // [화주 보존] 편집한 특이사항 본문 앞에 기존 [화주] 태그를 다시 붙여 저장
-      const composedMemo = [ownerTag(container?.memo), memo.trim()].filter(Boolean).join(' ').trim() || undefined
-      // 컨테이너 번호는 변경하지 않지만 백엔드 필수값이라 기존 번호를 그대로 실어 보낸다.
-      await containerApi.update(slot.containerId, {
-        containerNo: slot.containerNo ?? container?.containerNo ?? undefined,
-        capacityTon,
-        memo: composedMemo,
-        inboundDate: inboundDate || undefined,
-        expectedOutboundDate: expectedOutboundDate || undefined,
-      })
-      onDone()
-    } catch (err) {
-      setFormError(errMsg(err, '수정에 실패했습니다.'))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <Modal open onClose={onClose} title={`${extractOwner(container?.memo) ?? '컨테이너'} · 보관 정보 수정`}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
-          <span className="block text-xs text-slate-400">화주(고객)</span>
-          <span className="font-semibold text-slate-800">{extractOwner(container?.memo) ?? '—'}</span>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">용량(톤)</label>
-          <input type="number" min={1} value={capacityTon} onChange={(e) => setCapacityTon(Number(e.target.value))} className={inputCls} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">보관 입고일</label>
-            <input type="date" value={inboundDate} max={todayStr()} onChange={(e) => setInboundDate(e.target.value)} className={inputCls} />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">출고 예정일</label>
-            <input type="date" value={expectedOutboundDate} min={inboundDate || undefined} onChange={(e) => setExpectedOutboundDate(e.target.value)} className={inputCls} />
-          </div>
-        </div>
-        {dateError && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{dateError}</p>}
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">특이사항</label>
-          <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} />
-        </div>
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
-            취소
-          </button>
-          <button type="submit" disabled={submitting || dateError != null} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
-            {submitting ? '저장 중…' : '저장'}
-          </button>
-        </div>
-      </form>
     </Modal>
   )
 }
@@ -1412,12 +1354,6 @@ function errMsg(err: unknown, fallback: string): string {
   return status ? `[HTTP ${status}] ${detail ?? fallback}` : (detail ?? fallback)
 }
 
-/** memo 앞머리의 [ ... ] 화주 태그 원문(대괄호 포함). 없으면 빈 문자열. */
-function ownerTag(memo?: string | null): string {
-  if (!memo) return ''
-  const m = memo.match(/^\[[^\]]*\]/)
-  return m ? m[0] : ''
-}
 
 /** [화주] 태그를 걷어낸 순수 특이사항 본문만 반환. */
 function stripOwnerTag(memo?: string | null): string {

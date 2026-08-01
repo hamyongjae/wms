@@ -12,46 +12,57 @@ import { cn } from '@/lib/cn'
  * 규격을 바꿀 일이 생겨도 이 파일만 고치면 두 화면이 동시에 따라온다
  * (= 파편화가 구조적으로 재발할 수 없다).
  *
- * 모바일 우선: 손가락 오작동·노안을 고려해 기본은 크게(py-3, text-base),
- * md 이상 데스크톱에서는 정보 밀도를 위해 기존 규격(py-2, text-sm)으로 축소한다.
+ * 기준은 앞서 최적화를 마친 '계약 등록' 화면의 콤팩트 2열 규격이다.
  */
 
-/** 입력 박스 표준 규격 — 등록·수정 모든 input/select/textarea가 공유 */
+/** 전체 폭(단일 컬럼) 입력 박스 — 창고 선택·메모처럼 넓게 쓰는 필드 */
 export const inputCls =
   'w-full rounded-lg border border-slate-300 px-3.5 py-3 text-base outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 md:px-3 md:py-2 md:text-sm'
 
 /**
- * 읽기 전용 박스 규격 — 높이·곡률은 입력 박스와 완전히 동일하되,
- * 회색 배경 + 커서 없음으로 "만질 수 없는 값"임을 시각적으로 구분한다.
- * 규격을 유지하는 이유: 폼의 격자 정렬이 깨지면 화면이 들쭉날쭉해 보인다.
+ * [2열 콤팩트 폼 전용] 계약 등록/수정 팝업의 가로 2열 구간(날짜·보관료·결제 등) 규격.
+ *   좁은 반쪽 폭에서 겹침·넘침이 없도록 높이(h-11)·테두리·곡률·여백을 모든 박스에 동일하게 고정한다.
+ * min-w-0: 그리드 트랙은 minmax(0,1fr)라 넓어지지 않지만, 그리드 "아이템" 자체는 기본값이
+ *   min-width:auto(콘텐츠 기준)라 셀 안의 네이티브 date input·긴 텍스트가 트랙 폭을 무시하고
+ *   오른쪽으로 삐져나간다. 셀 div와 그 안의 입력 요소 모두에 min-w-0을 명시해야 실제로 줄어든다.
  */
-export const readonlyCls =
-  'flex min-h-[46px] w-full items-center rounded-lg border border-slate-200 bg-slate-100 px-3.5 py-3 text-base font-semibold text-slate-500 md:min-h-[38px] md:px-3 md:py-2 md:text-sm'
-
-/** 파생값(계산 결과) 표시 박스 — 읽기 전용이지만 '살아있는 값'이라 강조색을 쓴다 */
-export const derivedCls =
-  'flex min-h-[46px] w-full items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3.5 text-base font-semibold text-indigo-600 md:min-h-[38px] md:px-3 md:text-sm'
-
-/** 라벨 표준 규격 */
+export const gridCellCls = 'min-w-0'
+export const gridInputCls =
+  'h-11 w-full min-w-0 rounded-lg border border-slate-300 px-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+/** 계산 결과(보관일수·하루 보관료) — 규격은 입력 박스와 동일하되 강조색으로 '살아있는 값'임을 표시 */
+export const gridReadonlyCls =
+  'flex h-11 min-w-0 items-center justify-end rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-sm font-semibold text-indigo-600'
+/**
+ * 수정 불가한 고정 정보(예: 채번된 컨테이너 번호) — 높이·곡률은 입력 박스와 같아
+ * 격자 정렬이 흐트러지지 않지만, 진한 회색 배경으로 "만질 수 없는 값"임을 구분한다.
+ * div 라서 탭해도 키보드가 뜨지 않는다(오터치 원천 차단).
+ */
+export const gridLockedCls =
+  'flex h-11 min-w-0 items-center rounded-lg border border-slate-200 bg-slate-100 px-2.5 text-sm font-semibold text-slate-500'
+export const gridLabelCls = 'mb-1 block truncate text-sm font-semibold text-slate-700'
+/** 전체 폭 라벨 (단일 컬럼 필드용) */
 export const labelCls = 'mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium'
 
-/** 필드 한 칸 — 라벨 + 입력 요소. required면 라벨 뒤에 * 를 붙인다. */
-export function Field({
+/** 2열 격자 컨테이너 — 등록·수정이 같은 간격(gap-2.5)을 공유한다 */
+export function FieldGrid({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn('grid grid-cols-2 gap-2.5', className)}>{children}</div>
+}
+
+/** 2열 격자 안의 한 칸 — 라벨 + 입력 요소 + (선택) 보조 설명 */
+export function GridField({
   label,
   required,
   hint,
   children,
-  className,
 }: {
   label: string
   required?: boolean
   hint?: string
   children: ReactNode
-  className?: string
 }) {
   return (
-    <div className={className}>
-      <label className={labelCls}>
+    <div className={gridCellCls}>
+      <label className={gridLabelCls}>
         {label}
         {required && ' *'}
       </label>
@@ -61,21 +72,17 @@ export function Field({
   )
 }
 
-/**
- * 수정 불가한 고정 정보 — 규격은 입력 박스와 같지만 회색 톤으로 잠금을 표현한다.
- * 실제 input 이 아니라 div 라서 탭해도 키보드가 뜨지 않는다(오터치 원천 차단).
- */
-export function ReadOnlyField({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
+/** 전체 폭 필드 — 라벨 + 입력 요소 */
+export function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
   return (
-    <Field label={label} hint={hint}>
-      <div className={readonlyCls}>{value ?? '—'}</div>
-    </Field>
+    <div>
+      <label className={labelCls}>
+        {label}
+        {required && ' *'}
+      </label>
+      {children}
+    </div>
   )
-}
-
-/** 폼 본문 2열 격자 — 모바일 1열, sm 이상 2열. 등록·수정이 같은 간격을 쓴다. */
-export function FieldGrid({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2', className)}>{children}</div>
 }
 
 /**
@@ -84,11 +91,11 @@ export function FieldGrid({ children, className }: { children: ReactNode; classN
  */
 export function ContextBar({ items }: { items: { label: string; value: ReactNode }[] }) {
   return (
-    <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
+    <div className="grid grid-cols-2 gap-2.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5">
       {items.map((it) => (
         <div key={it.label} className="min-w-0">
-          <span className="block text-xs text-slate-400">{it.label}</span>
-          <span className="block truncate font-medium text-slate-700">{it.value ?? '—'}</span>
+          <span className="block text-xs text-slate-500">{it.label}</span>
+          <span className="block truncate text-sm font-semibold text-slate-800">{it.value ?? '—'}</span>
         </div>
       ))}
     </div>
@@ -96,17 +103,47 @@ export function ContextBar({ items }: { items: { label: string; value: ReactNode
 }
 
 /**
- * 폼 하단 액션 바.
- * 모바일에선 sticky 로 화면 바닥에 붙어 스크롤 위치와 무관하게 항상 한 번에 누를 수 있고,
- * 데스크톱에선 일반 흐름의 우측 정렬 버튼으로 돌아간다.
+ * [출고일 미정] 토글 — 장기 보관 계약처럼 종료일이 확정되지 않은 건을 표현한다.
+ *
+ * 체크박스 줄 전체가 터치 레이어(h-11)라 글자 어디를 눌러도 토글되고,
+ * 다른 입력 박스와 같은 높이라 2열 격자의 정렬이 깨지지 않는다.
+ */
+export function UndecidedToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="mb-1.5 flex h-11 w-full min-w-0 cursor-pointer select-none items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold text-slate-600 transition active:bg-slate-100">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+      />
+      <span className="min-w-0 flex-1 truncate">출고일 미정</span>
+    </label>
+  )
+}
+
+/** '출고일 미정'이 켜졌을 때 날짜 입력창 자리를 대신하는 톤다운 표시 */
+export function UndecidedPlaceholder() {
+  return (
+    <div className="flex h-11 min-w-0 items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold leading-tight text-slate-400">
+      미정 · 장기 보관
+    </div>
+  )
+}
+
+/**
+ * 폼 하단 액션 바 — Modal 의 footer 슬롯에 넣는다.
+ * 버튼이 <form> 밖에 렌더되므로 submit 버튼은 form 속성으로 폼과 연결한다.
  */
 export function FormActions({
+  formId,
   onCancel,
   submitting,
   disabled,
   submitLabel,
   submittingLabel,
 }: {
+  formId: string
   onCancel: () => void
   submitting: boolean
   disabled?: boolean
@@ -114,7 +151,7 @@ export function FormActions({
   submittingLabel: string
 }) {
   return (
-    <div className="sticky bottom-0 z-10 -mx-5 mt-2 flex gap-2 border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur md:static md:mx-0 md:mt-0 md:justify-end md:border-0 md:bg-transparent md:px-0 md:py-0 md:pt-2 md:backdrop-blur-none">
+    <div className="flex gap-2 md:justify-end">
       <button
         type="button"
         onClick={onCancel}
@@ -124,34 +161,12 @@ export function FormActions({
       </button>
       <button
         type="submit"
+        form={formId}
         disabled={submitting || disabled}
         className="flex-1 rounded-xl bg-indigo-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99] disabled:opacity-60 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-indigo-700"
       >
         {submitting ? submittingLabel : submitLabel}
       </button>
     </div>
-  )
-}
-
-/**
- * [출고일 미정] 토글 — 장기 보관 계약처럼 종료일이 확정되지 않은 건을 표현한다.
- *
- * 체크하면 출고 예정일 입력창이 비워지고 잠긴다. 날짜를 지우는 것과 체크박스를
- * 켜는 것이 같은 뜻이 되도록(양방향 일치) 상위에서 상태를 하나로 묶어 쓴다.
- * 터치 타깃을 라벨 전체로 넓혀(44px 이상) 작은 네모를 정확히 찍지 않아도 켜진다.
- */
-export function UndecidedToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label className="mt-1.5 flex min-h-[44px] cursor-pointer select-none items-center gap-2 md:min-h-0">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-5 w-5 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 md:h-4 md:w-4"
-      />
-      <span className={cn('text-base font-medium md:text-sm', checked ? 'text-indigo-700' : 'text-slate-500')}>
-        출고일 미정 (장기 보관)
-      </span>
-    </label>
   )
 }
