@@ -178,7 +178,7 @@ export default function ScheduleCalendarPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5">
+    <div className="mx-auto max-w-7xl space-y-3 md:space-y-5">
       <div>
         <h2 className="text-xl font-bold text-slate-800">입출고 일정</h2>
       </div>
@@ -233,7 +233,7 @@ export default function ScheduleCalendarPage() {
       </div>
 
       {/* 본문: 달력 + 우측 패널 */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4 lg:gap-4">
         {/* 달력 */}
         <div className="lg:col-span-3">
           <div
@@ -357,8 +357,8 @@ export default function ScheduleCalendarPage() {
       {selectedDate && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-slate-900/30" onClick={() => setSelectedDate(null)} />
-          <div className="absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto rounded-t-2xl bg-white p-4 shadow-xl">
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200" />
+          <div className="absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto rounded-t-2xl bg-white p-3 shadow-xl">
+            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-slate-200" />
             <DetailPanel
               dateStr={selectedDate}
               events={selectedEvents}
@@ -398,7 +398,7 @@ function DetailPanel({
 }) {
   if (!dateStr) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center text-slate-400">
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center text-slate-400">
         <CalendarDays size={28} className="text-slate-300" />
         <p className="mt-3 text-sm font-medium text-slate-500">날짜를 선택하세요</p>
         <p className="mt-1 text-xs">그 날의 입출고·청구 일정과 액션이 표시됩니다.</p>
@@ -411,7 +411,7 @@ function DetailPanel({
 
   return (
     <div className={cn(!embedded && 'rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60')}>
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-slate-100 px-3.5 py-2.5">
         <div>
           <p className="text-sm font-semibold text-slate-800">{label}</p>
           <p className="text-xs text-slate-400">일정 {events.length}건</p>
@@ -424,9 +424,9 @@ function DetailPanel({
       </div>
 
       {events.length === 0 ? (
-        <p className="px-4 py-10 text-center text-sm text-slate-400">이 날 예정된 일정이 없습니다.</p>
+        <p className="px-4 py-8 text-center text-sm text-slate-400">이 날 예정된 일정이 없습니다.</p>
       ) : (
-        <div className="space-y-3 p-4">
+        <div className="space-y-2 p-3">
           {events.map((e) => (
             <EventCard key={`${e.type}-${e.id}`} event={e} isAdmin={isAdmin} onAction={onAction} navigate={navigate} />
           ))}
