@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type TouchEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
@@ -74,8 +75,10 @@ export default function Modal({
   }
 
   // ===== 모바일: 바텀 시트 =====
+  // body 로 포탈 — 페이지 내 overflow-y-auto 스크롤 컨테이너 안에 중첩되면 iOS Safari에서
+  // position:fixed 자식의 스택 순서가 하단 탭 바(별도 fixed 요소)보다 밀려 버튼이 가려진다.
   if (isMobile) {
-    return (
+    return createPortal(
       <div className="fixed inset-0 z-50 flex items-end">
         <div className="animate-scrim-in absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]" onClick={onClose} />
         <div
@@ -110,13 +113,14 @@ export default function Modal({
           {/* 내용 — 시트 내부만 스크롤, 하단 세이프 에어리어 존중 */}
           <div className="pb-safe min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 pb-5">{children}</div>
         </div>
-      </div>
+      </div>,
+      document.body,
     )
   }
 
   // ===== 데스크톱: 센터 다이얼로그 =====
   // 화면보다 큰 폼도 잘리지 않도록 최대 높이 제한 + 헤더 고정 + 본문만 스크롤.
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="animate-scrim-in absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={onClose} />
       <div className={`animate-dialog-in shadow-soft relative flex max-h-[90vh] w-full flex-col rounded-2xl bg-white ring-1 ring-slate-200/70 ${widthClass}`}>
@@ -132,6 +136,7 @@ export default function Modal({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

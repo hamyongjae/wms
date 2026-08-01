@@ -1030,7 +1030,7 @@ function EditOrderModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 시작일 *</label>
               <input
@@ -1044,7 +1044,7 @@ function EditOrderModal({
             <div>
               <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">출고 예정일</label>
               {/* 체크박스 전체 줄을 큼직한 독립 터치 레이어로 — 글자 어디를 눌러도 토글된다 */}
-              <label className="mb-2 flex w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-600 transition active:bg-slate-100">
+              <label className="mb-2 flex w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs font-semibold text-slate-600 transition active:bg-slate-100 sm:text-sm">
                 <input
                   type="checkbox"
                   checked={endDateUnknown}
@@ -1054,7 +1054,7 @@ function EditOrderModal({
                   }}
                   className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                출고일 미정 (장기 보관)
+                출고일 미정(장기 보관)
               </label>
               {endDateUnknown ? (
                 <div className="flex h-[46px] items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3.5 text-base font-semibold text-slate-400 md:h-[38px] md:text-sm">
@@ -1095,22 +1095,20 @@ function EditOrderModal({
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
               </div>
             </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
-                {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
-                <div className="flex h-[46px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-base font-semibold text-indigo-600 md:h-[38px] md:text-sm">
-                  {days != null ? `${days.toLocaleString()}일` : ''}
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
+              {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
+              <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                {days != null ? `${days.toLocaleString()}일` : ''}
               </div>
-              <div className="flex-1">
-                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
-                <div className="flex h-[46px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-base font-semibold text-indigo-600 md:h-[38px] md:text-sm">
-                  {dailyFee != null ? won(dailyFee) : ''}
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
+              <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
+              <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                {dailyFee != null ? won(dailyFee) : ''}
               </div>
+              <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -1465,7 +1463,7 @@ export function CreateOrderModal({
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관 시작일 *</label>
                 <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={inputCls} />
@@ -1473,7 +1471,7 @@ export function CreateOrderModal({
               <div>
                 <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">출고 예정일</label>
                 {/* 체크박스 전체 줄을 큼직한 독립 터치 레이어로 — 글자 어디를 눌러도 토글된다 */}
-                <label className="mb-2 flex w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-600 transition active:bg-slate-100">
+                <label className="mb-2 flex w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs font-semibold text-slate-600 transition active:bg-slate-100 sm:text-sm">
                   <input
                     type="checkbox"
                     checked={endDateUnknown}
@@ -1483,7 +1481,7 @@ export function CreateOrderModal({
                     }}
                     className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  출고일 미정 (장기 보관)
+                  출고일 미정(장기 보관)
                 </label>
                 {endDateUnknown ? (
                   <div className="flex h-[46px] items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3.5 text-base font-semibold text-slate-400 md:h-[38px] md:text-sm">
@@ -1524,23 +1522,21 @@ export function CreateOrderModal({
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">톤</span>
                 </div>
               </div>
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
-                  {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
-                  <div className="flex h-[46px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-base font-semibold text-indigo-600 md:h-[38px] md:text-sm">
-                    {days != null ? `${days.toLocaleString()}일` : ''}
-                  </div>
-                  <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">보관일수</label>
+                {/* 읽기 전용 — 보관 시작일·출고 예정일이 모두 유효할 때만 표시(당일 포함) */}
+                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                  {days != null ? `${days.toLocaleString()}일` : ''}
                 </div>
-                <div className="flex-1">
-                  <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
-                  {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
-                  <div className="flex h-[46px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-base font-semibold text-indigo-600 md:h-[38px] md:text-sm">
-                    {dailyFee != null ? won(dailyFee) : ''}
-                  </div>
-                  <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
+                <p className="mt-1 text-[11px] text-slate-400">보관 시작일 ~ 출고 예정일 (당일 포함)</p>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-base font-semibold text-slate-700 md:text-sm md:font-medium">하루 보관료</label>
+                {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
+                <div className="flex h-[38px] items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-indigo-600">
+                  {dailyFee != null ? won(dailyFee) : ''}
                 </div>
+                <p className="mt-1 text-[11px] text-slate-400">보관료 ÷ 보관일수 (당일 포함)</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
