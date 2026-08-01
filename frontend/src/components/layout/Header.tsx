@@ -8,14 +8,11 @@ import {
   Bell,
   LogOut,
   Loader2,
-  Palette,
-  Check,
 } from 'lucide-react'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { loadNotifications, type AppNotification } from '@/lib/notifications'
 import { useCompanyName } from '@/hooks/useCompanyName'
-import { THEMES, getTheme, applyTheme, type ThemeId } from '@/lib/theme'
 
 interface HeaderProps {
   collapsed: boolean
@@ -39,65 +36,9 @@ export default function Header({ collapsed, onToggle }: HeaderProps) {
 
       <div className="flex-1" />
 
-      <ThemePicker />
       <NotificationBell />
       <UserMenu />
     </header>
-  )
-}
-
-/* ===== 테마(포인트 컬러) 선택기 ===== */
-function ThemePicker() {
-  const [open, setOpen] = useState(false)
-  const [current, setCurrent] = useState<ThemeId>(() => getTheme())
-
-  function pick(id: ThemeId) {
-    applyTheme(id)
-    setCurrent(id)
-    setOpen(false)
-  }
-
-  const activeColor = THEMES.find((t) => t.id === current)?.color ?? '#0d8a89'
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        title="테마 색상 변경"
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-      >
-        <Palette size={18} />
-        <span
-          className="absolute bottom-1.5 right-1.5 h-2 w-2 rounded-full ring-1 ring-white"
-          style={{ backgroundColor: activeColor }}
-        />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-40 mt-1.5 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
-            <p className="px-2 py-1.5 text-xs font-medium text-slate-400">테마 색상</p>
-            {THEMES.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => pick(t.id)}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50"
-              >
-                <span
-                  className="h-5 w-5 shrink-0 rounded-full ring-1 ring-black/5"
-                  style={{ backgroundColor: t.color }}
-                />
-                <span className="flex-1">{t.label}</span>
-                {t.id === current && <Check size={15} className="text-slate-500" />}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
   )
 }
 
