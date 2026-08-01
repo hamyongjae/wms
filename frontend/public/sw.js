@@ -5,7 +5,7 @@
  * - 오프라인 시 페이지 이동은 캐시된 셸(index.html)로 폴백
  * 캐시 버전만 올리면(예: v1 -> v2) 새 배포가 반영된다.
  */
-const CACHE = 'wms-shell-v1'
+const CACHE = 'wms-shell-v2'
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (event) => {
