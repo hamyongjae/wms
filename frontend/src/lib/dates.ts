@@ -4,8 +4,16 @@
  * Date 객체 생성을 최소화하고 UTC 고정 연산으로 타임존 흔들림을 차단한다.
  */
 
-/** 오늘 날짜 (yyyy-MM-dd) */
-export const today = (): string => new Date().toISOString().slice(0, 10)
+/**
+ * 오늘 날짜 (yyyy-MM-dd, 로컬 타임존 기준).
+ * [버그 이력] toISOString()은 UTC로 변환한 뒤 자르므로, UTC+9(한국)에서는 자정~오전 9시 사이에
+ * 하루 전 날짜가 나오는 오프바이원 버그가 있었다(실측: 07:03에 출고일 기본값이 어제로 표시됨).
+ * 반드시 로컬 getFullYear/Month/Date로 조합해야 한다.
+ */
+export const today = (): string => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 /** 일수 더하기 (UTC 기준) */
 export function addDays(dateStr: string, days: number): string {

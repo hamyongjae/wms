@@ -5,7 +5,11 @@ import type { BillingLedger } from '@/api/billingApi'
  * 청구·정산 화면과 계약 정산 타임라인이 공용으로 사용.
  */
 
-export const todayStr = () => new Date().toISOString().slice(0, 10)
+/** [버그 이력] toISOString() 기반 UTC 변환은 UTC+9에서 자정~오전 9시에 하루 전으로 밀리는 오프바이원 버그가 있다. */
+export const todayStr = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 export const wonFmt = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 

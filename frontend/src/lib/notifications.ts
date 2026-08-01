@@ -11,7 +11,11 @@ export interface AppNotification {
   to?: string // 클릭 시 이동 경로
 }
 
-const today = () => new Date().toISOString().slice(0, 10)
+// [버그 이력] toISOString() 기반 UTC 변환은 UTC+9에서 자정~오전 9시에 하루 전으로 밀리는 오프바이원 버그가 있다.
+const today = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 // 상태 모델은 INBOUND/OUTBOUND 이진 — 예전 RECEIVED/IN_STORAGE 값은 폐기됨. 활성=아직 출고 안 됨(INBOUND).
 const isActive = (s: StorageOrder['status']) => s === 'INBOUND'
