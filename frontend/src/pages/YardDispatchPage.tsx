@@ -8,7 +8,6 @@ import {
   LogOut,
   ArrowRightLeft,
   Pencil,
-  PackagePlus,
   Boxes,
   Grid3x3,
   Square,
@@ -546,7 +545,10 @@ export default function YardDispatchPage() {
                       effectiveInactive={!effectiveActive(s)}
                       onClick={() => {
                         if (bulkMode) return handleBulkToggle(s)
-                        return s.occupied ? setActionSlot(s) : setEmptyActionSlot(s)
+                        if (s.occupied) return setActionSlot(s)
+                        // 빈 자리는 운영 중지 상태일 때만 옵션 시트(재사용 전환)를 거치고,
+                        // 정상 빈 자리는 옵션 없이 바로 계약 등록 팝업으로 직행한다.
+                        return s.active === false ? setEmptyActionSlot(s) : setInboundSlot(s)
                       }}
                       onDragStartCell={() => {
                         if (bulkMode) return
@@ -616,7 +618,9 @@ export default function YardDispatchPage() {
                               if (bulkMode) return handleBulkToggle(s)
                               if (s.occupied) return setActionSlot(s)
                               if (dragging) return handleDropMove(s)
-                              return setEmptyActionSlot(s)
+                              // 빈 자리는 운영 중지 상태일 때만 옵션 시트(재사용 전환)를 거치고,
+                              // 정상 빈 자리는 옵션 없이 바로 계약 등록 팝업으로 직행한다.
+                              return s.active === false ? setEmptyActionSlot(s) : setInboundSlot(s)
                             }}
                           />
                         ))}
@@ -653,53 +657,25 @@ export default function YardDispatchPage() {
         </>
       )}
 
-      {/* 빈 자리 옵션 시트 — 입고 배치 / 운영 상태(미사용) 전환 (모바일 바텀시트) */}
+      {/* 운영 중지(미사용) 빈 자리 전용 시트 — 정상 빈 자리는 옵션 없이 바로 계약 등록으로 직행하므로
+          이 시트는 재사용 전환 안내만 남는다 (모바일 바텀시트) */}
       {emptyActionSlot && (
         <Modal open onClose={() => setEmptyActionSlot(null)} title={`${emptyActionSlot.locationLabel} 자리`}>
           <div className="space-y-3">
-            {emptyActionSlot.active === false ? (
-              <>
-                <p className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-600">
-                  이 자리는 <b className="text-slate-800">미사용(운영 중지)</b> 상태예요. 입고 대상에서 제외됩니다.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const s = emptyActionSlot
-                    setEmptyActionSlot(null)
-                    handleToggleActive(s, true)
-                  }}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 text-lg font-bold text-white transition active:scale-[0.99]"
-                >
-                  다시 사용하기
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const s = emptyActionSlot
-                    setEmptyActionSlot(null)
-                    setInboundSlot(s)
-                  }}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-4 text-lg font-bold text-white transition active:scale-[0.99]"
-                >
-                  <PackagePlus size={20} /> 입고 배치
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const s = emptyActionSlot
-                    setEmptyActionSlot(null)
-                    handleToggleActive(s, false)
-                  }}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-slate-300 py-4 text-lg font-bold text-slate-700 transition active:scale-[0.99]"
-                >
-                  <Ban size={20} /> 운영 중지로 변경
-                </button>
-              </>
-            )}
+            <p className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-600">
+              이 자리는 <b className="text-slate-800">미사용(운영 중지)</b> 상태예요. 입고 대상에서 제외됩니다.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const s = emptyActionSlot
+                setEmptyActionSlot(null)
+                handleToggleActive(s, true)
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 text-lg font-bold text-white transition active:scale-[0.99]"
+            >
+              다시 사용하기
+            </button>
           </div>
         </Modal>
       )}
