@@ -21,6 +21,7 @@ import LocationPickerField from '@/components/yard/LocationPickerField'
 import PaymentAccountPicker from './PaymentAccountPicker'
 import {
   ContextBar,
+  DateField,
   Field,
   FieldGrid,
   FormActions,
@@ -286,10 +287,9 @@ export default function EditOrderModal({
 
         <FieldGrid>
           <GridField label="보관 시작일" required>
-            <input
-              type="date"
+            <DateField
               value={storageStartDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={setStartDate}
               required
               className={cn(gridInputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
             />
@@ -310,11 +310,10 @@ export default function EditOrderModal({
             {endDateUnknown ? (
               <UndecidedPlaceholder />
             ) : (
-              <input
-                type="date"
+              <DateField
                 value={expectedEndDate}
+                onChange={setEndDate}
                 min={storageStartDate || undefined}
-                onChange={(e) => setEndDate(e.target.value)}
                 className={cn(gridInputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
               />
             )}
@@ -386,7 +385,7 @@ export default function EditOrderModal({
         </FieldGrid>
         {/* 짝이 없는 단독 필드라 2열 그리드에 반쪽으로 남기지 않고 전체 폭으로 — 다른 단독 필드(메모 등)와 통일 */}
         <Field label="납기일">
-          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} />
+          <DateField value={dueDate} onChange={setDueDate} className={inputCls} />
         </Field>
 
         {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 */}

@@ -134,6 +134,51 @@ export function UndecidedToggle({ checked, onChange }: { checked: boolean; onCha
   )
 }
 
+/**
+ * [네이티브 date input 우회 렌더러]
+ *
+ * iOS(사파리·크롬iOS 공통 WebKit 엔진)의 빈 `<input type="date">`는 내부 위젯(달력 아이콘·
+ * 날짜 세그먼트)이 CSS로 지정한 박스 폭을 무시하고 옆 칸으로 삐져나오거나 오른쪽 화면 밖으로
+ * 넘치는 고질적인 렌더링 버그가 있다. width·gap·min-w-0을 아무리 조정해도 이 위젯 자체의
+ * 렌더링은 바뀌지 않는다(실측 확인됨).
+ *
+ * 그래서 네이티브 input은 완전히 투명하게 만들어 탭 영역으로만 쓰고(iOS 캘린더는 그대로 뜬다),
+ * 화면에 보이는 값은 우리가 직접 그린 텍스트로 대체한다 — 그러면 문제의 네이티브 위젯이
+ * 애초에 화면에 그려지지 않으므로 겹침·넘침이 구조적으로 발생할 수 없다.
+ */
+export function DateField({
+  value,
+  onChange,
+  min,
+  max,
+  required,
+  className,
+  placeholder = '날짜 선택',
+}: {
+  value: string
+  onChange: (v: string) => void
+  min?: string
+  max?: string
+  required?: boolean
+  className?: string
+  placeholder?: string
+}) {
+  return (
+    <div className={cn(className, 'relative flex items-center')}>
+      <span className={value ? undefined : 'text-slate-400'}>{value ? value.replaceAll('-', '.') : placeholder}</span>
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        min={min}
+        max={max}
+        required={required}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      />
+    </div>
+  )
+}
+
 /** '출고일 미정'이 켜졌을 때 날짜 입력창 자리를 대신하는 톤다운 표시 */
 export function UndecidedPlaceholder() {
   return (

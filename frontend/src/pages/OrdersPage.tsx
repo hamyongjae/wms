@@ -26,6 +26,7 @@ import EditOrderModal from '@/components/order/EditOrderModal'
 import PaymentAccountPicker from '@/components/order/PaymentAccountPicker'
 import { placeContainerAtSlot } from '@/lib/containerPlacement'
 import {
+  DateField,
   Field,
   FieldGrid,
   FormActions,
@@ -1139,7 +1140,7 @@ export function CreateOrderModal({
 
             <FieldGrid>
               <GridField label="보관 시작일" required>
-                <input type="date" value={storageStartDate} onChange={(e) => setStartDate(e.target.value)} required className={gridInputCls} />
+                <DateField value={storageStartDate} onChange={setStartDate} required className={gridInputCls} />
               </GridField>
               {/* '미정' 스위치는 라벨 줄 오른쪽에 — 입력창 높이를 다른 칸과 같게 유지한다 */}
               <GridField
@@ -1157,11 +1158,10 @@ export function CreateOrderModal({
                 {endDateUnknown ? (
                   <UndecidedPlaceholder />
                 ) : (
-                  <input
-                    type="date"
+                  <DateField
                     value={expectedEndDate}
+                    onChange={setEndDate}
                     min={storageStartDate || undefined}
-                    onChange={(e) => setEndDate(e.target.value)}
                     className={cn(gridInputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
                   />
                 )}
@@ -1215,7 +1215,7 @@ export function CreateOrderModal({
             </FieldGrid>
             {/* 짝이 없는 단독 필드라 2열 그리드에 반쪽으로 남기지 않고 전체 폭으로 — 다른 단독 필드(메모 등)와 통일 */}
             <Field label="납기일">
-              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} />
+              <DateField value={dueDate} onChange={setDueDate} className={inputCls} />
             </Field>
             {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 */}
             {paymentMethod === 'BANK_TRANSFER' && (
