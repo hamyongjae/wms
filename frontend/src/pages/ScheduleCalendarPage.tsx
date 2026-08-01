@@ -13,6 +13,8 @@ import {
   Plus,
   Pencil,
   Trash2,
+  LogOut,
+  Wallet,
 } from 'lucide-react'
 import {
   getMonthEvents,
@@ -26,7 +28,7 @@ import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { orderSync } from '@/lib/orderEvents'
-import { CreateOrderModal } from './OrdersPage'
+import { CreateOrderModal, StatusChangeModal, OrderBillingModal } from './OrdersPage'
 import EditOrderModal from '@/components/order/EditOrderModal'
 import Modal from '@/components/ui/Modal'
 
@@ -132,13 +134,15 @@ export default function ScheduleCalendarPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
 
-  // [계약 등록/수정] 계약관리에서 쓰는 팝업을 그대로 재사용한다.
+  // [계약 등록/수정/출고/정산] 계약관리에서 쓰는 팝업을 그대로 재사용한다.
   const [customers, setCustomers] = useState<Customer[]>([])
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [createOpen, setCreateOpen] = useState(false)
   const [createDate, setCreateDate] = useState<string | undefined>(undefined)
-  const [editTarget, setEditTarget] = useState<StorageOrder | null>(null)
-  const [editLoadingId, setEditLoadingId] = useState<number | null>(null)
+  const [statusTarget, setStatusTarget] = useState<StorageOrder | null>(null) // 출고(정상/중도 선택)
+  const [billingTarget, setBillingTarget] = useState<StorageOrder | null>(null) // 정산
+  const [editTarget, setEditTarget] = useState<StorageOrder | null>(null) // 수정
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null)
 
   useEffect(() => {
     customerApi.list().then(setCustomers).catch(() => setCustomers([]))
@@ -150,17 +154,19 @@ export default function ScheduleCalendarPage() {
     setCreateOpen(true)
   }
 
-  // [상세 조회 후 수정 팝업] 캘린더 이벤트는 요약 정보뿐이라, 계약관리와 동일한 수정 폼을
+  // [상세 조회 후 출고/정산/수정 팝업] 캘린더 이벤트는 요약 정보뿐이라, 계약관리와 동일한 폼을
   //   그대로 쓰려면 그 계약의 전체 정보를 한 번 불러와야 한다.
-  async function openEdit(orderId: number) {
-    setEditLoadingId(orderId)
+  async function openOrderAction(orderId: number, action: 'outbound' | 'billing' | 'edit') {
+    setActionLoadingId(orderId)
     try {
       const order = await orderApi.get(orderId)
-      setEditTarget(order)
+      if (action === 'outbound') setStatusTarget(order)
+      else if (action === 'billing') setBillingTarget(order)
+      else setEditTarget(order)
     } catch (err) {
       setNotice(isAxiosError(err) ? (err.response?.data?.message ?? '계약 정보를 불러오지 못했습니다.') : '계약 정보를 불러오지 못했습니다.')
     } finally {
-      setEditLoadingId(null)
+      setActionLoadingId(null)
     }
   }
 
@@ -419,9 +425,11 @@ export default function ScheduleCalendarPage() {
             }}
             navigate={navigate}
             onCreate={openCreateFor}
-            onEdit={openEdit}
+            onOutbound={(id) => openOrderAction(id, 'outbound')}
+            onBilling={(id) => openOrderAction(id, 'billing')}
+            onEdit={(id) => openOrderAction(id, 'edit')}
             onDelete={deleteEvent}
-            editLoadingId={editLoadingId}
+            actionLoadingId={actionLoadingId}
           />
         </div>
       </div>
@@ -457,9 +465,11 @@ export default function ScheduleCalendarPage() {
             }}
             navigate={navigate}
             onCreate={openCreateFor}
-            onEdit={openEdit}
+            onOutbound={(id) => openOrderAction(id, 'outbound')}
+            onBilling={(id) => openOrderAction(id, 'billing')}
+            onEdit={(id) => openOrderAction(id, 'edit')}
             onDelete={deleteEvent}
-            editLoadingId={editLoadingId}
+            actionLoadingId={actionLoadingId}
             bare
           />
         </Modal>
@@ -491,6 +501,21 @@ export default function ScheduleCalendarPage() {
         }}
       />
 
+      {/* [출고 처리] 이벤트 카드의 '출고'에서 전체 정보를 불러온 뒤, 계약관리와 동일한 정상/중도 선택 팝업을 연다 */}
+      <StatusChangeModal
+        target={statusTarget}
+        onClose={() => setStatusTarget(null)}
+        onDone={(updated) => {
+          setStatusTarget(null)
+          setNotice(`${updated.customerName} 출고 처리 완료`)
+          setRefreshKey((k) => k + 1)
+          orderSync.emit()
+        }}
+      />
+
+      {/* [정산 보기] 이벤트 카드의 '정산'에서 전체 정보를 불러온 뒤 연다 */}
+      <OrderBillingModal target={billingTarget} isAdmin={isAdmin} onClose={() => setBillingTarget(null)} />
+
       {/* [계약 수정] 이벤트 카드의 '수정'에서 전체 정보를 불러온 뒤 연다 */}
       <EditOrderModal
         target={editTarget}
@@ -515,9 +540,11 @@ function DetailPanel({
   onAction,
   navigate,
   onCreate,
+  onOutbound,
+  onBilling,
   onEdit,
   onDelete,
-  editLoadingId,
+  actionLoadingId,
   bare,
 }: {
   dateStr: string | null
@@ -528,9 +555,11 @@ function DetailPanel({
   onAction: (msg: string) => void
   navigate: (to: string) => void
   onCreate: (dateStr: string) => void
+  onOutbound: (orderId: number) => void
+  onBilling: (orderId: number) => void
   onEdit: (orderId: number) => void
   onDelete: (event: CalendarEvent) => void
-  editLoadingId: number | null
+  actionLoadingId: number | null
   /** Modal 안(모바일 바텀시트)에서 쓸 때 — Modal이 이미 제목·닫기 버튼을 그려주므로
    *  이 컴포넌트는 상단 바 없이 이벤트 목록만 그린다(제목 중복 방지). */
   bare?: boolean
@@ -557,9 +586,11 @@ function DetailPanel({
             isAdmin={isAdmin}
             onAction={onAction}
             navigate={navigate}
+            onOutbound={onOutbound}
+            onBilling={onBilling}
             onEdit={onEdit}
             onDelete={onDelete}
-            editLoading={editLoadingId === e.id}
+            actionLoading={actionLoadingId === e.id}
           />
         ))}
       </div>
@@ -603,17 +634,21 @@ function EventCard({
   isAdmin,
   onAction,
   navigate,
+  onOutbound,
+  onBilling,
   onEdit,
   onDelete,
-  editLoading,
+  actionLoading,
 }: {
   event: CalendarEvent
   isAdmin: boolean
   onAction: (msg: string) => void
   navigate: (to: string) => void
+  onOutbound: (orderId: number) => void
+  onBilling: (orderId: number) => void
   onEdit: (orderId: number) => void
   onDelete: (event: CalendarEvent) => void
-  editLoading: boolean
+  actionLoading: boolean
 }) {
   const [busy, setBusy] = useState(false)
   const meta = TYPE_META[event.type]
@@ -699,12 +734,21 @@ function EventCard({
         </div>
       </div>
 
-      {/* 유형별 퀵 액션 */}
+      {/* 유형별 퀵 액션 — 순서: 출고, 정산, 수정, 삭제 (컨테이너관리 액션 패널과 통일) */}
       <div className="mt-3 flex flex-wrap gap-1.5">
         {(event.type === 'INBOUND' || event.type === 'OUTBOUND') && (
           <>
-            <QuickBtn onClick={() => onEdit(event.id)} disabled={editLoading} icon={<Pencil size={13} />}>
-              {editLoading ? '불러오는 중…' : '수정'}
+            {/* 이미 실제 출고 완료된 계약은 다시 출고 처리할 필요가 없다 */}
+            {event.status !== 'COMPLETED' && (
+              <QuickBtn onClick={() => onOutbound(event.id)} disabled={actionLoading} icon={<LogOut size={13} />} tone="amber">
+                출고
+              </QuickBtn>
+            )}
+            <QuickBtn onClick={() => onBilling(event.id)} disabled={actionLoading} icon={<Wallet size={13} />} tone="emerald">
+              정산
+            </QuickBtn>
+            <QuickBtn onClick={() => onEdit(event.id)} disabled={actionLoading} icon={<Pencil size={13} />}>
+              수정
             </QuickBtn>
             {isAdmin && (
               <QuickBtn onClick={() => onDelete(event)} icon={<Trash2 size={13} />} tone="red">
@@ -712,11 +756,6 @@ function EventCard({
               </QuickBtn>
             )}
           </>
-        )}
-        {event.type === 'OUTBOUND' && (
-          <QuickBtn onClick={() => navigate('/billing')} icon={<ArrowRightLeft size={13} />}>
-            중도 출고 정산
-          </QuickBtn>
         )}
         {event.type === 'BILLING' && (
           <>
@@ -754,14 +793,16 @@ function QuickBtn({
   icon: ReactNode
   children: ReactNode
   disabled?: boolean
-  tone?: 'slate' | 'emerald' | 'red'
+  tone?: 'slate' | 'emerald' | 'red' | 'amber'
 }) {
   const cls =
     tone === 'emerald'
       ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
       : tone === 'red'
         ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-        : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+        : tone === 'amber'
+          ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+          : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
   return (
     <button
       type="button"
