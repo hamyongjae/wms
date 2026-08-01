@@ -784,15 +784,24 @@ function MobileSlotTile({
       )}
     >
       {slot.occupied ? (
-        <span className="text-lg font-extrabold leading-none tabular-nums">{container?.containerNo ?? slot.columnNo}</span>
+        <>
+          <span className="text-[11px] font-bold leading-none opacity-80 tabular-nums">{slot.columnNo}번</span>
+          <span className="mt-0.5 max-w-full truncate px-1 text-sm font-extrabold leading-tight">
+            {extractOwner(container?.memo) ?? container?.containerNo ?? '—'}
+          </span>
+          {maint && <span className="text-[9px] font-bold leading-none opacity-80">점검</span>}
+        </>
       ) : inactive ? (
-        <Ban size={20} />
+        <>
+          <Ban size={20} />
+          <span className="text-[10px] font-bold leading-none opacity-80">중지</span>
+        </>
       ) : (
-        <span className="text-lg font-extrabold leading-none tabular-nums">{slot.columnNo}</span>
+        <>
+          <span className="text-lg font-extrabold leading-none tabular-nums">{slot.columnNo}</span>
+          <span className="text-[10px] font-bold leading-none opacity-80">{dropTarget ? '이동' : '공실'}</span>
+        </>
       )}
-      <span className="text-[10px] font-bold leading-none opacity-80">
-        {slot.occupied ? (maint ? '점검' : '사용중') : inactive ? '중지' : dropTarget ? '이동' : '공실'}
-      </span>
     </button>
   )
 }
