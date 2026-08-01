@@ -770,7 +770,7 @@ function MobileSlotTile({
             : `${slot.locationLabel} · 빈 자리`
       }
       className={cn(
-        'flex aspect-square flex-col items-center justify-center gap-0.5 rounded-2xl border-2 text-center transition active:scale-95 disabled:opacity-40',
+        'relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-2xl border-2 text-center transition active:scale-95 disabled:opacity-40',
         slot.occupied
           ? maint
             ? 'border-amber-600 bg-amber-500 text-white shadow-sm'
@@ -785,11 +785,17 @@ function MobileSlotTile({
     >
       {slot.occupied ? (
         <>
-          <span className="text-[11px] font-bold leading-none opacity-80 tabular-nums">{slot.columnNo}번</span>
-          <span className="mt-0.5 max-w-full truncate px-1 text-sm font-extrabold leading-tight">
+          {/* 자리 번호는 화주명 길이와 무관하게 항상 같은 자리(상단 고정)에 표시 */}
+          <span className="absolute inset-x-0 top-1.5 text-center text-[11px] font-bold leading-none opacity-80 tabular-nums">
+            {slot.columnNo}번
+          </span>
+          {/* 화주명 — 길어도 자르지 않고 2줄까지 줄바꿈 */}
+          <span className="line-clamp-2 max-w-full break-words px-1.5 text-center text-xs font-extrabold leading-tight">
             {extractOwner(container?.memo) ?? container?.containerNo ?? '—'}
           </span>
-          {maint && <span className="text-[9px] font-bold leading-none opacity-80">점검</span>}
+          {maint && (
+            <span className="absolute inset-x-0 bottom-1 text-center text-[9px] font-bold leading-none opacity-80">점검</span>
+          )}
         </>
       ) : inactive ? (
         <>
