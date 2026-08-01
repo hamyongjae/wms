@@ -99,7 +99,7 @@ function MobileBtn({ label, onClick, tone = 'default' }: { label: string; onClic
       type="button"
       onClick={onClick}
       className={cn(
-        'rounded-2xl py-3.5 text-base font-bold transition active:scale-[0.99]',
+        'rounded-2xl py-3 text-base font-bold transition active:scale-[0.99]',
         tone === 'danger'
           ? 'bg-red-50 text-red-600 active:bg-red-100'
           : 'bg-slate-100 text-slate-700 active:bg-slate-200',
@@ -278,11 +278,11 @@ export default function OrdersPage() {
   )
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-3 md:space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">계약 관리</h2>
-          <p className="mt-1 text-sm text-slate-500">보관 계약을 등록하고 입고·출고 일정을 관리합니다.</p>
+          <p className="mt-0.5 text-sm text-slate-500">보관 계약을 등록하고 입고·출고 일정을 관리합니다.</p>
         </div>
         {/* 데스크톱: 상단 버튼 / 모바일: 하단 FAB(엄지 존)이 대신한다 */}
         <button
@@ -298,7 +298,7 @@ export default function OrdersPage() {
       <Fab actions={[{ label: '계약 등록', icon: Plus, onClick: () => setCreateOpen(true) }]} />
 
       {/* 조회 기간 — 상태 필터(전체·입고·출고) + 사용자 지정 기간(기본: 오늘로부터 한 달) */}
-      <div className="rounded-2xl bg-white p-3 shadow-soft ring-1 ring-slate-200/60">
+      <div className="rounded-2xl bg-white p-2.5 shadow-soft ring-1 ring-slate-200/60">
         {/* 데스크톱: 작은 필터 칩 */}
         <div className="hidden flex-wrap items-center gap-1.5 md:flex">
           {FILTERS.map((f) => {
@@ -347,7 +347,7 @@ export default function OrdersPage() {
           })}
         </div>
 
-        <div className="mt-2.5 flex items-center gap-2">
+        <div className="mt-2 flex items-center gap-2">
           <input
             type="date"
             value={range.from}
@@ -388,7 +388,7 @@ export default function OrdersPage() {
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center gap-2 py-20 text-slate-400">
+        <div className="flex items-center justify-center gap-2 py-12 text-slate-400">
           <Loader2 className="animate-spin" size={18} />
           <span className="text-sm">불러오는 중…</span>
         </div>
@@ -399,7 +399,7 @@ export default function OrdersPage() {
       )}
 
       {!loading && !error && visible.length === 0 && (
-        <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-10 py-16 text-center">
+        <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-10 py-10 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
             <FileText size={22} />
           </div>
@@ -452,13 +452,13 @@ export default function OrdersPage() {
 
       {/* ===== 모바일: 큰 요약 카드 + 원터치 액션 (md 미만) ===== */}
       {!loading && !error && visible.length > 0 && (
-        <div className="space-y-3 md:hidden">
+        <div className="space-y-2 md:hidden">
           {visible.map((o) => {
             // [방어적 표시] 출고 예정일이 지났는데 아직 보관 중 → '출고 지연' 경고
             const delayed = o.status === 'INBOUND' && o.expectedEndDate != null && o.expectedEndDate < today()
             const locs = locationsByOrder.get(o.id) ?? []
             return (
-              <div key={o.id} className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-200/60">
+              <div key={o.id} className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-200/60">
                 {/* 헤더: 고객 + 상태 */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -476,7 +476,7 @@ export default function OrdersPage() {
                 </div>
 
                 {/* 핵심 정보 */}
-                <div className="mt-4 space-y-2.5">
+                <div className="mt-3 space-y-2">
                   <InfoRow label="보관료" value={won(o.monthlyFee)} strong />
                   <InfoRow
                     label="보관기간"
@@ -489,12 +489,12 @@ export default function OrdersPage() {
                 </div>
 
                 {/* 원터치 액션 */}
-                <div className="mt-4 space-y-2">
+                <div className="mt-3 space-y-1.5">
                   {o.status === 'INBOUND' ? (
                     <button
                       type="button"
                       onClick={() => setStatusTarget(o)}
-                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 py-4 text-lg font-bold text-white shadow-sm transition active:scale-[0.99]"
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 py-3.5 text-lg font-bold text-white shadow-sm transition active:scale-[0.99]"
                     >
                       <Truck size={20} /> 출고 처리
                     </button>
@@ -502,7 +502,7 @@ export default function OrdersPage() {
                     <button
                       type="button"
                       onClick={() => setBillingTarget(o)}
-                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 text-lg font-bold text-white shadow-sm transition active:scale-[0.99]"
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-3.5 text-lg font-bold text-white shadow-sm transition active:scale-[0.99]"
                     >
                       <Wallet size={20} /> 정산 보기
                     </button>

@@ -209,11 +209,11 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-3 md:space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">정산 관리</h2>
-          <p className="mt-1 text-sm text-slate-500">보관료 청구 원장과 수금·조정·미수금 이월을 관리합니다.</p>
+          <p className="mt-0.5 text-sm text-slate-500">보관료 청구 원장과 수금·조정·미수금 이월을 관리합니다.</p>
         </div>
       </div>
 
@@ -227,16 +227,16 @@ export default function BillingPage() {
       )}
 
       {/* [기간 필터] 진입 즉시 당월. 월 이동(연·월 동시) + 사용자 지정 기간 — 변경 시 카드·표 동시 갱신 */}
-      <div className="flex flex-col gap-3 rounded-2xl bg-white p-3.5 shadow-soft ring-1 ring-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 rounded-2xl bg-white p-2.5 shadow-soft ring-1 ring-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center justify-between gap-2 sm:justify-start">
-          <button type="button" onClick={() => moveMonth(-1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 md:h-8 md:w-8" title="이전 달">
+          <button type="button" onClick={() => moveMonth(-1)} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 md:h-8 md:w-8" title="이전 달">
             <ChevronLeft size={18} />
           </button>
           <span className="min-w-28 text-center text-base font-bold text-slate-800 md:min-w-24 md:text-sm md:font-semibold">{cursor.year}년 {cursor.month1}월</span>
-          <button type="button" onClick={() => moveMonth(1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 md:h-8 md:w-8" title="다음 달">
+          <button type="button" onClick={() => moveMonth(1)} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 md:h-8 md:w-8" title="다음 달">
             <ChevronRight size={18} />
           </button>
-          <button type="button" onClick={goThisMonth} className="ml-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 md:px-2.5 md:py-1.5 md:text-xs md:font-medium">
+          <button type="button" onClick={goThisMonth} className="ml-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 md:px-2.5 md:py-1.5 md:text-xs md:font-medium">
             이번 달
           </button>
         </div>
@@ -260,7 +260,7 @@ export default function BillingPage() {
       </div>
 
       {/* 모바일: 가로형 요약 2×2 (큰 숫자·경고 색상) */}
-      <div className="grid grid-cols-2 gap-2.5 md:hidden">
+      <div className="grid grid-cols-2 gap-2 md:hidden">
         <BillStat label="누적 수금액" value={won(kpi.collected)} tone="emerald" />
         <BillStat label="정산 건수" value={`${kpi.count}건`} tone="slate" />
         <BillStat label="미수금 총액" value={won(kpi.outstanding)} tone="amber" alert={kpi.outstanding > 0} />
@@ -307,7 +307,7 @@ export default function BillingPage() {
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center gap-2 py-20 text-slate-400">
+        <div className="flex items-center justify-center gap-2 py-12 text-slate-400">
           <Loader2 className="animate-spin" size={18} />
           <span className="text-sm">불러오는 중…</span>
         </div>
@@ -318,7 +318,7 @@ export default function BillingPage() {
       )}
 
       {!loading && !error && visible.length === 0 && (
-        <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-10 py-16 text-center">
+        <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-10 py-10 text-center">
           <p className="text-base font-semibold text-slate-700">청구 원장이 없습니다</p>
           <p className="mt-1 text-sm text-slate-400">계약이 등록되면 스케줄러가 자동으로 원장을 생성합니다.</p>
         </div>
@@ -368,7 +368,7 @@ export default function BillingPage() {
 
       {/* ===== 모바일: 정산 내역 카드 (md 미만) — 탭하면 상세, 카드 내 원터치 처리 ===== */}
       {!loading && !error && visible.length > 0 && (
-        <div className="space-y-3 md:hidden">
+        <div className="space-y-2 md:hidden">
           {visible.map((l) => {
             const overdue = isOverdue(l)
             const outstanding = l.outstanding ?? Math.max(l.balance, 0)
@@ -387,7 +387,7 @@ export default function BillingPage() {
                     : 'text-slate-400'
             return (
               <div key={l.id} className="overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60">
-                <button type="button" onClick={() => setSelectedId(l.id)} className="w-full p-4 text-left transition active:bg-slate-50">
+                <button type="button" onClick={() => setSelectedId(l.id)} className="w-full p-3.5 text-left transition active:bg-slate-50">
                   <div className="flex items-center justify-between gap-2">
                     <p className="truncate text-lg font-bold text-slate-800">{l.customerName}</p>
                     <div className="flex shrink-0 items-center gap-1.5">
@@ -396,7 +396,7 @@ export default function BillingPage() {
                     </div>
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">{l.periodStart} ~ {l.periodEnd}</p>
-                  <div className="mt-3 flex items-end justify-between gap-3">
+                  <div className="mt-2 flex items-end justify-between gap-3">
                     <div>
                       <p className="text-xs font-medium text-slate-400">보관료</p>
                       <p className="mt-0.5 text-base font-semibold text-slate-700">{won(totalDue(l))}</p>
@@ -417,12 +417,12 @@ export default function BillingPage() {
 
                 {/* 원터치 처리 버튼 */}
                 {(canCollect || (canRefund && isAdmin)) && (
-                  <div className="space-y-2 border-t border-slate-100 p-2.5">
+                  <div className="space-y-1.5 border-t border-slate-100 p-2">
                     {canCollect && (
                       <button
                         type="button"
                         onClick={() => handleQuickCollect(l)}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99]"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-base font-bold text-white transition active:scale-[0.99]"
                       >
                         <HandCoins size={18} /> 전액 수금 · {won(outstanding)}
                       </button>
@@ -431,7 +431,7 @@ export default function BillingPage() {
                       <button
                         type="button"
                         onClick={() => handleQuickRefund(l)}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99]"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-base font-bold text-white transition active:scale-[0.99]"
                       >
                         <BadgeCheck size={18} /> 환불 완료
                       </button>
@@ -920,9 +920,9 @@ function BillStat({ label, value, tone, alert }: { label: string; value: string;
           ? alert ? 'text-red-600' : 'text-slate-400'
           : 'text-slate-800'
   return (
-    <div className="rounded-2xl bg-white p-3.5 shadow-soft ring-1 ring-slate-200/60">
+    <div className="rounded-2xl bg-white p-2.5 shadow-soft ring-1 ring-slate-200/60">
       <p className="text-xs font-semibold text-slate-500">{label}</p>
-      <p className={cn('mt-1 text-xl font-extrabold leading-tight', numCls)}>{value}</p>
+      <p className={cn('mt-0.5 text-xl font-extrabold leading-tight', numCls)}>{value}</p>
     </div>
   )
 }

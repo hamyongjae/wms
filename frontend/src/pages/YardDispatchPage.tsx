@@ -350,11 +350,11 @@ export default function YardDispatchPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+    <div className="mx-auto max-w-6xl space-y-3 md:space-y-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">컨테이너 관리</h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-0.5 text-sm text-slate-500">
             {bulkMode ? '빈 자리를 눌러 미사용 지정을 켜고 끄세요. 다 고르면 저장을 누르세요.' : '격자를 클릭해 그 자리에서 입고·출고·이동을 즉시 처리합니다.'}
           </p>
         </div>
@@ -413,7 +413,7 @@ export default function YardDispatchPage() {
       )}
 
       {/* 창고 탭 + 검색 */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2">
           {warehouses.map((w) => (
             <button
@@ -470,7 +470,7 @@ export default function YardDispatchPage() {
       )}
 
       {loading && (
-        <div className="flex items-center justify-center gap-2 py-20 text-slate-400">
+        <div className="flex items-center justify-center gap-2 py-12 text-slate-400">
           <Loader2 className="animate-spin" size={18} />
           <span className="text-sm">불러오는 중…</span>
         </div>
@@ -481,7 +481,7 @@ export default function YardDispatchPage() {
       )}
 
       {!loading && !error && slots.length === 0 && (
-        <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+        <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
           <Grid3x3 size={28} className="text-slate-300" />
           <p className="mt-3 text-lg font-bold text-slate-700">아직 컨테이너 자리가 없습니다</p>
           {isAdmin && selectedId != null ? (
@@ -522,11 +522,11 @@ export default function YardDispatchPage() {
 
           <section
             className={cn(
-              'rounded-2xl bg-white p-4 shadow-soft ring-1 sm:p-6 transition-shadow',
+              'rounded-2xl bg-white p-3 shadow-soft ring-1 sm:p-6 transition-shadow',
               bulkMode ? 'ring-2 ring-red-300' : 'ring-slate-200/60',
             )}
           >
-            <div className="mb-4 flex items-center justify-end">
+            <div className="mb-2 flex items-center justify-end">
               <Legend />
             </div>
 
@@ -569,7 +569,7 @@ export default function YardDispatchPage() {
               if (isMobile) {
                 const activeFloor = floors.find((f) => f.tier === selectedTier) ?? floors[0]
                 return (
-                  <div className="space-y-4">
+                  <div className="space-y-2.5">
                     {/* 이동 모드 안내 */}
                     {dragging && (
                       <div className="flex items-center justify-between gap-2 rounded-xl bg-amber-100 px-4 py-3 text-sm font-bold text-amber-800">
@@ -589,7 +589,7 @@ export default function YardDispatchPage() {
                             type="button"
                             onClick={() => setSelectedTier(f.tier)}
                             className={cn(
-                              'flex min-w-[4.5rem] flex-1 flex-col items-center rounded-2xl py-2.5 transition active:scale-[0.98]',
+                              'flex min-w-[4.5rem] flex-1 flex-col items-center rounded-2xl py-2 transition active:scale-[0.98]',
                               active ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 ring-1 ring-slate-200',
                             )}
                           >
@@ -1327,9 +1327,9 @@ function FloorPriceInline({
 /* 모바일 가로 요약 카드 — 큰 숫자 + 작은 라벨 */
 function YardStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl bg-white p-3 text-center shadow-soft ring-1 ring-slate-200/60">
+    <div className="rounded-2xl bg-white p-2.5 text-center shadow-soft ring-1 ring-slate-200/60">
       <p className="text-3xl font-extrabold leading-none text-slate-900">{fmt(value)}</p>
-      <p className="mt-1.5 text-xs font-semibold text-slate-500">{label}</p>
+      <p className="mt-1 text-xs font-semibold text-slate-500">{label}</p>
     </div>
   )
 }
