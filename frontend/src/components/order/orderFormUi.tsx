@@ -166,6 +166,7 @@ export function CalendarField({
   max,
   className,
   placeholder = '날짜 선택',
+  format = (iso) => iso.replaceAll('-', '.'),
 }: {
   value: string
   onChange: (v: string) => void
@@ -173,6 +174,8 @@ export function CalendarField({
   max?: string
   className?: string
   placeholder?: string
+  /** 값 표시 형식(기본: 2026.08.02). 화면마다 다른 표기가 필요하면 넘긴다. */
+  format?: (iso: string) => string
 }) {
   const [open, setOpen] = useState(false)
   const now = new Date()
@@ -203,7 +206,7 @@ export function CalendarField({
         onClick={openPicker}
         className={cn(className, 'flex items-center text-left', !value && 'text-slate-400')}
       >
-        {value ? value.replaceAll('-', '.') : placeholder}
+        {value ? format(value) : placeholder}
       </button>
 
       {open && (

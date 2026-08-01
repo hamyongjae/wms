@@ -71,6 +71,11 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 // 모바일 카드용 짧은 날짜(MM.DD) — 큰 글씨에서도 줄바꿈 없이 들어가도록
 const md = (s?: string | null) => (s ? s.slice(5).replace('-', '.') : '미정')
+// 조회 기간 검색창 표기용 — "2026년 01월 01일"
+const ymdKorean = (iso: string) => {
+  const [y, m, d] = iso.split('-')
+  return `${y}년 ${m}월 ${d}일`
+}
 
 const ymd = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -365,19 +370,19 @@ export default function OrdersPage() {
         </div>
 
         <div className="mt-2 flex items-center gap-2">
-          <input
-            type="date"
+          <CalendarField
             value={range.from}
+            onChange={(v) => setRange((r) => ({ ...r, from: v }))}
             max={range.to || undefined}
-            onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
+            format={ymdKorean}
             className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:flex-none"
           />
           <span className="shrink-0 text-slate-400">~</span>
-          <input
-            type="date"
+          <CalendarField
             value={range.to}
+            onChange={(v) => setRange((r) => ({ ...r, to: v }))}
             min={range.from || undefined}
-            onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
+            format={ymdKorean}
             className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:flex-none"
           />
         </div>
