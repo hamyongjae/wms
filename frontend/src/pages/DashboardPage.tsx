@@ -11,6 +11,7 @@ import {
   CalendarClock,
   CalendarDays,
   Warehouse,
+  ChevronLeft,
   ChevronRight,
   Loader2,
   type LucideIcon,
@@ -187,23 +188,8 @@ export default function DashboardPage() {
     )
     const remaining = Math.max(stats.totalSlots - stats.occupiedSlots, 0)
 
-    // 이번 달 달력 이벤트 (일자 → 입고/출고 건수)
-    const cal = new Map<number, { in: number; out: number }>()
-    const add = (ds: string | null | undefined, key: 'in' | 'out') => {
-      if (!ds) return
-      const [y, m, d] = ds.split('-').map(Number)
-      if (y === yy && m === mm) {
-        const e = cal.get(d) ?? { in: 0, out: 0 }
-        e[key] += 1
-        cal.set(d, e)
-      }
-    }
-    for (const o of orders) {
-      add(o.storageStartDate, 'in')
-      add(o.actualEndDate ?? o.expectedEndDate, 'out')
-    }
-
-    return { year: yy, month: mm, todayDay: dd, delayedOut, remaining, cal }
+    // 달력 이벤트는 '보고 있는 달'이 바뀔 때마다 달라지므로 MobileScheduleCard 내부에서 계산한다.
+    return { year: yy, month: mm, todayDay: dd, delayedOut, remaining }
   }, [orders, stats])
 
   // 상단 긴급 배너에 띄울 항목(연체·출고 지연)
@@ -303,7 +289,6 @@ export default function DashboardPage() {
               year={mobile.year}
               month={mobile.month}
               todayDay={mobile.todayDay}
-              events={mobile.cal}
             />
 
           </>
@@ -478,20 +463,63 @@ function MobileScheduleCard({
   year,
   month,
   todayDay,
-  events,
 }: {
   orders: StorageOrder[]
+  /** 오늘 기준 연/월/일 — 달력의 '이번 달' 기준점이자 오늘 강조 표시의 기준 */
   year: number
   month: number
   todayDay: number
-  events: Map<number, { in: number; out: number }>
 }) {
+  // [월 이동] 보고 있는 달. 오늘이 속한 달에서 시작해 이전/다음 버튼으로 자유롭게 이동한다.
+  const [view, setView] = useState({ year, month })
   const [selected, setSelected] = useState(todayDay)
-  // 데이터 갱신으로 오늘 날짜가 바뀌면 선택도 오늘로 재동기화
-  useEffect(() => setSelected(todayDay), [todayDay, month, year])
+
+  // 오늘 날짜가 바뀌면(자정 넘김·데이터 갱신) 이번 달·오늘로 재동기화
+  useEffect(() => {
+    setView({ year, month })
+    setSelected(todayDay)
+  }, [year, month, todayDay])
+
+  // 현재 보고 있는 달이 '이번 달'인지 — 오늘 강조와 '이번 달' 복귀 버튼의 표시 기준
+  const isCurrentMonth = view.year === year && view.month === month
+
+  /**
+   * [월 이동] delta(-1/+1)만큼 이동. Date 생성자에 month 인덱스를 그대로 넘겨
+   * 12월→1월, 1월→12월의 연도 넘김을 자동 처리한다(직접 나머지 연산하면 실수하기 쉬운 지점).
+   * 이동 후 선택일은 이번 달이면 오늘, 아니면 1일로 맞춘다 — 존재하지 않는 날짜(31일→2월)를 피한다.
+   */
+  function shiftMonth(delta: number) {
+    const d = new Date(view.year, view.month - 1 + delta, 1)
+    const ny = d.getFullYear()
+    const nm = d.getMonth() + 1
+    setView({ year: ny, month: nm })
+    setSelected(ny === year && nm === month ? todayDay : 1)
+  }
 
   const pad = (n: number) => String(n).padStart(2, '0')
-  const dateStr = `${year}-${pad(month)}-${pad(selected)}`
+  const dateStr = `${view.year}-${pad(view.month)}-${pad(selected)}`
+
+  /**
+   * [달력 이벤트] 보고 있는 달의 일자별 입고/출고 건수.
+   * 월을 넘길 때마다 그 달 기준으로 다시 집계한다. 서버 재조회 없이 이미 받아둔
+   * orders 를 필터링하므로 월 이동이 즉각 반영된다.
+   */
+  const events = useMemo(() => {
+    const cal = new Map<number, { in: number; out: number }>()
+    const add = (ds: string | null | undefined, key: 'in' | 'out') => {
+      if (!ds) return
+      const [y, m, d] = ds.split('-').map(Number)
+      if (y !== view.year || m !== view.month) return
+      const e = cal.get(d) ?? { in: 0, out: 0 }
+      e[key] += 1
+      cal.set(d, e)
+    }
+    for (const o of orders) {
+      add(o.storageStartDate, 'in')
+      add(o.actualEndDate ?? o.expectedEndDate, 'out')
+    }
+    return cal
+  }, [orders, view.year, view.month])
   // 같은 고객이 여러 건이어도 이름은 한 번만 (중복 제거)
   const inNames = [...new Set(orders.filter((o) => o.storageStartDate === dateStr).map((o) => o.customerName))]
   const outNames = [
@@ -514,13 +542,56 @@ function MobileScheduleCard({
         </Link>
       </div>
 
-      <p className="mb-2 text-center text-base font-bold text-slate-700">{year}년 {month}월</p>
-      <MiniCalendar year={year} month={month} todayDay={todayDay} events={events} selectedDay={selected} onSelect={setSelected} />
+      {/* 월 이동 — 좌우 화살표는 44px 터치 타깃(엄지 존 최소 규격)을 확보한다 */}
+      <div className="mb-2 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => shiftMonth(-1)}
+          aria-label="이전 달"
+          className="card-press flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 active:bg-slate-100"
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <div className="flex min-w-0 flex-col items-center">
+          <p className="text-base font-bold text-slate-700">
+            {view.year}년 {view.month}월
+          </p>
+          {!isCurrentMonth && (
+            <button
+              type="button"
+              onClick={() => {
+                setView({ year, month })
+                setSelected(todayDay)
+              }}
+              className="mt-0.5 text-[11px] font-medium text-indigo-600 underline-offset-2 active:underline"
+            >
+              이번 달로
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => shiftMonth(1)}
+          aria-label="다음 달"
+          className="card-press flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 active:bg-slate-100"
+        >
+          <ChevronRight size={20} />
+        </button>
+      </div>
+      <MiniCalendar
+        year={view.year}
+        month={view.month}
+        /* 오늘 강조는 이번 달을 보고 있을 때만 — 다른 달의 같은 날짜가 오늘로 보이는 오인을 막는다 */
+        todayDay={isCurrentMonth ? todayDay : undefined}
+        events={events}
+        selectedDay={selected}
+        onSelect={setSelected}
+      />
 
       {/* 선택한 날짜의 입고·출고 화주 */}
       <div className="mt-4 rounded-2xl bg-slate-50 p-4">
         <p className="text-base font-bold text-slate-700">
-          {month}월 {selected}일{selected === todayDay ? ' (오늘)' : ''} 입출고 화주
+          {view.month}월 {selected}일{isCurrentMonth && selected === todayDay ? ' (오늘)' : ''} 입출고 화주
         </p>
         <div className="mt-2.5 space-y-2.5">
           <div className="flex items-start gap-2">
@@ -555,7 +626,8 @@ function MiniCalendar({
 }: {
   year: number
   month: number
-  todayDay: number
+  /** 오늘 강조할 일자. 이번 달이 아닌 달을 보고 있으면 undefined */
+  todayDay?: number
   events: Map<number, { in: number; out: number }>
   selectedDay?: number
   onSelect?: (day: number) => void
