@@ -1002,8 +1002,28 @@ function EditOrderModal({
   const dailyFee = calcDailyFee(monthlyFee, storageStartDate, expectedEndDate)
 
   return (
-    <Modal open onClose={onClose} title="계약 수정" widthClass="max-w-5xl">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal
+      open
+      onClose={onClose}
+      title="계약 수정"
+      widthClass="max-w-5xl"
+      footer={
+        <div className="flex gap-2 md:justify-end">
+          <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-3.5 text-base font-semibold text-slate-600 transition active:bg-slate-50 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-slate-50">
+            취소
+          </button>
+          <button
+            type="submit"
+            form="edit-order-form"
+            disabled={submitting || periodError != null}
+            className="flex-1 rounded-xl bg-indigo-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99] disabled:opacity-60 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-indigo-700"
+          >
+            {submitting ? '저장 중…' : '수정 완료'}
+          </button>
+        </div>
+      }
+    >
+      <form id="edit-order-form" onSubmit={handleSubmit} className="space-y-4">
         {/* 단일 컬럼: 고객/창고(읽기전용) → 위치 → 일정 순 — 등록 팝업과 동일 템플릿 */}
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
@@ -1166,15 +1186,6 @@ function EditOrderModal({
         </div>
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
-
-        <div className="sticky bottom-0 z-10 -mx-5 mt-2 flex gap-2 border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur md:static md:mx-0 md:mt-0 md:justify-end md:border-0 md:bg-transparent md:px-0 md:py-0 md:pt-2 md:backdrop-blur-none">
-          <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-3.5 text-base font-semibold text-slate-600 transition active:bg-slate-50 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-slate-50">
-            취소
-          </button>
-          <button type="submit" disabled={submitting || periodError != null} className="flex-1 rounded-xl bg-indigo-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99] disabled:opacity-60 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-indigo-700">
-            {submitting ? '저장 중…' : '수정 완료'}
-          </button>
-        </div>
       </form>
     </Modal>
   )
@@ -1369,8 +1380,28 @@ export function CreateOrderModal({
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title="계약 등록" widthClass="max-w-5xl">
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <Modal
+        open={open}
+        onClose={onClose}
+        title="계약 등록"
+        widthClass="max-w-5xl"
+        footer={
+          <div className="flex gap-2 md:justify-end">
+            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-3.5 text-base font-semibold text-slate-600 transition active:bg-slate-50 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-slate-50">
+              취소
+            </button>
+            <button
+              type="submit"
+              form="create-order-form"
+              disabled={submitting || isBlacklisted || periodError != null}
+              className="flex-1 rounded-xl bg-indigo-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99] disabled:opacity-60 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-indigo-700"
+            >
+              {submitting ? '등록 중…' : '등록 완료'}
+            </button>
+          </div>
+        }
+      >
+        <form id="create-order-form" onSubmit={handleSubmit} className="space-y-4">
           {/* 단일 컬럼: 고객 → 고객 검색 → 창고 → 위치 → 일정 순 */}
           <div className="space-y-4">
 
@@ -1590,15 +1621,6 @@ export function CreateOrderModal({
           </div>
 
           {formError && <p className="text-sm text-red-600">{formError}</p>}
-
-          <div className="sticky bottom-0 z-10 -mx-5 mt-2 flex gap-2 border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur md:static md:mx-0 md:mt-0 md:justify-end md:border-0 md:bg-transparent md:px-0 md:py-0 md:pt-2 md:backdrop-blur-none">
-            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-3.5 text-base font-semibold text-slate-600 transition active:bg-slate-50 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-slate-50">
-              취소
-            </button>
-            <button type="submit" disabled={submitting || isBlacklisted || periodError != null} className="flex-1 rounded-xl bg-indigo-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99] disabled:opacity-60 md:flex-none md:rounded-lg md:px-4 md:py-2 md:text-sm md:font-medium md:hover:bg-indigo-700">
-              {submitting ? '등록 중…' : '등록 완료'}
-            </button>
-          </div>
         </form>
       </Modal>
 
