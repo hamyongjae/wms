@@ -252,6 +252,14 @@ export default function DashboardPage() {
               )}
             </MobileCard>
 
+            {/* 입출고 일정 (달력 + 선택일 화주) */}
+            <MobileScheduleCard
+              orders={orders}
+              year={mobile.year}
+              month={mobile.month}
+              todayDay={mobile.todayDay}
+            />
+
             {/* 현재 창고 잔여 공간 */}
             <MobileCard title="현재 창고 잔여 공간" icon={Warehouse}>
               <div className="flex items-end justify-between">
@@ -276,14 +284,6 @@ export default function DashboardPage() {
                 />
               </div>
             </MobileCard>
-
-            {/* 입출고 일정 (달력 + 선택일 화주) */}
-            <MobileScheduleCard
-              orders={orders}
-              year={mobile.year}
-              month={mobile.month}
-              todayDay={mobile.todayDay}
-            />
 
           </>
         )}
