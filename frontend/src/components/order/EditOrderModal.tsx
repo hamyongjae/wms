@@ -20,8 +20,8 @@ import MoneyInput from '@/components/ui/MoneyInput'
 import LocationPickerField from '@/components/yard/LocationPickerField'
 import PaymentAccountPicker from './PaymentAccountPicker'
 import {
+  CalendarField,
   ContextBar,
-  DateField,
   Field,
   FieldGrid,
   FormActions,
@@ -168,6 +168,8 @@ export default function EditOrderModal({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    // [필수값 방어] 캘린더 선택기는 네이티브 input이 아니라 HTML5 required가 자동으로 걸리지 않는다
+    if (!storageStartDate) return setFormError('보관 시작일을 입력하세요.')
     if (periodError) return setFormError(periodError)
     if (monthlyFee == null || monthlyFee <= 0) return setFormError('보관료를 입력하세요.')
 
@@ -287,10 +289,9 @@ export default function EditOrderModal({
 
         <FieldGrid>
           <GridField label="보관 시작일" required>
-            <DateField
+            <CalendarField
               value={storageStartDate}
               onChange={setStartDate}
-              required
               className={cn(gridInputCls, periodError && 'border-red-400 focus:border-red-500 focus:ring-red-100')}
             />
           </GridField>
@@ -310,7 +311,7 @@ export default function EditOrderModal({
             {endDateUnknown ? (
               <UndecidedPlaceholder />
             ) : (
-              <DateField
+              <CalendarField
                 value={expectedEndDate}
                 onChange={setEndDate}
                 min={storageStartDate || undefined}
@@ -395,7 +396,7 @@ export default function EditOrderModal({
         </FieldGrid>
         {/* 짝이 없는 단독 필드라 2열 그리드에 반쪽으로 남기지 않고 전체 폭으로 — 다른 단독 필드(메모 등)와 통일 */}
         <Field label="납기일">
-          <DateField value={dueDate} onChange={setDueDate} className={inputCls} />
+          <CalendarField value={dueDate} onChange={setDueDate} className={inputCls} />
         </Field>
 
         {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 */}

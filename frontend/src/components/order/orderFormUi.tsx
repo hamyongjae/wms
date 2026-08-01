@@ -1,5 +1,7 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import Modal from '@/components/ui/Modal'
 
 /**
  * ===== [계약 폼 공용 시각 템플릿] =====
@@ -135,24 +137,33 @@ export function UndecidedToggle({ checked, onChange }: { checked: boolean; onCha
   )
 }
 
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
+const pad2 = (n: number) => String(n).padStart(2, '0')
+const toIso = (y: number, m0: number, d: number) => `${y}-${pad2(m0 + 1)}-${pad2(d)}`
+function parseIso(s: string): { y: number; m0: number } | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  return m ? { y: Number(m[1]), m0: Number(m[2]) - 1 } : null
+}
+
 /**
- * [네이티브 date input 우회 렌더러]
+ * [원클릭 달력 선택기]
  *
- * iOS(사파리·크롬iOS 공통 WebKit 엔진)의 빈 `<input type="date">`는 내부 위젯(달력 아이콘·
- * 날짜 세그먼트)이 CSS로 지정한 박스 폭을 무시하고 옆 칸으로 삐져나오거나 오른쪽 화면 밖으로
- * 넘치는 고질적인 렌더링 버그가 있다. width·gap·min-w-0을 아무리 조정해도 이 위젯 자체의
- * 렌더링은 바뀌지 않는다(실측 확인됨).
+ * 네이티브 `<input type="date">`는 두 가지 문제가 있었다.
+ * 1) iOS 위아래 휠 방식이라 연·월·일을 각각 돌려 맞추고 'Done'까지 눌러야 하는 다단계 조작.
+ * 2) 빈 date input의 내부 위젯이 CSS 박스 크기를 무시하고 삐져나오는 렌더링 버그(실측 확인됨).
  *
- * 그래서 네이티브 input은 완전히 투명하게 만들어 탭 영역으로만 쓰고(iOS 캘린더는 그대로 뜬다),
- * 화면에 보이는 값은 우리가 직접 그린 텍스트로 대체한다 — 그러면 문제의 네이티브 위젯이
- * 애초에 화면에 그려지지 않으므로 겹침·넘침이 구조적으로 발생할 수 없다.
+ * 그래서 네이티브 input을 완전히 걷어내고, 탭하면 월 달력 그림(그리드)이 뜨는 자체 구현으로
+ * 바꿨다. 날짜 칸을 한 번 탭하면 그 값이 바로 들어가고 팝업이 닫힌다(원클릭). 화면에 보이는
+ * 것도 우리가 그린 텍스트뿐이라 앞서의 렌더링 버그가 애초에 발생할 수 없다.
+ *
+ * [폼 검증 주의] 네이티브 input이 없으므로 HTML5 required 검증이 더 이상 자동으로 걸리지 않는다.
+ * 이 필드를 필수로 쓰는 화면은 반드시 제출 로직에서 값이 비어 있는지 직접 확인해야 한다.
  */
-export function DateField({
+export function CalendarField({
   value,
   onChange,
   min,
   max,
-  required,
   className,
   placeholder = '날짜 선택',
 }: {
@@ -160,23 +171,111 @@ export function DateField({
   onChange: (v: string) => void
   min?: string
   max?: string
-  required?: boolean
   className?: string
   placeholder?: string
 }) {
+  const [open, setOpen] = useState(false)
+  const now = new Date()
+  const [viewY, setViewY] = useState(() => parseIso(value)?.y ?? now.getFullYear())
+  const [viewM, setViewM] = useState(() => parseIso(value)?.m0 ?? now.getMonth())
+
+  function openPicker() {
+    const p = parseIso(value)
+    setViewY(p?.y ?? now.getFullYear())
+    setViewM(p?.m0 ?? now.getMonth())
+    setOpen(true)
+  }
+
+  function shiftMonth(delta: number) {
+    const d = new Date(viewY, viewM + delta, 1)
+    setViewY(d.getFullYear())
+    setViewM(d.getMonth())
+  }
+
+  const firstWeekday = new Date(viewY, viewM, 1).getDay()
+  const dayCount = new Date(viewY, viewM + 1, 0).getDate()
+  const todayIso = toIso(now.getFullYear(), now.getMonth(), now.getDate())
+
   return (
-    <div className={cn(className, 'relative flex items-center')}>
-      <span className={value ? undefined : 'text-slate-400'}>{value ? value.replaceAll('-', '.') : placeholder}</span>
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        min={min}
-        max={max}
-        required={required}
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-      />
-    </div>
+    <>
+      <button
+        type="button"
+        onClick={openPicker}
+        className={cn(className, 'flex items-center text-left', !value && 'text-slate-400')}
+      >
+        {value ? value.replaceAll('-', '.') : placeholder}
+      </button>
+
+      {open && (
+        <Modal open onClose={() => setOpen(false)} title="날짜 선택">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => shiftMonth(-1)}
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <span className="text-lg font-bold text-slate-800">
+                {viewY}년 {viewM + 1}월
+              </span>
+              <button
+                type="button"
+                onClick={() => shiftMonth(1)}
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 text-center text-xs font-semibold text-slate-400">
+              {WEEKDAYS.map((w) => (
+                <div key={w} className="py-1">
+                  {w}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: firstWeekday }).map((_, i) => (
+                <div key={`blank-${i}`} />
+              ))}
+              {Array.from({ length: dayCount }).map((_, i) => {
+                const d = i + 1
+                const iso = toIso(viewY, viewM, d)
+                const disabled = (min != null && iso < min) || (max != null && iso > max)
+                const selected = iso === value
+                const isToday = iso === todayIso
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => {
+                      onChange(iso)
+                      setOpen(false)
+                    }}
+                    className={cn(
+                      'flex h-11 items-center justify-center rounded-xl text-base font-semibold transition active:scale-95 disabled:cursor-not-allowed',
+                      selected
+                        ? 'bg-indigo-600 text-white'
+                        : disabled
+                          ? 'text-slate-300'
+                          : isToday
+                            ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200'
+                            : 'text-slate-700 hover:bg-slate-100',
+                    )}
+                  >
+                    {d}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </Modal>
+      )}
+    </>
   )
 }
 

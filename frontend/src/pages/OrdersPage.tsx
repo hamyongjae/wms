@@ -26,7 +26,7 @@ import EditOrderModal from '@/components/order/EditOrderModal'
 import PaymentAccountPicker from '@/components/order/PaymentAccountPicker'
 import { placeContainerAtSlot } from '@/lib/containerPlacement'
 import {
-  DateField,
+  CalendarField,
   Field,
   FieldGrid,
   FormActions,
@@ -941,6 +941,11 @@ export function CreateOrderModal({
       setFormError('창고를 선택하세요.')
       return false
     }
+    // [필수값 방어] 캘린더 선택기는 네이티브 input이 아니라 HTML5 required가 자동으로 걸리지 않는다
+    if (!storageStartDate) {
+      setFormError('보관 시작일을 입력하세요.')
+      return false
+    }
     if (periodError) {
       setFormError(periodError)
       return false
@@ -1140,7 +1145,7 @@ export function CreateOrderModal({
 
             <FieldGrid>
               <GridField label="보관 시작일" required>
-                <DateField value={storageStartDate} onChange={setStartDate} required className={gridInputCls} />
+                <CalendarField value={storageStartDate} onChange={setStartDate} className={gridInputCls} />
               </GridField>
               {/* '미정' 스위치는 라벨 줄 오른쪽에 — 입력창 높이를 다른 칸과 같게 유지한다 */}
               <GridField
@@ -1158,7 +1163,7 @@ export function CreateOrderModal({
                 {endDateUnknown ? (
                   <UndecidedPlaceholder />
                 ) : (
-                  <DateField
+                  <CalendarField
                     value={expectedEndDate}
                     onChange={setEndDate}
                     min={storageStartDate || undefined}
@@ -1227,7 +1232,7 @@ export function CreateOrderModal({
             </FieldGrid>
             {/* 짝이 없는 단독 필드라 2열 그리드에 반쪽으로 남기지 않고 전체 폭으로 — 다른 단독 필드(메모 등)와 통일 */}
             <Field label="납기일">
-              <DateField value={dueDate} onChange={setDueDate} className={inputCls} />
+              <CalendarField value={dueDate} onChange={setDueDate} className={inputCls} />
             </Field>
             {/* [계좌 연동] 계좌이체일 때만 입금 계좌(담당 직원) 지정 폼 노출 */}
             {paymentMethod === 'BANK_TRANSFER' && (
