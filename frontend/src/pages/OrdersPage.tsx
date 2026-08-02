@@ -926,13 +926,6 @@ export function CreateOrderModal({
       setFormError('보관료를 입력하세요.')
       return false
     }
-    // [입고 완료 전제] 보관 시작일이 오늘이거나 과거면 물건이 이미 창고에 있어야 하는 계약이다.
-    //   그런데도 자리가 미지정이면 실제로는 어딘가에 놓여 있는데 시스템엔 안 잡히는 상태가 되므로,
-    //   이 경우엔 위치 지정을 필수로 막는다(예약 계약은 isFutureStart라 이 검사 대상이 아니다).
-    if (!isFutureStart && slotId == null) {
-      setFormError('보관 시작일이 오늘이거나 과거인 계약은 컨테이너 위치를 반드시 지정해야 합니다.')
-      return false
-    }
     setFormError(null)
     return true
   }
@@ -1064,22 +1057,17 @@ export function CreateOrderModal({
                 </div>
 
                 <div>
-                  <label className={labelCls}>컨테이너 위치 지정{!isFutureStart && ' *'}</label>
+                  <label className={labelCls}>컨테이너 위치 지정</label>
                   {isFutureStart ? (
                     <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3.5 py-3 text-sm text-slate-500">
                       보관 시작일이 아직 오지 않은 예약 계약입니다. 입고일이 되면 컨테이너 관리 화면에서 자리를 배정해주세요.
                     </p>
                   ) : (
-                    <>
-                      <LocationPickerField
-                        warehouseId={warehouseId ? Number(warehouseId) : null}
-                        value={slotId}
-                        onChange={setSlotId}
-                      />
-                      <p className="mt-1 text-[11px] text-slate-400">
-                        보관 시작일이 오늘이거나 과거라 실제 입고 위치를 반드시 지정해야 합니다.
-                      </p>
-                    </>
+                    <LocationPickerField
+                      warehouseId={warehouseId ? Number(warehouseId) : null}
+                      value={slotId}
+                      onChange={setSlotId}
+                    />
                   )}
                 </div>
               </>
