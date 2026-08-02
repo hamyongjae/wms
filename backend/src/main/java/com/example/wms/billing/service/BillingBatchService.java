@@ -52,7 +52,6 @@ public class BillingBatchService {
     public int generateMonthlyLedgers(YearMonth targetMonth) {
         LocalDate periodStart = targetMonth.atDay(1);
         LocalDate periodEnd = targetMonth.atEndOfMonth();
-        LocalDate dueDate = targetMonth.atDay(10);   // 납기: 해당 월 10일
 
         List<StorageOrder> activeOrders = storageOrderRepository.findByStatusIn(ACTIVE_STATUSES);
         int created = 0;
@@ -67,6 +66,7 @@ public class BillingBatchService {
             if (ledgerRepository.existsActiveLedgerOverlapping(order.getId(), periodStart, periodEnd)) {
                 continue;
             }
+            LocalDate dueDate = recurringDueDate(order, targetMonth);
             BigDecimal base = prorationCalculator.prorateMonthly(
                     BigDecimal.valueOf(order.getMonthlyFee()), periodStart, periodEnd);
 
@@ -79,6 +79,18 @@ public class BillingBatchService {
             created++;
         }
         return created;
+    }
+
+    /**
+     * [계약별 납기일] 배치 생성 시점(매월 1일)은 전 계약 공통이지만, 실제 납기는 계약마다 다르다.
+     * 계약에 저장된 dueDate의 '일(day)' 값을 매월 반복되는 납기 기준일로 삼는다.
+     * 기준일이 그 달에 없는 날짜(31일 등)면 그 달의 마지막 날로 자동 보정한다(말일 클램프).
+     * dueDate가 없는 레거시 계약만 10일을 기본값으로 쓴다.
+     */
+    private LocalDate recurringDueDate(StorageOrder order, YearMonth targetMonth) {
+        int anchorDay = order.getDueDate() != null ? order.getDueDate().getDayOfMonth() : 10;
+        int day = Math.min(anchorDay, targetMonth.lengthOfMonth());
+        return targetMonth.atDay(day);
     }
 
     /**
