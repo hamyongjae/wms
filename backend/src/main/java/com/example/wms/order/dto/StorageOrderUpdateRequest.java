@@ -22,4 +22,7 @@ public class StorageOrderUpdateRequest {
     private PaymentMethod paymentMethod;  // 계좌이체/현금/카드
     private Long settlementUserId;        // 입금 계좌(담당 직원)
     private LocalDate dueDate;            // 납기일
+
+    // 정산서 생성 방식(자동/수동) — 미지정(null) 시 기존 값 유지
+    private Boolean autoBillingEnabled;
 }

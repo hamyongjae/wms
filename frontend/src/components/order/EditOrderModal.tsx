@@ -20,6 +20,7 @@ import MoneyInput from '@/components/ui/MoneyInput'
 import LocationPickerField from '@/components/yard/LocationPickerField'
 import PaymentAccountPicker from './PaymentAccountPicker'
 import {
+  AutoBillingToggle,
   CalendarField,
   ContextBar,
   Field,
@@ -88,6 +89,7 @@ export default function EditOrderModal({
   const [settlementUserId, setSettlementUserId] = useState<number | null>(null)
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [dueDate, setDueDate] = useState('')
+  const [autoBillingEnabled, setAutoBillingEnabled] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -110,6 +112,7 @@ export default function EditOrderModal({
     setPaymentMethod(target.paymentMethod ?? 'BANK_TRANSFER')
     setSettlementUserId(target.settlementUserId ?? null)
     setDueDate(target.dueDate ?? '')
+    setAutoBillingEnabled(target.autoBillingEnabled ?? false)
     setFormError(null)
   }, [target])
 
@@ -190,6 +193,7 @@ export default function EditOrderModal({
         settlementUserId: paymentMethod === 'BANK_TRANSFER' ? (settlementUserId ?? undefined) : undefined,
         dueDate: dueDate || undefined,
         memo: memo || undefined,
+        autoBillingEnabled,
       })
 
       // ===== 2) 위치 변경 반영 (이동 / 신규 배정 / 미지정 해제) =====
@@ -403,6 +407,8 @@ export default function EditOrderModal({
         {paymentMethod === 'BANK_TRANSFER' && (
           <PaymentAccountPicker staffList={staffList} value={settlementUserId} onChange={setSettlementUserId} />
         )}
+
+        <AutoBillingToggle checked={autoBillingEnabled} onChange={setAutoBillingEnabled} />
 
         <Field label="메모">
           <textarea

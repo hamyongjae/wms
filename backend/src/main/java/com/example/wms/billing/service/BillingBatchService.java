@@ -58,6 +58,11 @@ public class BillingBatchService {
         int created = 0;
 
         for (StorageOrder order : activeOrders) {
+            // [수동 정산 계약 제외] 등록 시 최초 청구서는 이 값과 무관하게 항상 자동 발행되지만,
+            //   이후 매월 반복 자동 생성은 '자동'으로 설정된 계약만 대상으로 한다.
+            if (!Boolean.TRUE.equals(order.getAutoBillingEnabled())) {
+                continue;
+            }
             // [이중청구 방지] 이번 달 구간과 겹치는 원장(계약 등록 시 자동 발행분 포함)이 이미 있으면 건너뜀
             if (ledgerRepository.existsActiveLedgerOverlapping(order.getId(), periodStart, periodEnd)) {
                 continue;

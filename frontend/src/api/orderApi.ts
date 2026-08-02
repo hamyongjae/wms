@@ -28,6 +28,7 @@ export interface StorageOrder {
   bankName: string | null
   accountNumber: string | null
   accountHolder: string | null
+  autoBillingEnabled: boolean | null
 }
 
 export interface OrderCreate {
@@ -42,6 +43,8 @@ export interface OrderCreate {
   dueDate?: string // 납기일 — 선불=보관 시작일, 후불=보관 종료일 기본값(수동 변경 가능)
   capacityTons?: number // 보관 용량(톤)
   memo?: string
+  // 정산서 생성 방식 — true: 매월 자동 생성, false(기본값): 수동 생성. 최초 청구서는 이 값과 무관하게 항상 자동 발행됨.
+  autoBillingEnabled?: boolean
 }
 
 export interface OrderUpdate {
@@ -54,6 +57,7 @@ export interface OrderUpdate {
   settlementUserId?: number
   dueDate?: string // 납기일 — 선불=보관 시작일, 후불=보관 종료일 기본값(수동 변경 가능)
   memo?: string
+  autoBillingEnabled?: boolean // 정산서 생성 방식(자동/수동)
 }
 
 export interface OrderStatusChange {

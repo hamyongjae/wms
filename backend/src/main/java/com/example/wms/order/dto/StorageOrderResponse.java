@@ -37,6 +37,9 @@ public class StorageOrderResponse {
     private final String accountNumber;
     private final String accountHolder;
 
+    // 정산서 생성 방식 — true: 매월 자동 생성, false: 수동 생성
+    private final Boolean autoBillingEnabled;
+
     public StorageOrderResponse(StorageOrder order) {
         this.id = order.getId();
 
@@ -65,5 +68,7 @@ public class StorageOrderResponse {
         this.bankName = su != null ? su.getBankName() : null;
         this.accountNumber = su != null ? su.getAccountNumber() : null;
         this.accountHolder = su != null ? su.getAccountHolder() : null;
+
+        this.autoBillingEnabled = order.getAutoBillingEnabled();
     }
 }

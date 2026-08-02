@@ -62,6 +62,11 @@ public class StorageOrder {
     @Column(name = "due_date")
     private LocalDate dueDate;                // 납기일 (청구 대금 회수 기준일)
 
+    // 매월 반복 청구 원장 자동 생성 여부 — false(수동)면 BillingBatchService의 월간 배치 대상에서 제외된다.
+    // [스키마] 기존 행 호환을 위해 DB 기본값 true(기존 전원 자동 생성 동작 보존). 등록 시 최초 청구서는 이 값과 무관하게 항상 자동 발행된다.
+    @Column(name = "auto_billing_enabled", nullable = false, columnDefinition = "boolean default true")
+    private Boolean autoBillingEnabled = true;
+
     // ===== 결제 수단 & 수납 담당(계좌 연동) =====
     // [스키마] 기존 행 호환을 위해 nullable — 신규 계약은 아래 기본값(계좌이체)으로 저장된다.
     @Enumerated(EnumType.STRING)

@@ -27,6 +27,7 @@ import EditOrderModal from '@/components/order/EditOrderModal'
 import PaymentAccountPicker from '@/components/order/PaymentAccountPicker'
 import { placeContainerAtSlot } from '@/lib/containerPlacement'
 import {
+  AutoBillingToggle,
   CalendarField,
   Field,
   FieldGrid,
@@ -895,6 +896,8 @@ export function CreateOrderModal({
   const [dueDate, setDueDate] = useState('')
   const [settlementUserId, setSettlementUserId] = useState<number | null>(null)
   const [staffList, setStaffList] = useState<Staff[]>([])
+  // [정산서 생성 방식] 기본값은 수동 생성 — 담당자가 명시적으로 켜야만 매월 자동 청구가 시작된다.
+  const [autoBillingEnabled, setAutoBillingEnabled] = useState(false)
   const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -937,6 +940,7 @@ export function CreateOrderModal({
       setPaymentMethod('BANK_TRANSFER')
       setSettlementUserId(null)
       setDueDate('')
+      setAutoBillingEnabled(false)
       setMemo('')
       setFormError(null)
       setDormantConfirm(false)
@@ -1001,6 +1005,7 @@ export function CreateOrderModal({
         dueDate: dueDate || undefined,
         capacityTons: capacityTons ?? undefined,
         memo: memo || undefined,
+        autoBillingEnabled,
       })
       // 위치를 지정했으면 컨테이너 생성·배정·적재까지 이어서 처리(미지정이면 생략)
       if (slotId != null) {
@@ -1268,6 +1273,8 @@ export function CreateOrderModal({
                 onChange={setSettlementUserId}
               />
             )}
+
+            <AutoBillingToggle checked={autoBillingEnabled} onChange={setAutoBillingEnabled} />
 
             <div>
               <label className={labelCls}>메모</label>

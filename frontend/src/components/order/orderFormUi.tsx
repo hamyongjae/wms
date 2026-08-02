@@ -294,6 +294,52 @@ export function CalendarField({
   )
 }
 
+/**
+ * [정산서 생성 방식] 수동 생성 / 매월 자동 생성 세그먼트 토글.
+ *
+ * 자동 생성을 켜면 배치가 '매월 1일 새벽 청구서 자동 발행, 납기 매월 10일'로 처리한다는
+ * 사실을 안내 문구로 바로 보여줘 오조작을 막는다. 이 날짜는 계약마다 다르게 계산되는 값이
+ * 아니라 전 계약 공통 고정 스케줄(BillingScheduler)이므로, 별도 입력 없이 고정 문구로 충분하다.
+ */
+export function AutoBillingToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div>
+      <label className={labelCls}>정산서 생성 방식</label>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => onChange(false)}
+          className={cn(
+            'rounded-lg border py-3 text-base font-semibold transition md:py-2.5 md:text-sm',
+            !checked
+              ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+              : 'border-slate-300 text-slate-500 active:bg-slate-50',
+          )}
+        >
+          수동 생성
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(true)}
+          className={cn(
+            'rounded-lg border py-3 text-base font-semibold transition md:py-2.5 md:text-sm',
+            checked
+              ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+              : 'border-slate-300 text-slate-500 active:bg-slate-50',
+          )}
+        >
+          매월 자동 생성
+        </button>
+      </div>
+      <p className="mt-1.5 text-[11px] text-slate-400">
+        {checked
+          ? '매월 1일 새벽에 이번 달 청구서가 자동 발행됩니다 (납기일: 매월 10일).'
+          : '정산 화면에서 담당자가 직접 청구서를 생성해야 합니다.'}
+      </p>
+    </div>
+  )
+}
+
 /** '출고일 미정'이 켜졌을 때 날짜 입력창 자리를 대신하는 톤다운 표시 */
 export function UndecidedPlaceholder() {
   return (

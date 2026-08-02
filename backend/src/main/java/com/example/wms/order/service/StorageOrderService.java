@@ -110,6 +110,10 @@ public class StorageOrderService {
         order.setPaymentType(payType);
         order.setDueDate(due);
 
+        // [정산서 생성 방식] 미지정 시 자동(true) — 매출 구멍 방지를 위한 서버 안전 기본값. 폼의 초기 선택값(수동)은 항상 명시 전송되어야 한다.
+        order.setAutoBillingEnabled(
+                request.getAutoBillingEnabled() != null ? request.getAutoBillingEnabled() : true);
+
         StorageOrder saved = storageOrderRepository.save(order);
 
         // [청구서 자동 발행] 결제 방식과 무관하게 계약 등록과 동시에 청구 원장을 만든다.
@@ -192,6 +196,12 @@ public class StorageOrderService {
                 : (newType == SettlementType.PREPAID ? order.getStorageStartDate() : periodEnd);
         order.setPaymentType(newType);
         order.setDueDate(newDue);
+
+        // 4) 정산서 생성 방식(자동/수동) — 미지정 시 기존 값 유지
+        if (request.getAutoBillingEnabled() != null) {
+            order.setAutoBillingEnabled(request.getAutoBillingEnabled());
+        }
+
         // 원장 자동 재정산 (후불→선불 완납 / 선불→후불 수납취소 / 납기 갱신)
         billingService.resettleForOrder(order.getId(), newType, newDue, order.getPaymentMethod());
 
