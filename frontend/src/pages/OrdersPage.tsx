@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Truck, Wallet, Search, ChevronRight } from 'lucide-react'
+import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Search, ChevronRight } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger } from '@/api/billingApi'
@@ -91,18 +91,27 @@ function InfoRow({ label, value, strong }: { label: string; value: ReactNode; st
   )
 }
 
-/* 모바일 카드: 보조 액션 버튼(큰 터치 영역) */
-function MobileBtn({ label, onClick, tone = 'default' }: { label: string; onClick: () => void; tone?: 'default' | 'danger' }) {
+/* 모바일 카드: 액션 버튼 — 주 액션(출고 처리 등)까지 같은 격자·같은 크기로 통일한다 */
+function MobileBtn({
+  label,
+  onClick,
+  tone = 'default',
+}: {
+  label: string
+  onClick: () => void
+  tone?: 'default' | 'danger' | 'amber' | 'indigo'
+}) {
+  const cls = {
+    default: 'bg-slate-100 text-slate-700 active:bg-slate-200',
+    danger: 'bg-red-50 text-red-600 active:bg-red-100',
+    amber: 'bg-amber-500 text-white active:bg-amber-600',
+    indigo: 'bg-indigo-600 text-white active:bg-indigo-700',
+  }[tone]
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        'rounded-2xl py-2.5 text-base font-bold transition active:scale-[0.99]',
-        tone === 'danger'
-          ? 'bg-red-50 text-red-600 active:bg-red-100'
-          : 'bg-slate-100 text-slate-700 active:bg-slate-200',
-      )}
+      className={cn('rounded-xl py-2 text-sm font-bold transition active:scale-[0.98]', cls)}
     >
       {label}
     </button>
@@ -482,25 +491,25 @@ export default function OrdersPage() {
             const delayed = o.status === 'INBOUND' && o.expectedEndDate != null && o.expectedEndDate < today()
             const locs = locationsByOrder.get(o.id) ?? []
             return (
-              <div key={o.id} className="rounded-2xl bg-white p-3 shadow-soft ring-1 ring-slate-200/60">
+              <div key={o.id} className="rounded-2xl bg-white p-2.5 shadow-soft ring-1 ring-slate-200/60">
                 {/* 헤더: 고객 + 상태 */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-xl font-bold text-slate-800">{o.customerName}</p>
-                    <p className="mt-0.5 truncate text-sm text-slate-500">{o.warehouseName}</p>
+                    <p className="truncate text-lg font-bold text-slate-800">{o.customerName}</p>
+                    <p className="truncate text-xs text-slate-500">{o.warehouseName}</p>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <div className="flex shrink-0 flex-col items-end gap-1">
                     <OrderStatusBadge status={o.status} />
                     {delayed && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
-                        <AlertTriangle size={12} /> 출고 지연
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                        <AlertTriangle size={11} /> 출고 지연
                       </span>
                     )}
                   </div>
                 </div>
 
                 {/* 핵심 정보 */}
-                <div className="mt-2 space-y-1.5">
+                <div className="mt-1.5 space-y-1">
                   <InfoRow label="보관료" value={won(o.monthlyFee)} strong />
                   <InfoRow
                     label="보관기간"
@@ -512,34 +521,20 @@ export default function OrdersPage() {
                   </div>
                 </div>
 
-                {/* 원터치 액션 */}
-                <div className="mt-2 space-y-1.5">
+                {/* 액션 — 주 액션(출고 처리/정산 보기)도 같은 격자·같은 크기로 통일 */}
+                <div className={cn('mt-1.5 grid gap-1.5', isAdmin ? 'grid-cols-4' : 'grid-cols-3')}>
                   {o.status === 'INBOUND' ? (
-                    <button
-                      type="button"
-                      onClick={() => setStatusTarget(o)}
-                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 py-3 text-lg font-bold text-white shadow-sm transition active:scale-[0.99]"
-                    >
-                      <Truck size={20} /> 출고 처리
-                    </button>
+                    <MobileBtn label="출고 처리" tone="amber" onClick={() => setStatusTarget(o)} />
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setBillingTarget(o)}
-                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-3 text-lg font-bold text-white shadow-sm transition active:scale-[0.99]"
-                    >
-                      <Wallet size={20} /> 정산 보기
-                    </button>
+                    <MobileBtn label="정산 보기" tone="indigo" onClick={() => setBillingTarget(o)} />
                   )}
-                  <div className={cn('grid gap-1.5', isAdmin ? 'grid-cols-3' : 'grid-cols-2')}>
-                    {o.status === 'INBOUND' ? (
-                      <MobileBtn label="정산" onClick={() => setBillingTarget(o)} />
-                    ) : (
-                      <MobileBtn label="출고취소" onClick={() => handleCancelRelease(o)} />
-                    )}
-                    <MobileBtn label="수정" onClick={() => setEditTarget(o)} />
-                    {isAdmin && <MobileBtn label="삭제" tone="danger" onClick={() => handleDelete(o)} />}
-                  </div>
+                  {o.status === 'INBOUND' ? (
+                    <MobileBtn label="정산" onClick={() => setBillingTarget(o)} />
+                  ) : (
+                    <MobileBtn label="출고취소" onClick={() => handleCancelRelease(o)} />
+                  )}
+                  <MobileBtn label="수정" onClick={() => setEditTarget(o)} />
+                  {isAdmin && <MobileBtn label="삭제" tone="danger" onClick={() => handleDelete(o)} />}
                 </div>
               </div>
             )
