@@ -140,7 +140,7 @@ export default function LedgerDetailPanel({
   }
 
   return (
-    <Modal open onClose={onClose} title={`${l?.customerName ?? '청구 원장'} 정산서`} widthClass="max-w-2xl">
+    <Modal open onClose={onClose} title={l?.customerName ? `${l.customerName} 정산서` : '정산서'} widthClass="max-w-2xl">
       {loading || !l ? (
         <div className="flex items-center justify-center gap-2 py-24 text-slate-400">
           <Loader2 className="animate-spin" size={18} />

@@ -315,7 +315,7 @@ export default function YardDispatchPage() {
 
   // [통합] 계약 삭제 — 계약 관리의 삭제와 동일 동작(청구 원장·입금 내역도 함께 삭제)
   async function handleDeleteContract(order: StorageOrder) {
-    if (!window.confirm(`'${order.customerName}' 계약을 삭제할까요?\n(연결된 청구 원장·입금 내역도 함께 삭제됩니다)`)) return
+    if (!window.confirm(`'${order.customerName}' 계약을 삭제할까요?\n(연결된 정산서·입금 내역도 함께 삭제됩니다)`)) return
     try {
       await orderApi.remove(order.id)
       setActionSlot(null)

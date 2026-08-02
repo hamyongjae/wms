@@ -278,7 +278,7 @@ export default function OrdersPage() {
   }
 
   async function handleDelete(o: StorageOrder) {
-    if (!window.confirm(`'${o.customerName}' 계약을 삭제할까요?\n(연결된 청구 원장·입금 내역도 함께 삭제됩니다)`)) return
+    if (!window.confirm(`'${o.customerName}' 계약을 삭제할까요?\n(연결된 정산서·입금 내역도 함께 삭제됩니다)`)) return
     try {
       await orderApi.remove(o.id)
       // 화면에서 즉시 제거 (비동기 부분 갱신)
@@ -657,7 +657,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
       // [보관기간 동기화] 회차 청구로 계약 종료일이 확장됐을 수 있으니 계약·달력 갱신
       orderSync.emit()
     } catch (err) {
-      setGenError(errMsg(err, '청구서 생성에 실패했습니다.'))
+      setGenError(errMsg(err, '정산서 생성에 실패했습니다.'))
     } finally {
       setCreating(false)
     }
@@ -678,44 +678,50 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
             </span>
           </div>
 
-          {/* 청구서 생성 (관리자) — 원장이 없으면 여기서 만들어야 정산이 시작된다 */}
+          {/* 정산서 생성 (관리자) — 원장이 없으면 여기서 만들어야 정산이 시작된다 */}
           {isAdmin && !genOpen && (
             <button
               type="button"
               onClick={openGenerator}
               className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-indigo-300 bg-indigo-50/50 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
             >
-              <Plus size={15} /> 청구서 생성 (이번 회차)
+              <Plus size={15} /> 정산서 생성 (이번 회차)
             </button>
           )}
           {genOpen && (
             <form onSubmit={submitGenerate} className="space-y-2.5 rounded-xl bg-indigo-50/40 p-3.5 ring-1 ring-indigo-200/60">
-              <p className="text-xs font-semibold text-slate-600">청구서 생성 · 생성하면 바로 입금을 기록할 수 있습니다</p>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-0.5 block text-[11px] text-slate-500">청구 시작일</label>
-                  <input type="date" value={genStart} max={genEnd || undefined} onChange={(e) => setGenStart(e.target.value)} className={inputCls} />
-                </div>
-                <div>
-                  <label className="mb-0.5 block text-[11px] text-slate-500">청구 종료일</label>
-                  <input type="date" value={genEnd} min={genStart || undefined} onChange={(e) => setGenEnd(e.target.value)} className={inputCls} />
-                </div>
-                <div>
-                  <label className="mb-0.5 block text-[11px] text-slate-500">청구 금액</label>
-                  <MoneyInput value={genAmount} onChange={setGenAmount} required className={cn(inputCls, 'pr-8')} />
-                </div>
-                <div>
-                  <label className="mb-0.5 block text-[11px] text-slate-500">납기일</label>
-                  <input type="date" value={genDue} onChange={(e) => setGenDue(e.target.value)} className={inputCls} />
-                </div>
-              </div>
+              <p className="text-xs font-semibold text-slate-600">정산서 생성 · 생성하면 바로 입금을 기록할 수 있습니다</p>
+              <FieldGrid>
+                <GridField label="청구 시작일">
+                  <CalendarField
+                    value={genStart}
+                    onChange={setGenStart}
+                    max={genEnd || undefined}
+                    className={gridInputCls}
+                  />
+                </GridField>
+                <GridField label="청구 종료일">
+                  <CalendarField
+                    value={genEnd}
+                    onChange={setGenEnd}
+                    min={genStart || undefined}
+                    className={gridInputCls}
+                  />
+                </GridField>
+                <GridField label="청구 금액">
+                  <MoneyInput value={genAmount} onChange={setGenAmount} required className={cn(gridInputCls, 'pr-8')} />
+                </GridField>
+                <GridField label="납기일">
+                  <CalendarField value={genDue} onChange={setGenDue} className={gridInputCls} />
+                </GridField>
+              </FieldGrid>
               {genError && <p className="text-xs text-red-600">{genError}</p>}
               <div className="flex justify-end gap-1.5">
                 <button type="button" onClick={() => setGenOpen(false)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 transition hover:bg-white">
                   취소
                 </button>
                 <button type="submit" disabled={creating} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
-                  {creating ? '생성 중…' : '청구서 생성'}
+                  {creating ? '생성 중…' : '정산서 생성'}
                 </button>
               </div>
             </form>
@@ -730,8 +736,8 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
 
           {!loading && ledgers.length === 0 && (
             <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
-              아직 생성된 청구 회차가 없습니다.
-              {isAdmin ? ' 위 "청구서 생성"으로 이번 회차를 만들면 바로 입금을 기록할 수 있습니다.' : ' 원장은 매월 1일 자동 생성됩니다.'}
+              아직 생성된 정산서가 없습니다.
+              {isAdmin ? ' 위 "정산서 생성"으로 이번 회차를 만들면 바로 입금을 기록할 수 있습니다.' : ' 정산서는 매월 1일 자동 생성됩니다.'}
             </p>
           )}
 

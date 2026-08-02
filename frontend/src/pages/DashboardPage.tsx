@@ -345,7 +345,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <p className="py-12 text-center text-sm text-slate-400">
-                  아직 청구 데이터가 없습니다. 계약과 청구 원장이 쌓이면 추이가 표시됩니다.
+                  아직 정산 데이터가 없습니다. 계약과 정산서가 쌓이면 추이가 표시됩니다.
                 </p>
               )}
             </section>

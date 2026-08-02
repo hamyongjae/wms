@@ -109,7 +109,7 @@ export default function BillingPage() {
     billingApi
       .list(range.from && range.to ? range : undefined)
       .then(setLedgers)
-      .catch(() => setError('청구 원장을 불러오지 못했습니다.'))
+      .catch(() => setError('정산서를 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [refreshKey, range])
 
@@ -177,7 +177,7 @@ export default function BillingPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">정산 관리</h2>
-          <p className="mt-0.5 text-sm text-slate-500">보관료 청구 원장과 수금·조정·미수금 이월을 관리합니다.</p>
+          <p className="mt-0.5 text-sm text-slate-500">보관료 정산서와 수금·조정을 관리합니다.</p>
         </div>
       </div>
 
@@ -283,8 +283,8 @@ export default function BillingPage() {
 
       {!loading && !error && visible.length === 0 && (
         <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-10 py-10 text-center">
-          <p className="text-base font-semibold text-slate-700">청구 원장이 없습니다</p>
-          <p className="mt-1 text-sm text-slate-400">계약이 등록되면 스케줄러가 자동으로 원장을 생성합니다.</p>
+          <p className="text-base font-semibold text-slate-700">정산서가 없습니다</p>
+          <p className="mt-1 text-sm text-slate-400">계약이 등록되면 스케줄러가 자동으로 정산서를 생성합니다.</p>
         </div>
       )}
 

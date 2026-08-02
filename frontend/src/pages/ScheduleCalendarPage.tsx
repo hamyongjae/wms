@@ -171,7 +171,7 @@ export default function ScheduleCalendarPage() {
   }
 
   async function deleteEvent(event: CalendarEvent) {
-    if (!window.confirm(`'${event.customerName}' 계약을 삭제할까요?\n(연결된 청구 원장·입금 내역도 함께 삭제됩니다)`)) return
+    if (!window.confirm(`'${event.customerName}' 계약을 삭제할까요?\n(연결된 정산서·입금 내역도 함께 삭제됩니다)`)) return
     try {
       await orderApi.remove(event.id)
       setNotice(`'${event.customerName}' 계약을 삭제했습니다.`)
