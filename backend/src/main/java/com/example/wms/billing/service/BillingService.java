@@ -56,7 +56,12 @@ public class BillingService {
 
     // ===================== 원장 생성/발행 =====================
 
-    /** 청구 원장 생성 (일할 계산 반영, DRAFT 상태) */
+    /**
+     * [생성=발행 통합] 청구 원장 생성(일할 계산 반영) 즉시 발행까지 한 번에 끝낸다.
+     * 예전엔 DRAFT로 만들어두고 관리자가 곧바로 "발행" 버튼을 한 번 더 눌러야 했다 — 사실상 항상
+     * 같이 일어나는 두 단계를 억지로 나눠 놓은 것뿐이라, 계약 등록 시 자동 발행(issuePostpaid/
+     * settlePrepaid)과 같은 원칙으로 여기서도 생성과 동시에 발행한다.
+     */
     @Transactional
     public BillingLedgerResponse createLedger(LedgerCreateRequest req) {
         Long tenantId = SecurityUtils.getCurrentTenantId();
@@ -77,6 +82,11 @@ public class BillingService {
                 req.getBillingType(), req.getSettlementType(),
                 req.getPeriodStart(), req.getPeriodEnd(),
                 baseAmount, carriedOverIn, req.getDueDate());
+
+        // 납기 기본값: 미지정 시 결제 방식별 기본(선불=기간 시작일 / 후불=기간 종료일) — 계약 등록과 동일 규칙
+        LocalDate due = req.getDueDate() != null ? req.getDueDate()
+                : (req.getSettlementType() == SettlementType.PREPAID ? req.getPeriodStart() : req.getPeriodEnd());
+        ledger.issue(due);
 
         BillingLedger saved = ledgerRepository.save(ledger);
         // [보관기간 동기화] 회차 청구가 계약 종료일을 넘기면 계약을 그 종료일까지 자동 연장

@@ -635,7 +635,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
     setGenOpen(true)
   }
 
-  // 청구서 생성 → 곧바로 발행(ISSUED)까지 → 입금 기록 가능 상태로
+  // 청구서 생성 — 서버가 생성과 동시에 발행까지 끝내므로(createLedger) 별도 발행 호출이 필요 없다
   async function submitGenerate(e: FormEvent) {
     e.preventDefault()
     if (!genStart || !genEnd) return setGenError('청구 기간을 입력하세요.')
@@ -643,7 +643,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
     if (genEnd < genStart) return setGenError('종료일은 시작일보다 빠를 수 없습니다.')
     setCreating(true)
     try {
-      const created = await billingApi.createLedger({
+      await billingApi.createLedger({
         storageOrderId: target!.id,
         billingType: 'MONTHLY',
         settlementType: 'PREPAID',
@@ -652,7 +652,6 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
         baseAmount: genAmount,
         dueDate: genDue || undefined,
       })
-      await billingApi.issue(created.id, genDue || undefined) // 발행해야 수금 가능
       setGenOpen(false)
       load(target!.id)
       // [보관기간 동기화] 회차 청구로 계약 종료일이 확장됐을 수 있으니 계약·달력 갱신
@@ -691,7 +690,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
           )}
           {genOpen && (
             <form onSubmit={submitGenerate} className="space-y-2.5 rounded-xl bg-indigo-50/40 p-3.5 ring-1 ring-indigo-200/60">
-              <p className="text-xs font-semibold text-slate-600">청구서 생성 · 생성 즉시 발행되어 입금 기록이 가능합니다</p>
+              <p className="text-xs font-semibold text-slate-600">청구서 생성 · 생성하면 바로 입금을 기록할 수 있습니다</p>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="mb-0.5 block text-[11px] text-slate-500">청구 시작일</label>
@@ -716,7 +715,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                   취소
                 </button>
                 <button type="submit" disabled={creating} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
-                  {creating ? '생성 중…' : '생성 + 발행'}
+                  {creating ? '생성 중…' : '청구서 생성'}
                 </button>
               </div>
             </form>
