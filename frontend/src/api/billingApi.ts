@@ -153,6 +153,11 @@ export const billingApi = {
     const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/${id}/refund-complete`, {})
     return data
   },
+  // [납기일 변경] 정산서 개별 원장의 납기일을 직접 조정
+  async changeDueDate(id: number, dueDate: string): Promise<BillingLedger> {
+    const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/${id}/due-date`, { dueDate })
+    return data
+  },
   async applyAdjustment(id: number, body: AdjustmentRequest): Promise<BillingLedger> {
     const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/${id}/adjustments`, body)
     return data

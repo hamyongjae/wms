@@ -112,7 +112,16 @@ public class BillingController {
         return ResponseEntity.ok(billingService.completeRefund(id));
     }
 
-    // ===== 정산 기록 삭제 — ADMIN 전용 (수금·조정 내역이 없는 원장만 가능) =====
+    // ===== 납기일 변경 — ADMIN 전용 =====
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{id}/due-date")
+    public ResponseEntity<BillingLedgerResponse> changeDueDate(
+            @PathVariable Long id,
+            @Valid @RequestBody DueDateChangeRequest request) {
+        return ResponseEntity.ok(billingService.changeDueDate(id, request.getDueDate()));
+    }
+
+    // ===== 정산 기록 삭제 — ADMIN 전용 (입금·조정 내역이 없는 원장만 가능) =====
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteLedger(@PathVariable Long id) {

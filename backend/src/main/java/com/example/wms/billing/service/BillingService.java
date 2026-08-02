@@ -306,6 +306,17 @@ public class BillingService {
     }
 
     /**
+     * [납기일 변경] 정산서 화면에서 관리자가 개별 원장의 납기일을 직접 조정한다.
+     * 취소/이월된 원장은 도메인 규칙(requireActive)이 막는다.
+     */
+    @Transactional
+    public BillingLedgerResponse changeDueDate(Long ledgerId, java.time.LocalDate newDueDate) {
+        BillingLedger ledger = lockLedger(ledgerId);
+        ledger.changeDueDate(newDueDate);
+        return new BillingLedgerResponse(ledger);
+    }
+
+    /**
      * [정산 기록 삭제] 실수로 생성됐거나 잘못된 원장을 화면에서 완전히 지운다.
      *
      * [하드가드] 이미 실제 돈이 오간 흔적(수금·조정)이 있거나 다음 원장으로 이월된 원장은

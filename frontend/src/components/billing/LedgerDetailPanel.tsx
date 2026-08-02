@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { isAxiosError } from 'axios'
-import { Loader2, BadgeCheck, HandCoins, SlidersHorizontal, Undo2, Trash2 } from 'lucide-react'
+import { Loader2, BadgeCheck, HandCoins, SlidersHorizontal, CalendarClock, Undo2, Trash2 } from 'lucide-react'
 import {
   billingApi,
   type BillingStatus,
@@ -72,7 +72,7 @@ export default function LedgerDetailPanel({
 }) {
   const [detail, setDetail] = useState<LedgerDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [mode, setMode] = useState<'pay' | 'adjust' | null>(null)
+  const [mode, setMode] = useState<'pay' | 'adjust' | 'duedate' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -201,7 +201,7 @@ export default function LedgerDetailPanel({
           <div className="flex flex-wrap gap-2">
             {canPay && (
               <ActionBtn onClick={() => setMode(mode === 'pay' ? null : 'pay')} icon={<HandCoins size={15} />} tone="emerald">
-                입금 기록
+                입금
               </ActionBtn>
             )}
             {canAdjust && isAdmin && (
@@ -211,6 +211,15 @@ export default function LedgerDetailPanel({
                 tone="amber"
               >
                 조정
+              </ActionBtn>
+            )}
+            {canAdjust && isAdmin && (
+              <ActionBtn
+                onClick={() => setMode(mode === 'duedate' ? null : 'duedate')}
+                icon={<CalendarClock size={15} />}
+                tone="amber"
+              >
+                납기일 변경
               </ActionBtn>
             )}
             {canRefund && isAdmin && (
@@ -231,6 +240,9 @@ export default function LedgerDetailPanel({
             <PaymentForm ledgerId={ledgerId} defaultAmount={l.balance} onDone={afterAction} onError={setActionError} />
           )}
           {mode === 'adjust' && <AdjustmentForm ledgerId={ledgerId} onDone={afterAction} onError={setActionError} />}
+          {mode === 'duedate' && (
+            <DueDateForm ledgerId={ledgerId} currentDueDate={l.dueDate} onDone={afterAction} onError={setActionError} />
+          )}
 
           {/* 입금 이력 */}
           <section>
@@ -354,7 +366,7 @@ function PaymentForm({
       })
       onDone()
     } catch (err) {
-      onError(errMsg(err, '입금 기록에 실패했습니다.'))
+      onError(errMsg(err, '입금에 실패했습니다.'))
     } finally {
       setSubmitting(false)
     }
@@ -362,7 +374,7 @@ function PaymentForm({
 
   return (
     <form onSubmit={submit} className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
-      <p className="text-sm font-semibold text-emerald-800">입금 기록</p>
+      <p className="text-sm font-semibold text-emerald-800">입금</p>
       <div className="grid grid-cols-2 gap-3">
         <Labeled label="입금액(원)">
           <input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} required className={inputCls} />
@@ -461,6 +473,45 @@ function AdjustmentForm({
         할인은 청구액에서 차감되고, 추가 청구는 청구액에 더해집니다.
       </p>
       <SubmitRow submitting={submitting} label="조정 적용" />
+    </form>
+  )
+}
+
+/* ===== 납기일 변경 폼 ===== */
+function DueDateForm({
+  ledgerId,
+  currentDueDate,
+  onDone,
+  onError,
+}: {
+  ledgerId: number
+  currentDueDate: string | null
+  onDone: () => void
+  onError: (m: string) => void
+}) {
+  const [dueDate, setDueDate] = useState(currentDueDate ?? today())
+  const [submitting, setSubmitting] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    try {
+      await billingApi.changeDueDate(ledgerId, dueDate)
+      onDone()
+    } catch (err) {
+      onError(errMsg(err, '납기일 변경에 실패했습니다.'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4">
+      <p className="text-sm font-semibold text-amber-800">납기일 변경</p>
+      <Labeled label="새 납기일">
+        <CalendarField value={dueDate} onChange={setDueDate} format={ymdKorean} className={inputCls} />
+      </Labeled>
+      <SubmitRow submitting={submitting} label="납기일 저장" />
     </form>
   )
 }
