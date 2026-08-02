@@ -585,7 +585,9 @@ export default function YardDispatchPage() {
                     )}
 
                     {/* 상단 층 선택 탭 (크게) — 누르면 그 층만 보임 */}
-                    <div className="flex gap-2 overflow-x-auto pb-1">
+                    {/* [클리핑 방지] overflow-x-auto가 있으면 브라우저가 overflow-y도 auto로 취급해,
+                        굵은 글자의 위쪽 획이 박스 위 여백이 없으면 잘려 보인다 — pt로 여유를 준다 */}
+                    <div className="flex gap-2 overflow-x-auto pt-1.5 pb-1">
                       {floors.map((f) => {
                         const used = f.cells.filter((cell) => cell.occupied).length
                         const active = f.tier === activeFloor?.tier
