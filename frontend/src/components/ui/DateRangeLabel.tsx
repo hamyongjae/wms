@@ -1,18 +1,15 @@
-import { cn } from '@/lib/cn'
-
 /**
- * 보관기간 표시 — 출고 예정일이 없는 장기/유연 계약을 일반 날짜와 시각적으로 구분한다.
+ * 보관기간 표시 — 시작일 ~ 종료일(또는 '출고일 미정')을 항상 같은 모양으로 보여준다.
  *
- * [배경] 출고일이 비어있으면 "~미정"처럼 화면에 흐릿하게 섞여 60대 현장 관리자가
- *   전산 오류로 오인하기 쉽다. 굵고 색이 다른 배지로 "정상적인 장기 보관 건"임을
- *   1초 만에 인지하도록 한다. 순수 표시용 span이라 클릭 핸들러를 붙이지 않는다 —
- *   출고일이 없으니 눌러 들어갈 상세 일정도 없다(터치 오작동 원천 차단).
+ * [이력] 처음엔 미정 건에 회색 배지를 따로 씌워 일반 날짜와 구분했는데, 그러면 카드마다
+ *   보관기간 줄의 생김새가 달라져 오히려 "통일감이 없다"는 피드백을 받았다. 지금은 배지 없이
+ *   양쪽 다 같은 글자 크기·같은 '~' 구분자로만 표시한다. 순수 표시용 span이라 클릭 핸들러를
+ *   붙이지 않는다 — 출고일이 없으니 눌러 들어갈 상세 일정도 없다(터치 오작동 원천 차단).
  */
 export default function DateRangeLabel({
   start,
   end,
   format = (s: string) => s,
-  size = 'md',
   className,
 }: {
   start: string
@@ -21,24 +18,11 @@ export default function DateRangeLabel({
   size?: 'sm' | 'md'
   className?: string
 }) {
-  if (end) {
-    return (
-      <span className={className}>
-        {format(start)}
-        <span className="text-slate-300"> ~ </span>
-        {format(end)}
-      </span>
-    )
-  }
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-md bg-slate-100 font-bold text-slate-500 ring-1 ring-slate-200',
-        size === 'sm' ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-0.5 text-base',
-        className,
-      )}
-    >
-      {format(start)} ~ 출고일 미정
+    <span className={className}>
+      {format(start)}
+      <span className="text-slate-300"> ~ </span>
+      {end ? format(end) : '출고일 미정'}
     </span>
   )
 }
