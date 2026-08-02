@@ -100,8 +100,10 @@ public class StorageOrderService {
 
         // [청구 조건] 결제 방식(미지정 시 후불)과 납기일을 계약에 영속화 — 수정 시 재정산의 기준이 된다.
         LocalDate periodStart = order.getStorageStartDate();
+        // [출고일 미정 임시 기간] 월 단위(MONTHLY) 청구이므로 임시 기간도 한 달로 잡는다.
+        //   예전엔 +7일(어정쩡한 일주일)이라 정산서 화면에 "8/2~8/9"처럼 표시돼 혼동을 줬다.
         LocalDate periodEnd = order.getExpectedEndDate() != null
-                ? order.getExpectedEndDate() : periodStart.plusDays(7);
+                ? order.getExpectedEndDate() : periodStart.plusMonths(1).minusDays(1);
         com.example.wms.billing.entity.SettlementType payType =
                 request.getPaymentType() != null ? request.getPaymentType() : SettlementType.POSTPAID;
         // 납기 기본값: 선불=보관 시작일 / 후불=보관 종료일 (프론트와 동일 규칙, 서버가 이중 방어)
@@ -188,10 +190,10 @@ public class StorageOrderService {
         SettlementType newType = request.getPaymentType() != null
                 ? request.getPaymentType() : order.getPaymentType();
         // 납기일: 명시값 우선, 없으면 결제 방식별 기본(선불=시작일/후불=종료일)
-        // [출고일 미정 방어] 종료일이 없으면 등록 때(createOrder)와 같은 규칙으로 시작일+7일을 임시 기준으로 삼는다.
+        // [출고일 미정 방어] 종료일이 없으면 등록 때(createOrder)와 같은 규칙으로 시작일+1개월을 임시 기준으로 삼는다.
         //   시작일 그대로 쓰면 후불 계약의 납기일이 등록 당일이 되어 장기 계약이 즉시 연체로 보이는 문제가 있었다.
         LocalDate periodEnd = order.getExpectedEndDate() != null
-                ? order.getExpectedEndDate() : order.getStorageStartDate().plusDays(7);
+                ? order.getExpectedEndDate() : order.getStorageStartDate().plusMonths(1).minusDays(1);
         LocalDate newDue = request.getDueDate() != null ? request.getDueDate()
                 : (newType == SettlementType.PREPAID ? order.getStorageStartDate() : periodEnd);
         order.setPaymentType(newType);

@@ -111,8 +111,9 @@ public class BillingBatchService {
         for (StorageOrder order : missing) {
             if (order.getMonthlyFee() == null || order.getMonthlyFee() <= 0) continue;
             LocalDate periodStart = order.getStorageStartDate();
+            // [출고일 미정 임시 기간] 월 단위 청구이므로 한 달로 잡는다 (등록·수정과 동일 규칙)
             LocalDate periodEnd = order.getExpectedEndDate() != null
-                    ? order.getExpectedEndDate() : periodStart.plusDays(7);
+                    ? order.getExpectedEndDate() : periodStart.plusMonths(1).minusDays(1);
             LocalDate dueDate = periodEnd;   // 후불 소급분 납기 = 보관 종료일
 
             BigDecimal base = prorationCalculator.prorateMonthly(
