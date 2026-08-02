@@ -38,7 +38,7 @@ export default function DateRangeLabel({
         className,
       )}
     >
-      {format(start)}~ · 출고일 미정
+      {format(start)} ~ 출고일 미정
     </span>
   )
 }
