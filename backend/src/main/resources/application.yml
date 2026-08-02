@@ -27,6 +27,10 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/wms}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:1234}
+    hikari:
+      # [저사양 서버] 커넥션 하나당 서버·DB 양쪽에 메모리가 들어간다. 기본값(10)은 1GB급 서버에는
+      # 과하고, 지금 트래픽(테넌트 소수) 규모엔 5개면 충분하다 — postgres max_connections(15)도 낮춰둔 것과 짝을 맞춘다.
+      maximum-pool-size: 5
 
   # ===== JPA / Hibernate =====
   jpa:
