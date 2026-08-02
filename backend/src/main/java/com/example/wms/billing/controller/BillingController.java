@@ -106,6 +106,14 @@ public class BillingController {
         return ResponseEntity.ok(billingService.completeRefund(id));
     }
 
+    // ===== 정산 기록 삭제 — ADMIN 전용 (수금·조정 내역이 없는 원장만 가능) =====
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteLedger(@PathVariable Long id) {
+        billingService.deleteLedger(id);
+        return ResponseEntity.noContent().build();
+    }
+
     // ===== 조정/할인 — ADMIN 전용 =====
 
     @PreAuthorize("hasRole('ADMIN')")

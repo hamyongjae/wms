@@ -172,4 +172,8 @@ export const billingApi = {
   async sendPaymentRequest(id: number): Promise<void> {
     await api.post(`/api/billing/ledgers/${id}/notify/payment-request`, {})
   },
+  // [정산 기록 삭제] 수금·조정 내역이 없는 원장만 가능(서버가 재검증) — 잘못 생성된 청구서 정리용
+  async remove(id: number): Promise<void> {
+    await api.delete(`/api/billing/ledgers/${id}`)
+  },
 }

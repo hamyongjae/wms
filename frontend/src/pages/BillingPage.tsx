@@ -15,6 +15,7 @@ import {
   Undo2,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from 'lucide-react'
 import {
   billingApi,
@@ -500,6 +501,10 @@ function LedgerDetailPanel({
   const canCarry = l != null && l.balance > 0 && (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
   // [환불 완료] 환불 대상 금액이 있고 아직 미완료일 때만 (이중 방어 — 백엔드에서도 재검증)
   const canRefund = l != null && (l.refundDue ?? Math.max(-l.balance, 0)) > 0 && !l.refundCompleted
+  // [삭제 가능 조건] 서버가 최종 재검증하지만, 화면에서도 미리 걸러 헛클릭을 막는다.
+  //   수금·조정 흔적이 없고 다음 원장으로 이월되지 않은 원장만 — 실제 돈이 오간 기록은 지울 수 없다.
+  const canDelete =
+    isAdmin && l != null && l.paidTotal === 0 && l.adjustmentTotal === 0 && l.status !== 'CARRIED_OVER'
 
   async function handleIssue() {
     try {
@@ -517,6 +522,18 @@ function LedgerDetailPanel({
       afterAction() // 상세·목록 비동기 재조회 (전체 새로고침 없음)
     } catch (err) {
       setActionError(errMsg(err, '환불 완료 처리에 실패했습니다.'))
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm('이 정산 기록을 삭제하시겠습니까?\n삭제하면 되돌릴 수 없습니다.')) return
+    try {
+      await billingApi.remove(ledgerId)
+      onChanged() // 목록 갱신
+      orderSync.emit()
+      onClose() // 삭제된 원장이라 상세를 계속 보여줄 수 없음 — 패널 닫기
+    } catch (err) {
+      setActionError(errMsg(err, '삭제에 실패했습니다.'))
     }
   }
 
@@ -633,6 +650,11 @@ function LedgerDetailPanel({
               {canRefund && isAdmin && (
                 <ActionBtn onClick={handleCompleteRefund} icon={<BadgeCheck size={15} />} tone="emerald">
                   환불 완료
+                </ActionBtn>
+              )}
+              {canDelete && (
+                <ActionBtn onClick={handleDelete} icon={<Trash2 size={15} />} tone="red">
+                  삭제
                 </ActionBtn>
               )}
             </div>
@@ -935,7 +957,7 @@ function ActionBtn({
 }: {
   onClick: () => void
   icon: ReactNode
-  tone: 'indigo' | 'emerald' | 'amber' | 'violet'
+  tone: 'indigo' | 'emerald' | 'amber' | 'violet' | 'red'
   children: ReactNode
 }) {
   const cls = {
@@ -943,6 +965,7 @@ function ActionBtn({
     emerald: 'bg-emerald-600 hover:bg-emerald-700 text-white',
     amber: 'border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100',
     violet: 'border border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100',
+    red: 'border border-red-300 bg-red-50 text-red-700 hover:bg-red-100',
   }[tone]
   return (
     <button
