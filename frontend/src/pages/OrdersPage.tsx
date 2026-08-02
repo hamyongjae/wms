@@ -243,11 +243,11 @@ export default function OrdersPage() {
   }
 
   // [주의 필요 판정]
-  //  - 입고 미배치: 보관 시작일이 지났는데(오늘 포함) 아직 어느 슬롯에도 배치되지 않은 경우 —
-  //    현장에서 실제 컨테이너 번호 등록을 빠뜨렸을 가능성이 높다.
+  //  - 입고 미배치: 보관 시작일이 지났는데(당일은 아직 입고 작업 중일 수 있으니 다음 날부터)
+  //    아직 어느 슬롯에도 배치되지 않은 경우 — 현장에서 실제 컨테이너 번호 등록을 빠뜨렸을 가능성이 높다.
   //  - 출고 지연: 출고 예정일이 지났는데 아직 출고 처리가 안 돼 컨테이너를 그대로 점유 중인 경우.
   const isUnplaced = (o: StorageOrder) =>
-    o.status === 'INBOUND' && o.storageStartDate <= today() && (locationsByOrder.get(o.id)?.length ?? 0) === 0
+    o.status === 'INBOUND' && o.storageStartDate < today() && (locationsByOrder.get(o.id)?.length ?? 0) === 0
   const isOutboundOverdue = (o: StorageOrder) =>
     o.status === 'INBOUND' && o.expectedEndDate != null && o.expectedEndDate < today()
 
