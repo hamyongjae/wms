@@ -213,7 +213,7 @@ export default function DashboardPage() {
             {/* [최상단] 긴급 알림 — 있을 때만 노출. 화면을 압도하지 않는 차분한 톤 */}
             {urgentItems.length > 0 && (
               <Link
-                to={stats.overdue > 0 ? '/billing' : '/yard'}
+                to={stats.overdue > 0 ? '/billing?filter=OVERDUE' : '/yard'}
                 className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 transition active:bg-red-100"
               >
                 <AlertTriangle size={20} className="shrink-0 text-red-500" />

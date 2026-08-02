@@ -51,7 +51,7 @@ export async function loadNotifications(): Promise<NotificationResult> {
       id: 'overdue-summary',
       text: `미납 청구 ${overdue.length}건이 납기를 지났습니다.`,
       tone: 'red',
-      to: '/billing',
+      to: '/billing?filter=OVERDUE',
     })
     for (const l of overdue.slice(0, 3)) {
       items.push({
@@ -59,7 +59,7 @@ export async function loadNotifications(): Promise<NotificationResult> {
         text: `${l.customerName} · 미수 ${won(l.balance)}`,
         sub: `납기 ${l.dueDate} 경과`,
         tone: 'red',
-        to: '/billing',
+        to: `/billing?ledger=${l.id}`,
       })
     }
   }

@@ -101,6 +101,17 @@ export default function BillingPage() {
     }
   }, [searchParams, setSearchParams])
 
+  // [딥링크] 대시보드 연체 알림에서 /billing?filter=OVERDUE 로 들어오면 연체 칩을 바로 켠다.
+  //   기간이 이번 달로 좁혀져 있으면 지난달 이전에 밀린 연체 건이 안 보이므로 기간도 '전체'로 넓힌다.
+  useEffect(() => {
+    const f = searchParams.get('filter')
+    if (f === 'OVERDUE') {
+      setStatusFilter('OVERDUE')
+      setRange({ from: '', to: '' })
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
+
   const reload = () => setRefreshKey((k) => k + 1)
 
   useEffect(() => {
