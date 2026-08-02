@@ -417,7 +417,10 @@ function AdjustmentForm({
   onDone: () => void
   onError: (m: string) => void
 }) {
-  const [type, setType] = useState<AdjustmentType>('DISCOUNT')
+  // [간소화] 회계 용어 4종(할인/가산/대손상각/정정) 중 실제로 자주 쓰는 '할인/추가청구' 2개만 노출한다.
+  //   대손상각·정정은 과거 이력 표시(ADJ_LABEL)만 유지하고 새로 만드는 화면에서는 뺐다 —
+  //   구분이 세분화될수록 60대 사용자가 "이게 뭐지" 하고 멈추는 지점이 늘어난다.
+  const [type, setType] = useState<'DISCOUNT' | 'SURCHARGE'>('DISCOUNT')
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -438,25 +441,43 @@ function AdjustmentForm({
   return (
     <form onSubmit={submit} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4">
       <p className="text-sm font-semibold text-amber-800">금액 조정</p>
-      <div className="grid grid-cols-2 gap-3">
-        <Labeled label="유형">
-          <select value={type} onChange={(e) => setType(e.target.value as AdjustmentType)} className={inputCls}>
-            {Object.entries(ADJ_LABEL).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </Labeled>
-        <Labeled label="금액(크기)">
-          <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required className={inputCls} />
-        </Labeled>
+      <div>
+        <span className="mb-1 block text-xs font-medium text-slate-600">유형</span>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setType('DISCOUNT')}
+            className={cn(
+              'rounded-lg border py-2 text-sm font-semibold transition',
+              type === 'DISCOUNT'
+                ? 'border-amber-500 bg-amber-100 text-amber-800'
+                : 'border-slate-300 bg-white text-slate-500',
+            )}
+          >
+            할인 (차감)
+          </button>
+          <button
+            type="button"
+            onClick={() => setType('SURCHARGE')}
+            className={cn(
+              'rounded-lg border py-2 text-sm font-semibold transition',
+              type === 'SURCHARGE'
+                ? 'border-amber-500 bg-amber-100 text-amber-800'
+                : 'border-slate-300 bg-white text-slate-500',
+            )}
+          >
+            추가 청구 (가산)
+          </button>
+        </div>
       </div>
+      <Labeled label="금액(크기)">
+        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required className={inputCls} />
+      </Labeled>
       <Labeled label="사유 (오딧 기록)">
         <input value={reason} onChange={(e) => setReason(e.target.value)} required placeholder="예: 단골 10% 할인" className={inputCls} />
       </Labeled>
       <p className="text-xs text-amber-700">
-        할인·대손은 서버가 자동 차감, 가산은 증액 처리합니다. 정정은 입력 부호를 그대로 적용합니다.
+        할인은 청구액에서 차감되고, 추가 청구는 청구액에 더해집니다.
       </p>
       <SubmitRow submitting={submitting} label="조정 적용" />
     </form>
