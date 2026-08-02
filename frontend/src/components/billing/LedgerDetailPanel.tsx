@@ -171,15 +171,18 @@ export default function LedgerDetailPanel({
                 {l.settlementType === 'PREPAID' ? '선납' : '후납'}
               </span>
             </div>
-            <dl className="grid grid-cols-2 gap-y-2 text-sm">
-              <Info label="청구기간">
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              {/* 청구기간은 날짜 범위라 폭이 넓어 옆 칸(납기)과 붙으면 줄바꿈된 숫자가 헷갈린다 — 단독 한 줄 */}
+              <Info label="청구기간" className="col-span-2">
                 {l.periodStart} ~ {l.periodEnd}
               </Info>
               <Info label="납기">{l.dueDate ?? '—'}</Info>
               <Info label="기본 청구액">{won(l.baseAmount)}</Info>
               <Info label="이월 유입">{won(l.carriedOverIn)}</Info>
               <Info label="조정 합계">{won(l.adjustmentTotal)}</Info>
-              <Info label="수금 합계">{won(l.paidTotal)}</Info>
+              <Info label="수금 합계" className="col-span-2">
+                {won(l.paidTotal)}
+              </Info>
             </dl>
             <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3">
               <span className="text-sm text-slate-500">{l.balance < 0 ? '환불 대상 금액' : '미수금 잔액'}</span>
@@ -565,11 +568,11 @@ function SubmitRow({ submitting, label }: { submitting: boolean; label: string }
   )
 }
 
-function Info({ label, children }: { label: string; children: ReactNode }) {
+function Info({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <div>
+    <div className={className}>
       <dt className="text-xs text-slate-400">{label}</dt>
-      <dd className="text-slate-700">{children}</dd>
+      <dd className="mt-0.5 text-slate-700">{children}</dd>
     </div>
   )
 }
