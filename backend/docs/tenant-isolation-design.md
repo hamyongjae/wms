@@ -27,6 +27,20 @@ List<StorageOrder> findByTenantIdAndStatus(Long tenantId, OrderStatus status);
    INSERT 시 tenant_id 자동 주입
 ```
 
+### 리졸버 등록
+
+Spring 빈이 아니라 **`application.yml` 프로퍼티**로 등록합니다.
+
+```yaml
+spring.jpa.properties.hibernate.tenant_identifier_resolver:
+  com.example.wms.security.tenant.WmsTenantIdentifierResolver
+```
+
+Spring Boot의 `HibernatePropertiesCustomizer`를 쓰지 않은 이유는 그 인터페이스의 패키지가
+Boot 메이저 버전마다 이동해 왔기 때문입니다(Boot 4에서 `org.springframework.boot.autoconfigure.orm.jpa`가 사라짐).
+리졸버는 상태가 없고 `TenantContext`의 정적 메서드만 참조하므로 DI가 필요 없고,
+덕분에 Hibernate SPI 하나에만 의존해 Boot 버전 이동에 영향을 받지 않습니다.
+
 ### 적용 엔티티 (10개)
 
 `StorageOrder` `BillingLedger` `BillingAdjustment` `PaymentHistory` `Container`

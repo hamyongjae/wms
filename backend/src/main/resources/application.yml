@@ -42,6 +42,11 @@ spring:
     properties:
       hibernate:
         format_sql: true      # SQL 보기 좋게 정렬
+        # ===== [테넌트 격리] =====
+        # @TenantId 가 붙은 엔티티의 모든 조회에 tenant_id 조건을 자동으로 끼워 넣고,
+        # 저장 시 현재 업체 id 를 자동으로 채운다. 상세는 backend/docs/tenant-isolation-design.md
+        # (Spring 빈이 아니라 클래스명 프로퍼티로 등록한다 — Hibernate 가 직접 인스턴스화)
+        tenant_identifier_resolver: com.example.wms.security.tenant.WmsTenantIdentifierResolver
 
 # ===== 앱 커스텀 설정 =====
 app:

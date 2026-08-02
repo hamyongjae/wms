@@ -1,11 +1,6 @@
 package com.example.wms.security.tenant;
 
-import org.hibernate.cfg.AvailableSettings;
 import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
-import org.springframework.boot.autoconfigure.orm.jpa.HibernatePropertiesCustomizer;
-import org.springframework.stereotype.Component;
-
-import java.util.Map;
 
 /**
  * ===== [Hibernate 테넌트 리졸버] =====
@@ -17,13 +12,23 @@ import java.util.Map;
  * <p>즉 서비스 코드가 조건을 깜빡해도 다른 업체 데이터가 넘어오지 않는다.
  * 격리가 '개발자의 습관'에서 'ORM 의 기본 동작'으로 내려온 것이 이 클래스의 존재 이유다.
  *
+ * <h3>등록 방법</h3>
+ * Spring 빈이 아니라 <b>application.yml 의 프로퍼티</b>로 등록한다.
+ * <pre>
+ * spring.jpa.properties.hibernate.tenant_identifier_resolver:
+ *     com.example.wms.security.tenant.WmsTenantIdentifierResolver
+ * </pre>
+ * Hibernate 가 이 클래스를 직접 인스턴스화한다(기본 생성자 필요).
+ * Spring Boot 의 {@code HibernatePropertiesCustomizer} 를 쓰지 않는 이유는,
+ * 그 인터페이스의 패키지가 Boot 메이저 버전마다 이동해 왔기 때문이다.
+ * 이 클래스는 상태를 갖지 않고 {@link TenantContext} 의 정적 메서드만 참조하므로
+ * 의존성 주입이 필요 없고, 덕분에 Hibernate SPI 하나에만 의존할 수 있다.
+ *
  * <h3>한계 — 반드시 알고 있어야 할 것</h3>
  * 네이티브 SQL({@code @Query(nativeQuery = true)})에는 이 필터가 적용되지 않는다.
  * 네이티브 쿼리를 쓸 때는 지금처럼 직접 tenant 조건을 넣어야 한다.
  */
-@Component
-public class WmsTenantIdentifierResolver
-        implements CurrentTenantIdentifierResolver<Long>, HibernatePropertiesCustomizer {
+public class WmsTenantIdentifierResolver implements CurrentTenantIdentifierResolver<Long> {
 
     @Override
     public Long resolveCurrentTenantIdentifier() {
@@ -46,11 +51,5 @@ public class WmsTenantIdentifierResolver
     @Override
     public boolean validateExistingCurrentSessions() {
         return false;
-    }
-
-    /** Spring Boot 가 만드는 EntityManagerFactory 에 이 리졸버를 등록한다. */
-    @Override
-    public void customize(Map<String, Object> hibernateProperties) {
-        hibernateProperties.put(AvailableSettings.MULTI_TENANT_IDENTIFIER_RESOLVER, this);
     }
 }
