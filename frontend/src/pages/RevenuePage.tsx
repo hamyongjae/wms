@@ -3,8 +3,9 @@ import { ChevronLeft, ChevronRight, TrendingUp, FileText, Users, Loader2, PieCha
 import { orderApi, type StorageOrder } from '@/api/orderApi'
 import { computeRangeRevenue } from '@/lib/revenue'
 import { orderSync } from '@/lib/orderEvents'
-import { addDays } from '@/lib/dates'
+import { addDays, ymdKorean } from '@/lib/dates'
 import { cn } from '@/lib/cn'
+import { CalendarField } from '@/components/order/orderFormUi'
 
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const pct = (r: number) => `${Math.round(r * 100)}%`
@@ -91,40 +92,40 @@ export default function RevenuePage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-3 md:space-y-6">
       <div>
         <h2 className="text-xl font-bold text-slate-800">매출 관리</h2>
       </div>
 
       {/* [기간 필터] 정산 관리와 동일 — 진입 즉시 당월, 월 이동(연·월 동시) + 사용자 지정 기간 */}
-      <div className="flex flex-col gap-3 rounded-2xl bg-white p-3.5 shadow-soft ring-1 ring-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 rounded-2xl bg-white p-2.5 shadow-soft ring-1 ring-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center justify-between gap-2 sm:justify-start">
-          <button type="button" onClick={() => moveMonth(-1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 sm:h-8 sm:w-8" title="이전 달">
+          <button type="button" onClick={() => moveMonth(-1)} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 md:h-8 md:w-8" title="이전 달">
             <ChevronLeft size={18} />
           </button>
-          <span className="text-base font-bold text-slate-800 sm:min-w-24 sm:text-center sm:text-sm sm:font-semibold">{cursor.year}년 {cursor.month1}월</span>
-          <button type="button" onClick={() => moveMonth(1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 sm:h-8 sm:w-8" title="다음 달">
+          <span className="min-w-28 text-center text-base font-bold text-slate-800 md:min-w-24 md:text-sm md:font-semibold">{cursor.year}년 {cursor.month1}월</span>
+          <button type="button" onClick={() => moveMonth(1)} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 md:h-8 md:w-8" title="다음 달">
             <ChevronRight size={18} />
           </button>
-          <button type="button" onClick={goThisMonth} className="ml-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:px-2.5 sm:py-1.5 sm:text-xs">
+          <button type="button" onClick={goThisMonth} className="ml-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 md:px-2.5 md:py-1.5 md:text-xs md:font-medium">
             이번 달
           </button>
         </div>
-        <div className="flex items-center gap-2 text-sm">
-          <input
-            type="date"
+        <div className="flex flex-1 items-center gap-2 text-sm sm:flex-none">
+          <CalendarField
             value={range.from}
+            onChange={(v) => setRange((r) => ({ ...r, from: v }))}
             max={range.to || undefined}
-            onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
-            className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            format={ymdKorean}
+            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:w-36 sm:flex-none"
           />
-          <span className="text-slate-400">~</span>
-          <input
-            type="date"
+          <span className="shrink-0 text-slate-400">~</span>
+          <CalendarField
             value={range.to}
+            onChange={(v) => setRange((r) => ({ ...r, to: v }))}
             min={range.from || undefined}
-            onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
-            className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            format={ymdKorean}
+            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:w-36 sm:flex-none"
           />
         </div>
       </div>
@@ -139,22 +140,22 @@ export default function RevenuePage() {
       ) : (
         <>
           {/* 모바일: 매출 히어로 카드 + 가로 2칸 요약 */}
-          <div className="space-y-3 md:hidden">
-            <div className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-200/60">
+          <div className="space-y-2 md:hidden">
+            <div className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-200/60">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-slate-500">{revenueLabel}</span>
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
                   <TrendingUp size={18} />
                 </span>
               </div>
-              <p className="mt-2 text-3xl font-extrabold leading-none text-slate-900">{won(summary.total)}</p>
+              <p className="mt-1.5 text-3xl font-extrabold leading-none text-slate-900">{won(summary.total)}</p>
               {deltaPct != null && (
-                <p className={cn('mt-2 text-sm font-bold', delta >= 0 ? 'text-emerald-600' : 'text-red-500')}>
+                <p className={cn('mt-1.5 text-sm font-bold', delta >= 0 ? 'text-emerald-600' : 'text-red-500')}>
                   {deltaLabel} {delta >= 0 ? '▲' : '▼'} {won(Math.abs(delta))} ({deltaPct >= 0 ? '+' : ''}{deltaPct}%)
                 </p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               <div className="rounded-2xl bg-white p-4 text-center shadow-soft ring-1 ring-slate-200/60">
                 <p className="text-2xl font-extrabold text-slate-800">{summary.contractCount}건</p>
                 <p className="mt-1 text-xs font-semibold text-slate-500">매출 발생 계약</p>
@@ -202,7 +203,7 @@ export default function RevenuePage() {
             </div>
           </div>
 
-          <section className="rounded-2xl bg-white p-6 shadow-soft ring-1 ring-slate-200/60">
+          <section className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-200/60 md:p-6">
             <div className="flex items-center justify-between">
               <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
                 <PieChart size={15} className="text-slate-400" /> 고객별 매출 비중
@@ -213,7 +214,7 @@ export default function RevenuePage() {
             {summary.customers.length === 0 ? (
               <p className="py-14 text-center text-sm text-slate-400">이 기간에 발생한 보관 매출이 없습니다.</p>
             ) : (
-              <ul className="mt-5 space-y-4">
+              <ul className="mt-4 space-y-3">
                 {summary.customers.map((c, i) => (
                   <li key={c.customerId}>
                     <div className="flex items-center justify-between gap-2 text-base">
