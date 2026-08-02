@@ -80,4 +80,9 @@ public class PaymentHistory {
     public void markReversed() {
         this.reversed = true;
     }
+
+    /** [취소 롤백] 잘못 취소한 수금 건을 다시 유효한 수금으로 되돌린다 */
+    public void markRestored() {
+        this.reversed = false;
+    }
 }

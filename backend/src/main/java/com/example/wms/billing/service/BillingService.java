@@ -262,6 +262,28 @@ public class BillingService {
     }
 
     /**
+     * [취소 롤백] 실수로 취소한 수금 건을 다시 유효한 수금으로 되돌린다.
+     * 원장에 금액을 재반영하므로, 그 사이 원장이 취소/이월돼 더 이상 변경할 수 없는 상태라면
+     * 도메인 규칙(requireActive)이 막는다 — 그런 경우는 되돌리지 않고 예외로 알린다.
+     */
+    @Transactional
+    public BillingLedgerResponse restorePayment(Long paymentId) {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+
+        PaymentHistory payment = paymentHistoryRepository.findByIdAndTenantId(paymentId, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 수금 건입니다. id=" + paymentId));
+        if (!payment.isReversed()) {
+            throw new IllegalArgumentException("취소되지 않은 수금 건입니다.");
+        }
+
+        BillingLedger ledger = lockLedger(payment.getBillingLedger().getId());
+        ledger.applyPayment(payment.getAmount());
+        payment.markRestored();
+
+        return new BillingLedgerResponse(ledger);
+    }
+
+    /**
      * [환불 완료 처리] 환불 대상 금액(과오납)을 실제 지급 후 마감한다.
      * 비관적 락으로 원장을 잠근 뒤 도메인 규칙(completeRefund)으로 잔액을 0원으로 정리하고 상태를 마감한다.
      * (이미 환불 완료됐거나 환불 대상이 없으면 도메인에서 예외 → 중복 처리 차단)

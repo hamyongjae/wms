@@ -150,6 +150,11 @@ export const billingApi = {
     const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/payments/${paymentId}/reverse`, {})
     return data
   },
+  // [취소 롤백] 잘못 취소한 수금 건을 다시 유효한 수금으로 되돌린다
+  async restorePayment(paymentId: number): Promise<BillingLedger> {
+    const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/payments/${paymentId}/restore`, {})
+    return data
+  },
   // 환불 완료 처리 — 환불 대상 금액을 실제 지급 후 마감(잔액 0·정산 마감)
   async completeRefund(id: number): Promise<BillingLedger> {
     const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/${id}/refund-complete`, {})

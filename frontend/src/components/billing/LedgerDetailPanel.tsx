@@ -290,6 +290,24 @@ export default function LedgerDetailPanel({
                         취소
                       </button>
                     )}
+                    {isAdmin && p.reversed && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!window.confirm('이 수금 건을 다시 유효한 수금으로 되돌릴까요?')) return
+                          try {
+                            await billingApi.restorePayment(p.id)
+                            afterAction()
+                          } catch (err) {
+                            setActionError(errMsg(err, '수금 복원에 실패했습니다.'))
+                          }
+                        }}
+                        className="flex items-center gap-1 text-xs text-indigo-500 transition hover:text-indigo-700"
+                      >
+                        <Undo2 size={13} className="-scale-x-100" />
+                        복원
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
