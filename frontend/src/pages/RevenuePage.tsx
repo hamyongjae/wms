@@ -94,7 +94,6 @@ export default function RevenuePage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
         <h2 className="text-xl font-bold text-slate-800">매출 관리</h2>
-        <p className="mt-1 text-sm text-slate-500">계약 점유 기간에 따라 자동 누적되는 보관 매출을 한 화면에서 확인합니다.</p>
       </div>
 
       {/* [기간 필터] 정산 관리와 동일 — 진입 즉시 당월, 월 이동(연·월 동시) + 사용자 지정 기간 */}
