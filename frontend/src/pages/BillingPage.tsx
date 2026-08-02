@@ -25,14 +25,14 @@ import { CalendarField } from '@/components/order/orderFormUi'
 
 /* '연체'는 저장 상태가 아니라 시점 해석 — 클라이언트 파생 필터로 제공한다 */
 type FilterKey = 'ALL' | BillingStatus | 'OVERDUE'
+// [간소화] '작성중(DRAFT)'·'이월(CARRIED_OVER)' 칩은 뺐다 — 생성=발행 통합 이후 새 정산서는 DRAFT가
+//   될 수 없고, 이월 기능 자체를 없앴으므로 두 필터는 항상 0건만 뜨는 죽은 버튼이었다.
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'ALL', label: '전체' },
   { key: 'OVERDUE', label: '연체' },
   { key: 'ISSUED', label: '발행' },
   { key: 'PARTIALLY_PAID', label: '부분수금' },
   { key: 'PAID', label: '완납' },
-  { key: 'DRAFT', label: '작성중' },
-  { key: 'CARRIED_OVER', label: '이월' },
 ]
 
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
