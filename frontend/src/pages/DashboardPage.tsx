@@ -245,11 +245,6 @@ export default function DashboardPage() {
                   <p className="text-sm font-semibold text-orange-600">출고</p>
                 </Link>
               </div>
-              {(stats.todayInbound.length > 0 || stats.todayOutbound.length > 0) && (
-                <p className="mt-3 text-sm leading-relaxed text-slate-500">
-                  {[...stats.todayInbound, ...stats.todayOutbound].map((o) => o.customerName).join(', ')}
-                </p>
-              )}
             </MobileCard>
 
             {/* 입출고 일정 (달력 + 선택일 화주) */}
