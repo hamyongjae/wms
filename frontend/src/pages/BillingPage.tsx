@@ -30,7 +30,7 @@ type FilterKey = 'ALL' | BillingStatus | 'OVERDUE'
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'ALL', label: '전체' },
   { key: 'OVERDUE', label: '연체' },
-  { key: 'ISSUED', label: '발행' },
+  { key: 'ISSUED', label: '입금예정' }, // 목록 행 배지(displayStatus)와 같은 말을 쓴다 — '발행'은 회계 용어라 배지 문구와 안 맞았다
   { key: 'PARTIALLY_PAID', label: '부분수금' },
   { key: 'PAID', label: '완납' },
 ]
