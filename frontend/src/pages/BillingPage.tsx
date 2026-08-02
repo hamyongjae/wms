@@ -20,7 +20,8 @@ import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { isOverdue, daysFromDue, displayStatus } from '@/lib/billing'
 import { orderSync } from '@/lib/orderEvents'
-import { today } from '@/lib/dates'
+import { today, ymdKorean } from '@/lib/dates'
+import { CalendarField } from '@/components/order/orderFormUi'
 
 /* '연체'는 저장 상태가 아니라 시점 해석 — 클라이언트 파생 필터로 제공한다 */
 type FilterKey = 'ALL' | BillingStatus | 'OVERDUE'
@@ -175,10 +176,7 @@ export default function BillingPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-3 md:space-y-6">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800">정산 관리</h2>
-          <p className="mt-0.5 text-sm text-slate-500">보관료 정산서와 수금·조정을 관리합니다.</p>
-        </div>
+        <h2 className="text-xl font-bold text-slate-800">정산 관리</h2>
       </div>
 
       {notice && (
@@ -204,21 +202,21 @@ export default function BillingPage() {
             이번 달
           </button>
         </div>
-        <div className="flex items-center gap-2 text-sm">
-          <input
-            type="date"
+        <div className="flex flex-1 items-center gap-2 text-sm sm:flex-none">
+          <CalendarField
             value={range.from}
+            onChange={(v) => setRange((r) => ({ ...r, from: v }))}
             max={range.to || undefined}
-            onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
-            className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            format={ymdKorean}
+            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:w-36 sm:flex-none"
           />
-          <span className="text-slate-400">~</span>
-          <input
-            type="date"
+          <span className="shrink-0 text-slate-400">~</span>
+          <CalendarField
             value={range.to}
+            onChange={(v) => setRange((r) => ({ ...r, to: v }))}
             min={range.from || undefined}
-            onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
-            className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            format={ymdKorean}
+            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:w-36 sm:flex-none"
           />
         </div>
       </div>

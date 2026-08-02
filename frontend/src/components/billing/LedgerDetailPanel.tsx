@@ -10,7 +10,7 @@ import {
 } from '@/api/billingApi'
 import { cn } from '@/lib/cn'
 import { orderSync } from '@/lib/orderEvents'
-import { today } from '@/lib/dates'
+import { today, ymdKorean } from '@/lib/dates'
 import Modal from '@/components/ui/Modal'
 import { CalendarField } from '@/components/order/orderFormUi'
 
@@ -29,11 +29,6 @@ import { CalendarField } from '@/components/order/orderFormUi'
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 function errMsg(err: unknown, fallback: string): string {
   return isAxiosError(err) ? (err.response?.data?.message ?? fallback) : fallback
-}
-/** yyyy-MM-dd → '2026년 8월 2일' (0으로 채우지 않은 자연스러운 한글 표기) */
-function ymdKorean(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  return `${y}년 ${m}월 ${d}일`
 }
 
 const inputCls =

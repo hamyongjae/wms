@@ -48,3 +48,9 @@ export function endOfMonth(dateStr: string): string {
   const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0))
   return last.toISOString().slice(0, 10)
 }
+
+/** yyyy-MM-dd → '2026년 8월 2일' (0으로 채우지 않은 자연스러운 한글 표기) */
+export function ymdKorean(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return `${y}년 ${m}월 ${d}일`
+}
