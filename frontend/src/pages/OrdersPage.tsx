@@ -898,6 +898,16 @@ export function CreateOrderModal({
   //   보관료는 담당자가 직접 입력한 값만 저장되며, 날짜·위치를 바꿔도 금액이 바뀌지 않는다.
 
   const periodError = validateContractPeriod(storageStartDate, expectedEndDate)
+  // [예약 계약] 보관 시작일이 미래면 아직 실제로 입고된 게 아니므로 컨테이너를 물리적으로 배치할 수 없다
+  //   (백엔드가 "입고일은 오늘 이후로 지정할 수 없습니다"로 막는다) — 그 자리에서 바로 자리를 배정하는 대신
+  //   입고일이 되면 컨테이너 관리 화면에서 배치하도록 안내한다.
+  const isFutureStart = storageStartDate !== '' && storageStartDate > today()
+
+  // [예약 계약 방어] 날짜를 미래로 바꾸는 순간 이미 골라둔 자리 선택은 무효화한다
+  //   (자리 선택 UI는 아래에서 숨기지만, 상태값이 남아있으면 제출 시 배치를 시도해 같은 오류가 난다)
+  useEffect(() => {
+    if (isFutureStart) setSlotId(null)
+  }, [isFutureStart])
 
   function validate(): boolean {
     if (!selectedCustomer) {
@@ -1053,11 +1063,17 @@ export function CreateOrderModal({
 
                 <div>
                   <label className={labelCls}>컨테이너 위치 지정</label>
-                  <LocationPickerField
-                    warehouseId={warehouseId ? Number(warehouseId) : null}
-                    value={slotId}
-                    onChange={setSlotId}
-                  />
+                  {isFutureStart ? (
+                    <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3.5 py-3 text-sm text-slate-500">
+                      보관 시작일이 아직 오지 않은 예약 계약입니다. 입고일이 되면 컨테이너 관리 화면에서 자리를 배정해주세요.
+                    </p>
+                  ) : (
+                    <LocationPickerField
+                      warehouseId={warehouseId ? Number(warehouseId) : null}
+                      value={slotId}
+                      onChange={setSlotId}
+                    />
+                  )}
                 </div>
               </>
             )}
@@ -1113,7 +1129,14 @@ export function CreateOrderModal({
 
             <FieldGrid>
               <GridField label="보관 시작일" required>
-                <CalendarField value={storageStartDate} onChange={setStartDate} className={gridInputCls} />
+                <CalendarField
+                  value={storageStartDate}
+                  onChange={setStartDate}
+                  // [즉시 배치 전제] 빈 자리를 탭해 들어온 입고 등록은 "지금 물리적으로 놓는" 흐름이라
+                  //   미래 날짜를 고르면 배치 시점에 항상 실패한다 — 애초에 오늘 이전으로만 고르게 막는다.
+                  max={fixedSlot ? today() : undefined}
+                  className={gridInputCls}
+                />
               </GridField>
               {/* '미정' 스위치는 라벨 줄 오른쪽에 — 입력창 높이를 다른 칸과 같게 유지한다 */}
               <GridField

@@ -12,6 +12,7 @@ import { containerApi, type Container } from '@/api/containerApi'
 import { yardApi } from '@/api/yardApi'
 import { cn } from '@/lib/cn'
 import { validateContractPeriod } from '@/lib/dateValidation'
+import { today } from '@/lib/dates'
 import { calcDailyFee, storageDays } from '@/lib/fee'
 import { placeContainerAtSlot } from '@/lib/containerPlacement'
 import { orderSync } from '@/lib/orderEvents'
@@ -160,6 +161,15 @@ export default function EditOrderModal({
     }
   }, [target])
 
+  // [예약 계약 방어] 보관 시작일을 미래로 바꾸는 순간 자리 이동 선택은 무효화한다(원래 자리로 되돌림).
+  //   위치 지정 UI는 아래에서 숨기지만, 상태값이 남아있으면 제출 시 자리 이동을 시도해
+  //   "입고일은 오늘 이후로 지정할 수 없습니다" 오류가 난다.
+  useEffect(() => {
+    if (storageStartDate !== '' && storageStartDate > today()) {
+      setSlotId(currentSlotId)
+    }
+  }, [storageStartDate, currentSlotId])
+
   if (!target) return null
 
   // [정합성] 보관 시작일이 계약 종료일보다 미래가 될 수 없다 (당일 허용)
@@ -168,6 +178,9 @@ export default function EditOrderModal({
   const dailyFee = calcDailyFee(monthlyFee, storageStartDate, expectedEndDate)
   const locationChanged = slotId !== currentSlotId
   const locationLabel = hint?.locationLabel
+  // [예약 계약] 보관 시작일을 미래로 바꾸면 아직 실제 입고가 아니므로 자리를 물리적으로 옮길 수 없다
+  //   (백엔드가 "입고일은 오늘 이후로 지정할 수 없습니다"로 막는다) — 위치 지정 UI를 숨기고 안내한다.
+  const isFutureStart = storageStartDate !== '' && storageStartDate > today()
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -283,12 +296,18 @@ export default function EditOrderModal({
               </button>
             )}
           </div>
-          <LocationPickerField
-            warehouseId={target.warehouseId}
-            value={slotId}
-            onChange={setSlotId}
-            currentSlotId={currentSlotId}
-          />
+          {isFutureStart ? (
+            <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3.5 py-3 text-sm text-slate-500">
+              보관 시작일이 아직 오지 않은 예약 계약입니다. 입고일이 되면 컨테이너 관리 화면에서 자리를 배정해주세요.
+            </p>
+          ) : (
+            <LocationPickerField
+              warehouseId={target.warehouseId}
+              value={slotId}
+              onChange={setSlotId}
+              currentSlotId={currentSlotId}
+            />
+          )}
         </div>
 
         <FieldGrid>
