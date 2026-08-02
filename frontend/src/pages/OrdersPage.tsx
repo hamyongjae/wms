@@ -152,6 +152,9 @@ export default function OrdersPage() {
   const [statusTarget, setStatusTarget] = useState<StorageOrder | null>(null) // 입/출고 처리 모달 대상
   // 계약 id → 배치된 슬롯 위치 라벨 목록 (창고+화주 기준으로 조인)
   const [locationsByOrder, setLocationsByOrder] = useState<Map<number, string[]>>(new Map())
+  // [주의 필요 필터] 상단 경고 배너를 눌러 "입고 미배치" / "출고 지연" 건만 골라 보기.
+  //   상태 탭(전체/입고/출고)과는 별개 축이라, 활성화하면 다른 조회 조건은 초기화해 결과가 헷갈리지 않게 한다.
+  const [attention, setAttention] = useState<'NONE' | 'UNPLACED' | 'OVERDUE'>('NONE')
 
   const reload = () => setRefreshKey((k) => k + 1)
 
@@ -239,6 +242,31 @@ export default function OrdersPage() {
     }
   }
 
+  // [주의 필요 판정]
+  //  - 입고 미배치: 보관 시작일이 지났는데(오늘 포함) 아직 어느 슬롯에도 배치되지 않은 경우 —
+  //    현장에서 실제 컨테이너 번호 등록을 빠뜨렸을 가능성이 높다.
+  //  - 출고 지연: 출고 예정일이 지났는데 아직 출고 처리가 안 돼 컨테이너를 그대로 점유 중인 경우.
+  const isUnplaced = (o: StorageOrder) =>
+    o.status === 'INBOUND' && o.storageStartDate <= today() && (locationsByOrder.get(o.id)?.length ?? 0) === 0
+  const isOutboundOverdue = (o: StorageOrder) =>
+    o.status === 'INBOUND' && o.expectedEndDate != null && o.expectedEndDate < today()
+
+  const unplacedCount = useMemo(
+    () => orders.filter(isUnplaced).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [orders, locationsByOrder],
+  )
+  const overdueCount = useMemo(() => orders.filter(isOutboundOverdue).length, [orders])
+
+  // 배너를 눌러 주의 필요 목록만 볼 때는 다른 조회 조건(상태 탭·조회어·날짜)을 비워
+  // "지금 이 화면에 보이는 게 전부"라는 걸 명확히 한다.
+  function toggleAttention(kind: 'UNPLACED' | 'OVERDUE') {
+    setAttention((prev) => (prev === kind ? 'NONE' : kind))
+    setFilter('ALL')
+    setQuery('')
+    setDate('')
+  }
+
   // [필터 칩 개수 = 실제 조회 결과와 항상 일치] 조회어·날짜 조건은 그대로 두고 상태(전체/입고/출고)만 바꿔가며
   //   세어야, 칩에 적힌 숫자와 칩을 눌렀을 때 실제로 보이는 건수가 어긋나지 않는다.
   //
@@ -263,11 +291,13 @@ export default function OrdersPage() {
     return true
   }
 
-  const visible = useMemo(
-    () => orders.filter((o) => matchesFilter(o, filter)),
+  const visible = useMemo(() => {
+    const base = orders.filter((o) => matchesFilter(o, filter))
+    if (attention === 'UNPLACED') return base.filter(isUnplaced)
+    if (attention === 'OVERDUE') return base.filter(isOutboundOverdue)
+    return base
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [orders, filter, query, date],
-  )
+  }, [orders, filter, query, date, attention, locationsByOrder])
 
   // [상태 처리 완료] 모달에서 처리된 결과를 해당 행만 즉시 반영 (새로고침 없음)
   function handleStatusChanged(updated: StorageOrder) {
@@ -331,6 +361,53 @@ export default function OrdersPage() {
       </div>
 
       <Fab actions={[{ label: '계약 등록', icon: Plus, onClick: () => setCreateOpen(true) }]} />
+
+      {/* [주의 필요 배너] 입고일 지났는데 위치 미배치 / 출고일 지났는데 그대로 점유 중인 계약을
+          숫자로 먼저 보여주고, 눌러서 바로 그 목록만 걸러본다. 0건이면 배너 자체를 숨겨 평소엔 조용하다. */}
+      {(unplacedCount > 0 || overdueCount > 0) && (
+        <div className="flex flex-wrap gap-1.5">
+          {unplacedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => toggleAttention('UNPLACED')}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition',
+                attention === 'UNPLACED'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-red-50 text-red-600 ring-1 ring-red-200 hover:bg-red-100',
+              )}
+            >
+              <AlertTriangle size={14} />
+              입고 미배치 {unplacedCount}건
+            </button>
+          )}
+          {overdueCount > 0 && (
+            <button
+              type="button"
+              onClick={() => toggleAttention('OVERDUE')}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition',
+                attention === 'OVERDUE'
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100',
+              )}
+            >
+              <AlertTriangle size={14} />
+              출고 지연 {overdueCount}건
+            </button>
+          )}
+          {attention !== 'NONE' && (
+            <button
+              type="button"
+              onClick={() => setAttention('NONE')}
+              className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-slate-400 transition hover:text-slate-600"
+            >
+              <X size={14} />
+              필터 해제
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 조회 기간 — 상태 필터(전체·입고·출고) + 사용자 지정 기간(기본: 오늘로부터 한 달) */}
       <div className="rounded-2xl bg-white p-2.5 shadow-soft ring-1 ring-slate-200/60">
@@ -437,10 +514,12 @@ export default function OrdersPage() {
             <FileText size={22} />
           </div>
           <p className="mt-4 text-base font-semibold text-slate-700">
-            {query.trim() || filter !== 'ALL' || date ? '조회 결과가 없습니다' : '계약이 없습니다'}
+            {query.trim() || filter !== 'ALL' || date || attention !== 'NONE' ? '조회 결과가 없습니다' : '계약이 없습니다'}
           </p>
           <p className="mt-1 text-sm text-slate-400">
-            {query.trim() || filter !== 'ALL' || date ? '다른 날짜·조건으로 다시 조회해 보세요.' : '"계약 등록"으로 첫 보관 계약을 추가하세요.'}
+            {query.trim() || filter !== 'ALL' || date || attention !== 'NONE'
+              ? '다른 날짜·조건으로 다시 조회해 보세요.'
+              : '"계약 등록"으로 첫 보관 계약을 추가하세요.'}
           </p>
         </div>
       )}
@@ -466,10 +545,15 @@ export default function OrdersPage() {
                   <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-800">{o.customerName}</td>
                   <td className="whitespace-nowrap px-5 py-3 text-slate-500">{o.warehouseName}</td>
                   <td className="whitespace-nowrap px-5 py-3 text-slate-500">
-                    <OrderLocationBadge locs={locationsByOrder.get(o.id) ?? []} />
+                    <OrderLocationBadge locs={locationsByOrder.get(o.id) ?? []} overdue={isUnplaced(o)} />
                   </td>
                   <td className="whitespace-nowrap px-5 py-3 text-slate-500">
                     <DateRangeLabel start={o.storageStartDate} end={o.actualEndDate ?? o.expectedEndDate} size="sm" />
+                    {isOutboundOverdue(o) && (
+                      <div className="mt-0.5">
+                        <OutboundOverdueBadge />
+                      </div>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-5 py-3 text-right text-slate-700">{won(o.monthlyFee)}</td>
                   <td className="whitespace-nowrap px-5 py-3">
@@ -487,8 +571,6 @@ export default function OrdersPage() {
       {!loading && !error && visible.length > 0 && (
         <div className="space-y-1.5 md:hidden">
           {visible.map((o) => {
-            // [방어적 표시] 출고 예정일이 지났는데 아직 보관 중 → '출고 지연' 경고
-            const delayed = o.status === 'INBOUND' && o.expectedEndDate != null && o.expectedEndDate < today()
             const locs = locationsByOrder.get(o.id) ?? []
             return (
               <div key={o.id} className="rounded-2xl bg-white p-2.5 shadow-soft ring-1 ring-slate-200/60">
@@ -500,11 +582,7 @@ export default function OrdersPage() {
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <OrderStatusBadge status={o.status} />
-                    {delayed && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
-                        <AlertTriangle size={11} /> 출고 지연
-                      </span>
-                    )}
+                    {isOutboundOverdue(o) && <OutboundOverdueBadge />}
                   </div>
                 </div>
 
@@ -517,7 +595,7 @@ export default function OrdersPage() {
                   />
                   <div className="flex items-center justify-between gap-3">
                     <span className="shrink-0 text-sm font-medium text-slate-400">위치</span>
-                    <OrderLocationBadge locs={locs} />
+                    <OrderLocationBadge locs={locs} overdue={isUnplaced(o)} />
                   </div>
                 </div>
 
@@ -1629,11 +1707,20 @@ function RowAction({
   )
 }
 
-/** [공용] 계약 위치 배지 — 테이블 셀과 모바일 카드가 동일 렌더를 공유(중복 제거) */
-function OrderLocationBadge({ locs }: { locs: string[] }) {
+/** [공용] 계약 위치 배지 — 테이블 셀과 모바일 카드가 동일 렌더를 공유(중복 제거)
+ *  overdue: 입고일이 지났는데도 미배치인 경우 중립 배지 대신 경고색으로 눈에 띄게 한다. */
+function OrderLocationBadge({ locs, overdue }: { locs: string[]; overdue?: boolean }) {
   if (locs.length === 0)
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#E2DCD1] bg-[#EFEBE4]/60 px-2 py-0.5 text-xs font-medium text-[#8A8172]">
+      <span
+        className={cn(
+          'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
+          overdue
+            ? 'border-red-200 bg-red-50 text-red-600'
+            : 'border-dashed border-[#E2DCD1] bg-[#EFEBE4]/60 text-[#8A8172]',
+        )}
+      >
+        {overdue && <AlertTriangle size={11} />}
         위치 미지정
       </span>
     )
@@ -1641,6 +1728,15 @@ function OrderLocationBadge({ locs }: { locs: string[] }) {
     <span title={locs.join(', ')} className="inline-flex items-center gap-1">
       <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">{locs[0]}</span>
       {locs.length > 1 && <span className="text-xs text-slate-400">외 {locs.length - 1}</span>}
+    </span>
+  )
+}
+
+/** [공용] 출고 지연 배지 — 출고 예정일이 지났는데 아직 출고 처리가 안 된 계약에 표시 */
+function OutboundOverdueBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+      <AlertTriangle size={11} /> 출고 지연
     </span>
   )
 }
