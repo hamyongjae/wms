@@ -99,9 +99,18 @@ export default function LedgerDetailPanel({
   // [환불 완료] 환불 대상 금액이 있고 아직 미완료일 때만 (이중 방어 — 백엔드에서도 재검증)
   const canRefund = l != null && (l.refundDue ?? Math.max(-l.balance, 0)) > 0 && !l.refundCompleted
   // [삭제 가능 조건] 서버가 최종 재검증하지만, 화면에서도 미리 걸러 헛클릭을 막는다.
-  //   수금·조정 흔적이 없고 다음 원장으로 이월되지 않은 원장만 — 실제 돈이 오간 기록은 지울 수 없다.
+  //   입금·조정 흔적이 없고 다음 원장으로 이월되지 않은 원장만 — 실제 돈이 오간 기록은 지울 수 없다.
   const canDelete =
     isAdmin && l != null && l.paidTotal === 0 && l.adjustmentTotal === 0 && l.status !== 'CARRIED_OVER'
+  // [한 줄 고정] 버튼 개수가 상황마다 달라(입금/조정/납기일변경/환불완료/삭제) flex-wrap이면
+  //   두 번째 줄로 밀리기 쉽다 — 실제로 보일 개수만큼 그리드 칸을 나눠 항상 한 줄에 맞춘다.
+  const visibleActionCount = [
+    canPay,
+    canAdjust && isAdmin,
+    canAdjust && isAdmin, // 납기일 변경 — 조정과 같은 조건으로 함께 뜬다
+    canRefund && isAdmin,
+    canDelete,
+  ].filter(Boolean).length
 
   async function handleCompleteRefund() {
     if (!window.confirm('환불 완료 처리하시겠습니까?\n환불 대상 금액을 지급 완료로 마감하고 잔액을 0원으로 정리합니다.')) return
@@ -197,8 +206,8 @@ export default function LedgerDetailPanel({
             )}
           </section>
 
-          {/* 액션 버튼 */}
-          <div className="flex flex-wrap gap-2">
+          {/* 액션 버튼 — 개수에 맞춰 칸을 나눠 항상 한 줄에 맞춘다 */}
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${visibleActionCount || 1}, minmax(0, 1fr))` }}>
             {canPay && (
               <ActionBtn onClick={() => setMode(mode === 'pay' ? null : 'pay')} icon={<HandCoins size={15} />} tone="emerald">
                 입금
@@ -210,7 +219,7 @@ export default function LedgerDetailPanel({
                 icon={<SlidersHorizontal size={15} />}
                 tone="amber"
               >
-                조정
+                금액 조정
               </ActionBtn>
             )}
             {canAdjust && isAdmin && (
@@ -537,10 +546,13 @@ function ActionBtn({
     <button
       type="button"
       onClick={onClick}
-      className={cn('flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition', cls)}
+      className={cn(
+        'flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-2 text-center text-xs font-medium leading-tight transition',
+        cls,
+      )}
     >
       {icon}
-      {children}
+      <span className="truncate">{children}</span>
     </button>
   )
 }
