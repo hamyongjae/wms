@@ -12,6 +12,7 @@ import { cn } from '@/lib/cn'
 import { orderSync } from '@/lib/orderEvents'
 import { today } from '@/lib/dates'
 import Modal from '@/components/ui/Modal'
+import { CalendarField } from '@/components/order/orderFormUi'
 
 /**
  * ===== [정산 상세 팝업 — 단일 공용 템플릿] =====
@@ -396,7 +397,7 @@ function PaymentForm({
           </select>
         </Labeled>
         <Labeled label="입금일">
-          <input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} required className={inputCls} />
+          <CalendarField value={paidOn} onChange={setPaidOn} className={inputCls} />
         </Labeled>
         <Labeled label="메모">
           <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} />
