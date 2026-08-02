@@ -408,7 +408,7 @@ export default function EditOrderModal({
           <PaymentAccountPicker staffList={staffList} value={settlementUserId} onChange={setSettlementUserId} />
         )}
 
-        <AutoBillingToggle checked={autoBillingEnabled} onChange={setAutoBillingEnabled} />
+        <AutoBillingToggle checked={autoBillingEnabled} onChange={setAutoBillingEnabled} dueDate={dueDate} />
 
         <Field label="메모">
           <textarea

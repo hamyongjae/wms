@@ -1274,7 +1274,7 @@ export function CreateOrderModal({
               />
             )}
 
-            <AutoBillingToggle checked={autoBillingEnabled} onChange={setAutoBillingEnabled} />
+            <AutoBillingToggle checked={autoBillingEnabled} onChange={setAutoBillingEnabled} dueDate={dueDate} />
 
             <div>
               <label className={labelCls}>메모</label>

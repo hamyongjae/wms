@@ -140,9 +140,9 @@ export function UndecidedToggle({ checked, onChange }: { checked: boolean; onCha
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 const pad2 = (n: number) => String(n).padStart(2, '0')
 const toIso = (y: number, m0: number, d: number) => `${y}-${pad2(m0 + 1)}-${pad2(d)}`
-function parseIso(s: string): { y: number; m0: number } | null {
+function parseIso(s: string): { y: number; m0: number; d: number } | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
-  return m ? { y: Number(m[1]), m0: Number(m[2]) - 1 } : null
+  return m ? { y: Number(m[1]), m0: Number(m[2]) - 1, d: Number(m[3]) } : null
 }
 
 /**
@@ -297,11 +297,22 @@ export function CalendarField({
 /**
  * [정산서 생성 방식] 수동 생성 / 매월 자동 생성 세그먼트 토글.
  *
- * 자동 생성을 켜면 배치가 '매월 1일 새벽 청구서 자동 발행, 납기 매월 10일'로 처리한다는
- * 사실을 안내 문구로 바로 보여줘 오조작을 막는다. 이 날짜는 계약마다 다르게 계산되는 값이
- * 아니라 전 계약 공통 고정 스케줄(BillingScheduler)이므로, 별도 입력 없이 고정 문구로 충분하다.
+ * 자동 생성을 켜면 매월 1일 새벽에 배치가 이번 달 청구서를 자동 발행한다는 사실을 안내
+ * 문구로 보여줘 오조작을 막는다. 납기일은 전 계약 공통 고정값이 아니라 이 계약에 입력된
+ * 납기일(dueDate)의 '일(day)'을 매달 재사용한다(BillingBatchService.recurringDueDate와 동일 규칙,
+ * 31일처럼 없는 달은 말일로 자동 보정) — 그래서 안내 문구도 그 값을 그대로 반영해 보여준다.
  */
-export function AutoBillingToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+export function AutoBillingToggle({
+  checked,
+  onChange,
+  dueDate,
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  /** 폼에 입력된 납기일(yyyy-MM-dd). 매월 반복 납기일 계산의 기준(일자)으로 그대로 쓰인다. */
+  dueDate?: string
+}) {
+  const anchorDay = parseIso(dueDate ?? '')?.d
   return (
     <div>
       <label className={labelCls}>정산서 생성 방식</label>
@@ -333,7 +344,9 @@ export function AutoBillingToggle({ checked, onChange }: { checked: boolean; onC
       </div>
       <p className="mt-1.5 text-[11px] text-slate-400">
         {checked
-          ? '매월 1일 새벽에 이번 달 청구서가 자동 발행됩니다 (납기일: 매월 10일).'
+          ? anchorDay != null
+            ? `매월 1일 새벽에 이번 달 청구서가 자동 발행됩니다 (납기일: 매월 ${anchorDay}일 · 없는 달은 말일).`
+            : '매월 1일 새벽에 이번 달 청구서가 자동 발행됩니다. 납기일은 아래 "납기일" 필드의 일자를 매달 기준으로 사용합니다.'
           : '정산 화면에서 담당자가 직접 청구서를 생성해야 합니다.'}
       </p>
     </div>
