@@ -29,6 +29,11 @@ const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 function errMsg(err: unknown, fallback: string): string {
   return isAxiosError(err) ? (err.response?.data?.message ?? fallback) : fallback
 }
+/** yyyy-MM-dd → '2026년 8월 2일' (0으로 채우지 않은 자연스러운 한글 표기) */
+function ymdKorean(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return `${y}년 ${m}월 ${d}일`
+}
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
@@ -174,9 +179,9 @@ export default function LedgerDetailPanel({
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               {/* 청구기간은 날짜 범위라 폭이 넓어 옆 칸(납기)과 붙으면 줄바꿈된 숫자가 헷갈린다 — 단독 한 줄 */}
               <Info label="청구기간" className="col-span-2">
-                {l.periodStart} ~ {l.periodEnd}
+                {ymdKorean(l.periodStart)} ~ {ymdKorean(l.periodEnd)}
               </Info>
-              <Info label="납기">{l.dueDate ?? '—'}</Info>
+              <Info label="납기">{l.dueDate ? ymdKorean(l.dueDate) : '—'}</Info>
               <Info label="기본 청구액">{won(l.baseAmount)}</Info>
               <Info label="이월 유입">{won(l.carriedOverIn)}</Info>
               <Info label="조정 합계">{won(l.adjustmentTotal)}</Info>
@@ -202,7 +207,7 @@ export default function LedgerDetailPanel({
             )}
             {l.refundCompleted && l.refundedAt && (
               <p className="mt-1 text-right text-[11px] text-slate-400">
-                {l.refundedAt.slice(0, 10)} 환불 지급 완료 · 정산 마감
+                {ymdKorean(l.refundedAt.slice(0, 10))} 환불 지급 완료 · 정산 마감
               </p>
             )}
           </section>
@@ -271,7 +276,7 @@ export default function LedgerDetailPanel({
                     <div>
                       <span className={cn('font-medium', p.reversed && 'line-through')}>{won(p.amount)}</span>
                       <span className="ml-2 text-xs text-slate-400">
-                        {METHOD_LABEL[p.method]} · {p.paidOn}
+                        {METHOD_LABEL[p.method]} · {ymdKorean(p.paidOn)}
                       </span>
                       {p.reversed && <span className="ml-2 text-xs text-red-500">취소됨</span>}
                     </div>
