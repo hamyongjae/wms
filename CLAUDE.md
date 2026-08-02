@@ -30,6 +30,16 @@ npx eslint <변경한 파일>       # 린트
 `npm run build`(vite)는 네이티브 바이너리 문제로 샌드박스에서 실패한다.
 번들 빌드 검증은 `deploy.ps1`의 1단계가 대신한다.
 
+## 백엔드 구조 메모
+
+- 테넌트 격리는 Hibernate `@TenantId`로 ORM이 자동 처리한다. 상세는 `backend/docs/tenant-isolation-design.md`.
+  - 엔티티에 tenant 컬럼을 추가할 때는 `@TenantId` 필드(쓰기) + `@JoinColumn(insertable=false, updatable=false)`(읽기) 쌍으로 둔다.
+  - **네이티브 쿼리(`nativeQuery = true`)에는 필터가 걸리지 않는다.** 직접 `tenant_id` 조건을 넣을 것.
+  - 인증 정보가 없는 흐름(배치·기동 러너)에서 새 엔티티를 저장할 땐 `TenantContext.runAs(tenantId, ...)`로 감싼다.
+- 금액 계산은 `billing/support`의 순수 함수(`ProrationCalculator`, `MoneyPolicy`)에만 둔다.
+  회귀 테스트가 경계값을 고정하고 있으므로 계산 규칙을 바꿀 땐 테스트를 먼저 고친다.
+- 백업·복구는 `ops/backup/`. 스크립트 수정 시 복구 리허설(`wms-restore-drill.sh`)도 함께 확인한다.
+
 ## 프론트엔드 구조 메모
 
 - 계약 등록/수정 폼의 시각 규격은 `src/components/order/orderFormUi.tsx` 한 곳에만 정의한다.

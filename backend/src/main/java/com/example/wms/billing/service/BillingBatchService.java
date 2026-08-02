@@ -8,6 +8,7 @@ import com.example.wms.billing.notification.BillingNotificationEvent;
 import com.example.wms.billing.notification.NotificationType;
 import com.example.wms.billing.repository.BillingLedgerRepository;
 import com.example.wms.billing.support.MoneyPolicy;
+import com.example.wms.security.tenant.TenantContext;
 import com.example.wms.billing.support.ProrationCalculator;
 import com.example.wms.order.entity.OrderStatus;
 import com.example.wms.order.entity.StorageOrder;
@@ -75,7 +76,10 @@ public class BillingBatchService {
                     BillingType.MONTHLY, SettlementType.POSTPAID,
                     periodStart, periodEnd, base, MoneyPolicy.ZERO, dueDate);
             ledger.issue(dueDate);   // 자동 생성분은 바로 발행(청구 확정)
-            ledgerRepository.save(ledger);
+            // [테넌트 격리] 배치는 로그인 사용자가 없어 ROOT 컨텍스트로 돈다. 읽기는 전 테넌트를
+            //   가로질러야 하므로 그대로 두고, 저장만 그 계약의 업체로 명시 전환한다.
+            //   (전환하지 않으면 tenant_id 가 채워지지 않아 FK 위반으로 즉시 실패한다 — 조용한 오염 없음)
+            TenantContext.runAs(order.getTenantId(), () -> ledgerRepository.save(ledger));
             created++;
         }
         return created;
@@ -124,7 +128,8 @@ public class BillingBatchService {
                     BillingType.MONTHLY, SettlementType.POSTPAID,
                     periodStart, periodEnd, base, MoneyPolicy.ZERO, dueDate);
             ledger.issue(dueDate);   // 발행(입금예정, 미납=전액)
-            ledgerRepository.save(ledger);
+            // [테넌트 격리] 위와 동일 — 저장 시점에만 해당 업체로 전환한다
+            TenantContext.runAs(order.getTenantId(), () -> ledgerRepository.save(ledger));
             created++;
         }
         return created;

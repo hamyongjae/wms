@@ -87,6 +87,7 @@ public class AuthService {
                         "존재하지 않는 업체입니다. tenantId=" + tenantId));
 
         // [유일 식별자] 이메일은 전 시스템에서 유일해야 하므로 전역 중복 검사
+        //   (User 는 @TenantId 대상이 아니라 테넌트 필터가 걸리지 않으므로 그대로 전역 조회된다)
         if (userRepository.existsByEmail(email)) {
             throw new IllegalArgumentException("이미 사용 중인 이메일입니다: " + email);
         }

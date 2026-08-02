@@ -33,6 +33,11 @@ public class User {
     private Long id;
 
     // 소속 창고업체 — 소셜 최초 진입 시엔 아직 미지정(NULL)일 수 있다(가입 미완성 상태).
+    // [테넌트 격리 예외] User 는 의도적으로 @TenantId 대상에서 제외한다.
+    //   · 소셜 최초 진입 계정은 tenant_id 가 NULL 인 상태로 존재한다(가입 미완성)
+    //   · 회사 등록/초대 수락 시점에 tenant 가 '나중에' 배정된다
+    //   @TenantId 는 저장 시 자동 주입되고 이후 불변이라 위 두 성질과 정면으로 충돌한다.
+    //   대신 계정 조회는 findAllByTenantIdOrderByCreatedAtDesc 등으로 명시 격리한다.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id")   // nullable: 소셜 인증만 된 PENDING 유저는 tenant가 없다
     private Tenant tenant;

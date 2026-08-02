@@ -4,6 +4,7 @@ import com.example.wms.customer.entity.Customer;
 import com.example.wms.warehouse.entity.Warehouse;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -36,8 +37,17 @@ public class StorageOrder {
     private Long id;
 
     // ===== 관계 =====
+    /**
+     * [테넌트 격리] Hibernate 가 모든 조회에 {@code tenant_id = ?} 를 자동으로 덧붙이고,
+     * 저장 시에는 현재 컨텍스트의 업체 id 를 자동으로 채운다.
+     * 아래 tenant 연관관계는 같은 컬럼을 읽기 전용으로 바라본다(쓰기 주체는 이 필드 하나뿐).
+     */
+    @TenantId
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tenant_id", nullable = false)
+    @JoinColumn(name = "tenant_id", insertable = false, updatable = false)
     private Tenant tenant;
 
     @ManyToOne(fetch = FetchType.LAZY)
