@@ -7,6 +7,15 @@ plugins {
 group = 'com.example'
 version = '0.0.1-SNAPSHOT'
 
+// [Windows 전용 우회] 이 프로젝트 경로("...\프로젝트\...")에 한글이 있고, 이 컴퓨터의 활성
+// 코드페이지가 949(MS949)로 고정돼 있다. Gradle이 테스트 실행용 JVM을 띄울 때 클래스패스가 길어지면
+// @인자파일 방식을 쓰는데, 그 파일을 네이티브 런처가 MS949로 잘못 디코딩해 한글 경로가 깨져
+// build/classes 자체를 못 찾는다(테스트 전부가 ClassNotFoundException으로 실패). JVM 플래그로는
+// 못 고치므로(그 파일을 읽어야 플래그를 알 수 있는 순서상 모순) 빌드 산출물 위치를 한글 없는 경로로 옮긴다.
+if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+    layout.buildDirectory.set(file("${System.getProperty('user.home')}/.gradle-builds/wms-backend"))
+}
+
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(21)
@@ -56,6 +65,25 @@ dependencies {
 
     // 보안 테스트 유틸 (@WithMockUser 등)
     testImplementation 'org.springframework.security:spring-security-test'
+
+    // MockMvc 테스트 지원 — Boot 4에서 spring-boot-test-autoconfigure로부터 분리된 별도 모듈
+    testImplementation 'org.springframework.boot:spring-boot-webmvc-test'
+
+    // 통합테스트용 실제 Postgres 컨테이너 — 네이티브 쿼리(date_trunc 등)는 H2로 대체 불가.
+    // spring-boot-testcontainers(4.1.0)는 아직 postgresql/junit-jupiter 모듈이 배포 안 된
+    // testcontainers 코어 2.0.5를 끌어와 실행 시 충돌하므로 쓰지 않고, 실제 배포된 최신 짝
+    // (1.21.4)을 직접 지정한다 — @DynamicPropertySource로 접속정보를 넘기므로 스타터가 없어도 된다.
+    testImplementation 'org.testcontainers:junit-jupiter:1.21.4'
+    testImplementation 'org.testcontainers:postgresql:1.21.4'
+}
+
+// Spring Boot BOM(io.spring.dependency-management)이 아직 postgresql/junit-jupiter
+// 모듈이 없는 testcontainers 코어 2.0.5로 강제 승격시켜 1.21.4 계열과 뒤섞인다.
+// 이 플러그인은 Gradle 기본 resolutionStrategy.force보다 우선하므로, 전용 DSL로 재정의한다.
+dependencyManagement {
+    dependencies {
+        dependency 'org.testcontainers:testcontainers:1.21.4'
+    }
 }
 
 tasks.named('test') {

@@ -72,7 +72,7 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 // 모바일 카드용 짧은 날짜(MM.DD) — 큰 글씨에서도 줄바꿈 없이 들어가도록
-const md = (s?: string | null) => (s ? s.slice(5).replace('-', '.') : '미정')
+const md = (s?: string | null) => (s ? s.replace(/-/g, '.') : '미정')
 // 조회 기간 검색창 표기용 — "2026년 01월 01일"
 const ymdKorean = (iso: string) => {
   const [y, m, d] = iso.split('-')
