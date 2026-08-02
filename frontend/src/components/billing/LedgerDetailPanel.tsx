@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { isAxiosError } from 'axios'
-import { Loader2, BadgeCheck, HandCoins, SlidersHorizontal, ArrowRightCircle, Undo2, Trash2 } from 'lucide-react'
+import { Loader2, BadgeCheck, HandCoins, SlidersHorizontal, Undo2, Trash2 } from 'lucide-react'
 import {
   billingApi,
   type BillingStatus,
@@ -76,7 +76,7 @@ export default function LedgerDetailPanel({
 }) {
   const [detail, setDetail] = useState<LedgerDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [mode, setMode] = useState<'pay' | 'adjust' | 'carry' | null>(null)
+  const [mode, setMode] = useState<'pay' | 'adjust' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -101,7 +101,6 @@ export default function LedgerDetailPanel({
   const canIssue = l?.status === 'DRAFT'
   const canPay = l != null && l.balance > 0 && (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
   const canAdjust = l != null && (l.status === 'DRAFT' || l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
-  const canCarry = l != null && l.balance > 0 && (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
   // [환불 완료] 환불 대상 금액이 있고 아직 미완료일 때만 (이중 방어 — 백엔드에서도 재검증)
   const canRefund = l != null && (l.refundDue ?? Math.max(-l.balance, 0)) > 0 && !l.refundCompleted
   // [삭제 가능 조건] 서버가 최종 재검증하지만, 화면에서도 미리 걸러 헛클릭을 막는다.
@@ -233,11 +232,6 @@ export default function LedgerDetailPanel({
                 조정
               </ActionBtn>
             )}
-            {canCarry && isAdmin && (
-              <ActionBtn onClick={() => setMode(mode === 'carry' ? null : 'carry')} icon={<ArrowRightCircle size={15} />} tone="violet">
-                미수금 이월
-              </ActionBtn>
-            )}
             {canRefund && isAdmin && (
               <ActionBtn onClick={handleCompleteRefund} icon={<BadgeCheck size={15} />} tone="emerald">
                 환불 완료
@@ -256,7 +250,6 @@ export default function LedgerDetailPanel({
             <PaymentForm ledgerId={ledgerId} defaultAmount={l.balance} onDone={afterAction} onError={setActionError} />
           )}
           {mode === 'adjust' && <AdjustmentForm ledgerId={ledgerId} onDone={afterAction} onError={setActionError} />}
-          {mode === 'carry' && <CarryOverForm ledgerId={ledgerId} onDone={afterAction} onError={setActionError} />}
 
           {/* 수금 이력 */}
           <section>
@@ -470,63 +463,6 @@ function AdjustmentForm({
   )
 }
 
-/* ===== 이월 폼 ===== */
-function CarryOverForm({
-  ledgerId,
-  onDone,
-  onError,
-}: {
-  ledgerId: number
-  onDone: () => void
-  onError: (m: string) => void
-}) {
-  const [nextPeriodStart, setStart] = useState('')
-  const [nextPeriodEnd, setEnd] = useState('')
-  const [nextDueDate, setDue] = useState('')
-  const [nextBaseAmount, setBase] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    setSubmitting(true)
-    try {
-      await billingApi.carryOver(ledgerId, {
-        nextPeriodStart,
-        nextPeriodEnd,
-        nextDueDate: nextDueDate || undefined,
-        nextBaseAmount: nextBaseAmount ? Number(nextBaseAmount) : undefined,
-      })
-      onDone()
-    } catch (err) {
-      onError(errMsg(err, '이월에 실패했습니다.'))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="space-y-3 rounded-xl border border-violet-200 bg-violet-50/40 p-4">
-      <p className="text-sm font-semibold text-violet-800">미수금 차월 이월</p>
-      <div className="grid grid-cols-2 gap-3">
-        <Labeled label="차월 시작일">
-          <input type="date" value={nextPeriodStart} onChange={(e) => setStart(e.target.value)} required className={inputCls} />
-        </Labeled>
-        <Labeled label="차월 종료일">
-          <input type="date" value={nextPeriodEnd} onChange={(e) => setEnd(e.target.value)} required className={inputCls} />
-        </Labeled>
-        <Labeled label="차월 납기 (선택)">
-          <input type="date" value={nextDueDate} onChange={(e) => setDue(e.target.value)} className={inputCls} />
-        </Labeled>
-        <Labeled label="차월 기본액 (선택)">
-          <input type="number" value={nextBaseAmount} onChange={(e) => setBase(e.target.value)} placeholder="미입력 시 자동 산정" className={inputCls} />
-        </Labeled>
-      </div>
-      <p className="text-xs text-violet-700">현재 원장은 마감되고, 남은 미수금이 새 원장으로 이월·발행됩니다.</p>
-      <SubmitRow submitting={submitting} label="이월 실행" />
-    </form>
-  )
-}
-
 /* ===== 소품 ===== */
 function ActionBtn({
   onClick,
@@ -536,14 +472,13 @@ function ActionBtn({
 }: {
   onClick: () => void
   icon: ReactNode
-  tone: 'indigo' | 'emerald' | 'amber' | 'violet' | 'red'
+  tone: 'indigo' | 'emerald' | 'amber' | 'red'
   children: ReactNode
 }) {
   const cls = {
     indigo: 'bg-indigo-600 hover:bg-indigo-700 text-white',
     emerald: 'bg-emerald-600 hover:bg-emerald-700 text-white',
     amber: 'border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100',
-    violet: 'border border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100',
     red: 'border border-red-300 bg-red-50 text-red-700 hover:bg-red-100',
   }[tone]
   return (

@@ -338,36 +338,6 @@ public class BillingService {
         return new BillingLedgerResponse(ledger);
     }
 
-    // ===================== 미수금 차월 이월 =====================
-
-    /** 남은 미수금을 차월 원장으로 이월하고 현재 원장 마감 */
-    @Transactional
-    public BillingLedgerResponse carryOverToNext(Long ledgerId, CarryOverRequest req) {
-        BillingLedger current = lockLedger(ledgerId);
-
-        BigDecimal outstanding = current.outstandingBalance();
-        if (outstanding.signum() <= 0) {
-            throw new IllegalStateException("이월할 미수금이 없습니다. 잔액=" + current.getBalance());
-        }
-
-        StorageOrder order = current.getStorageOrder();
-        BigDecimal nextBase = resolveNextBaseAmount(req, current, order);
-
-        BillingLedger next = new BillingLedger(
-                current.getTenant(), order, current.getCustomer(), generateLedgerNo(),
-                current.getBillingType(), current.getSettlementType(),
-                req.getNextPeriodStart(), req.getNextPeriodEnd(),
-                nextBase, outstanding, req.getNextDueDate());
-        // 이월 원장은 바로 발행 상태로 (미수금이 살아있어야 하므로)
-        next.issue(req.getNextDueDate());
-        BillingLedger savedNext = ledgerRepository.save(next);
-
-        current.carryOverTo(savedNext);
-        // [보관기간 동기화] 이월(연장) 회차 종료일까지 계약 보관기간 확장
-        extendOrderPeriod(order, req.getNextPeriodEnd());
-        return new BillingLedgerResponse(savedNext);
-    }
-
     // ===================== 중도 출고 정산 =====================
 
     /** 중도 출고 정산 미리보기 (원장 변경 없음) */
@@ -607,18 +577,6 @@ public class BillingService {
             throw new IllegalArgumentException("일 단위 계약은 dailyRate 또는 baseAmount가 필요합니다.");
         }
         return prorationCalculator.prorateDaily(req.getDailyRate(), req.getPeriodStart(), req.getPeriodEnd());
-    }
-
-    private BigDecimal resolveNextBaseAmount(CarryOverRequest req, BillingLedger current, StorageOrder order) {
-        if (req.getNextBaseAmount() != null) {
-            return MoneyPolicy.normalize(req.getNextBaseAmount());
-        }
-        if (current.getBillingType() == BillingType.MONTHLY) {
-            BigDecimal monthlyFee = BigDecimal.valueOf(order.getMonthlyFee());
-            return prorationCalculator.prorateMonthly(
-                    monthlyFee, req.getNextPeriodStart(), req.getNextPeriodEnd());
-        }
-        throw new IllegalArgumentException("일 단위 계약은 차월 기본액(nextBaseAmount)을 직접 지정하세요.");
     }
 
     /** 조정 유형에 따라 부호 결정 */

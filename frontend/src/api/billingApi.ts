@@ -93,13 +93,6 @@ export interface AdjustmentRequest {
   reason: string
 }
 
-export interface CarryOverRequest {
-  nextPeriodStart: string
-  nextPeriodEnd: string
-  nextBaseAmount?: number
-  nextDueDate?: string
-}
-
 export interface LedgerCreateRequest {
   storageOrderId: number
   billingType: BillingType
@@ -162,10 +155,6 @@ export const billingApi = {
   },
   async applyAdjustment(id: number, body: AdjustmentRequest): Promise<BillingLedger> {
     const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/${id}/adjustments`, body)
-    return data
-  },
-  async carryOver(id: number, body: CarryOverRequest): Promise<BillingLedger> {
-    const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/${id}/carry-over`, body)
     return data
   },
   // 미납(연체) 촉구 일괄 발송 → 결과 메시지 문자열

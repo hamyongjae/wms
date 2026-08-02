@@ -130,16 +130,6 @@ public class BillingController {
         return ResponseEntity.status(HttpStatus.CREATED).body(billingService.applyAdjustment(id, request));
     }
 
-    // ===== 미수금 차월 이월 — ADMIN 전용 =====
-
-    @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/{id}/carry-over")
-    public ResponseEntity<BillingLedgerResponse> carryOver(
-            @PathVariable Long id,
-            @Valid @RequestBody CarryOverRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(billingService.carryOverToNext(id, request));
-    }
-
     // ===== 중도 출고 정산 =====
 
     @PostMapping("/{id}/mid-release/preview")
