@@ -877,7 +877,12 @@ export function CreateOrderModal({
       setFormError(null)
       setDormantConfirm(false)
     }
-  }, [open, warehouses, fixedSlot, defaultStartDate])
+    // [입력값 보호] warehouses를 deps에 넣으면 안 된다 — 페이지의 60초 자동 새로고침·orderSync
+    //   이벤트가 배열을 새로 만들 때마다(내용이 같아도) 이 effect가 다시 돌아 폼을 전부 초기화해버렸다
+    //   (실측: 등록 폼을 채우던 중 "갑자기" 값이 사라지는 버그). 기본 창고값은 열리는 시점의
+    //   warehouses를 그대로 읽기만 하면 되므로, open이 새로 켜질 때만 반응하면 충분하다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, fixedSlot, defaultStartDate])
 
   // [수납 계좌] 직원 목록 로드 (계좌이체 시 담당 직원 선택용) — 권한 없으면 빈 목록
   useEffect(() => {
