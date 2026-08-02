@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Truck, Wallet, Search } from 'lucide-react'
+import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Truck, Wallet, Search, ChevronRight } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
-import { billingApi, type BillingLedger, type PaymentMethod } from '@/api/billingApi'
+import { billingApi, type BillingLedger } from '@/api/billingApi'
 import { displayStatus, isOpenLedger } from '@/lib/billing'
+import LedgerDetailPanel from '@/components/billing/LedgerDetailPanel'
 import { customerApi, type Customer, type CustomerType } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { containerApi } from '@/api/containerApi'
@@ -586,12 +587,9 @@ export default function OrdersPage() {
 export function OrderBillingModal({ target, isAdmin, onClose }: { target: StorageOrder | null; isAdmin: boolean; onClose: () => void }) {
   const [ledgers, setLedgers] = useState<BillingLedger[]>([])
   const [loading, setLoading] = useState(true)
-  const [payTarget, setPayTarget] = useState<BillingLedger | null>(null) // 입금 기록 중인 회차
-  const [amount, setAmount] = useState<number | null>(null)
-  const [method, setMethod] = useState<PaymentMethod>('BANK_TRANSFER')
-  const [paidOn, setPaidOn] = useState(today())
-  const [saving, setSaving] = useState(false)
-  const [payError, setPayError] = useState<string | null>(null)
+  // [단일 템플릿] 회차를 고르면 정산 화면과 동일한 공용 상세 팝업(LedgerDetailPanel)을 그 위에 연다 —
+  //   발행·수금·조정·이월·환불·삭제 전부 이 하나의 컴포넌트로 처리해 진입 경로별 화면 차이를 없앤다.
+  const [selectedLedgerId, setSelectedLedgerId] = useState<number | null>(null)
   // 청구서 생성
   const [creating, setCreating] = useState(false)
   const [genOpen, setGenOpen] = useState(false)
@@ -618,39 +616,12 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
 
   useEffect(() => {
     if (target) {
-      setPayTarget(null)
-      setPayError(null)
+      setSelectedLedgerId(null)
       load(target.id)
     }
   }, [target])
 
   if (!target) return null
-
-  function openPay(l: BillingLedger) {
-    setPayTarget(l)
-    setAmount(l.balance) // 기본값 = 잔액 전액 (부분입금이면 수정)
-    setMethod('BANK_TRANSFER')
-    setPaidOn(today())
-    setPayError(null)
-  }
-
-  async function submitPay(e: FormEvent) {
-    e.preventDefault()
-    if (!payTarget || amount == null || amount <= 0) {
-      setPayError('입금액을 입력하세요.')
-      return
-    }
-    setSaving(true)
-    try {
-      await billingApi.recordPayment(payTarget.id, { amount, method, paidOn })
-      setPayTarget(null)
-      load(target!.id)
-    } catch (err) {
-      setPayError(errMsg(err, '입금 기록에 실패했습니다.'))
-    } finally {
-      setSaving(false)
-    }
-  }
 
   // 다음 청구 회차 기본값 프리필: 시작 = 마지막 회차 종료 다음날(없으면 계약 시작일), 종료 = +1개월
   function openGenerator() {
@@ -693,168 +664,124 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
     }
   }
 
-  // DRAFT 원장 즉시 발행
-  async function issueLedger(l: BillingLedger) {
-    try {
-      await billingApi.issue(l.id, l.dueDate ?? undefined)
-      load(target!.id)
-    } catch (err) {
-      window.alert(errMsg(err, '발행에 실패했습니다.'))
-    }
-  }
-
   const totalBalance = ledgers.reduce((s, l) => s + (isOpenLedger(l) ? l.balance : 0), 0)
 
   return (
-    <Modal open onClose={onClose} title={`${target.customerName} · 정산 이력`} widthClass="max-w-2xl">
-      <div className="space-y-3">
-        <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-          <span className="text-slate-500">
-            계약 기간 <span className="font-medium text-slate-700">{target.storageStartDate} ~ {target.actualEndDate ?? target.expectedEndDate ?? '미정'}</span>
-          </span>
-          <span className={cn('font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-[#5C7C6B]')}>
-            {totalBalance > 0 ? `미수 잔액 ${won(totalBalance)}` : '미수 없음'}
-          </span>
-        </div>
-
-        {/* 청구서 생성 (관리자) — 원장이 없으면 여기서 만들어야 정산이 시작된다 */}
-        {isAdmin && !genOpen && (
-          <button
-            type="button"
-            onClick={openGenerator}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-indigo-300 bg-indigo-50/50 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
-          >
-            <Plus size={15} /> 청구서 생성 (이번 회차)
-          </button>
-        )}
-        {genOpen && (
-          <form onSubmit={submitGenerate} className="space-y-2.5 rounded-xl bg-indigo-50/40 p-3.5 ring-1 ring-indigo-200/60">
-            <p className="text-xs font-semibold text-slate-600">청구서 생성 · 생성 즉시 발행되어 입금 기록이 가능합니다</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="mb-0.5 block text-[11px] text-slate-500">청구 시작일</label>
-                <input type="date" value={genStart} max={genEnd || undefined} onChange={(e) => setGenStart(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="mb-0.5 block text-[11px] text-slate-500">청구 종료일</label>
-                <input type="date" value={genEnd} min={genStart || undefined} onChange={(e) => setGenEnd(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="mb-0.5 block text-[11px] text-slate-500">청구 금액</label>
-                <MoneyInput value={genAmount} onChange={setGenAmount} required className={cn(inputCls, 'pr-8')} />
-              </div>
-              <div>
-                <label className="mb-0.5 block text-[11px] text-slate-500">납기일</label>
-                <input type="date" value={genDue} onChange={(e) => setGenDue(e.target.value)} className={inputCls} />
-              </div>
-            </div>
-            {genError && <p className="text-xs text-red-600">{genError}</p>}
-            <div className="flex justify-end gap-1.5">
-              <button type="button" onClick={() => setGenOpen(false)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 transition hover:bg-white">
-                취소
-              </button>
-              <button type="submit" disabled={creating} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
-                {creating ? '생성 중…' : '생성 + 발행'}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {loading && (
-          <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
-            <Loader2 className="animate-spin" size={16} />
-            <span className="text-sm">정산 이력을 불러오는 중…</span>
+    <>
+      <Modal open onClose={onClose} title={`${target.customerName} · 정산 이력`} widthClass="max-w-2xl">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+            <span className="text-slate-500">
+              계약 기간 <span className="font-medium text-slate-700">{target.storageStartDate} ~ {target.actualEndDate ?? target.expectedEndDate ?? '미정'}</span>
+            </span>
+            <span className={cn('font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-[#5C7C6B]')}>
+              {totalBalance > 0 ? `미수 잔액 ${won(totalBalance)}` : '미수 없음'}
+            </span>
           </div>
-        )}
 
-        {!loading && ledgers.length === 0 && (
-          <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
-            아직 생성된 청구 회차가 없습니다.
-            {isAdmin ? ' 위 "청구서 생성"으로 이번 회차를 만들면 바로 입금을 기록할 수 있습니다.' : ' 원장은 매월 1일 자동 생성됩니다.'}
-          </p>
-        )}
+          {/* 청구서 생성 (관리자) — 원장이 없으면 여기서 만들어야 정산이 시작된다 */}
+          {isAdmin && !genOpen && (
+            <button
+              type="button"
+              onClick={openGenerator}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-indigo-300 bg-indigo-50/50 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
+            >
+              <Plus size={15} /> 청구서 생성 (이번 회차)
+            </button>
+          )}
+          {genOpen && (
+            <form onSubmit={submitGenerate} className="space-y-2.5 rounded-xl bg-indigo-50/40 p-3.5 ring-1 ring-indigo-200/60">
+              <p className="text-xs font-semibold text-slate-600">청구서 생성 · 생성 즉시 발행되어 입금 기록이 가능합니다</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-0.5 block text-[11px] text-slate-500">청구 시작일</label>
+                  <input type="date" value={genStart} max={genEnd || undefined} onChange={(e) => setGenStart(e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className="mb-0.5 block text-[11px] text-slate-500">청구 종료일</label>
+                  <input type="date" value={genEnd} min={genStart || undefined} onChange={(e) => setGenEnd(e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className="mb-0.5 block text-[11px] text-slate-500">청구 금액</label>
+                  <MoneyInput value={genAmount} onChange={setGenAmount} required className={cn(inputCls, 'pr-8')} />
+                </div>
+                <div>
+                  <label className="mb-0.5 block text-[11px] text-slate-500">납기일</label>
+                  <input type="date" value={genDue} onChange={(e) => setGenDue(e.target.value)} className={inputCls} />
+                </div>
+              </div>
+              {genError && <p className="text-xs text-red-600">{genError}</p>}
+              <div className="flex justify-end gap-1.5">
+                <button type="button" onClick={() => setGenOpen(false)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 transition hover:bg-white">
+                  취소
+                </button>
+                <button type="submit" disabled={creating} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
+                  {creating ? '생성 중…' : '생성 + 발행'}
+                </button>
+              </div>
+            </form>
+          )}
 
-        {!loading && ledgers.length > 0 && (
-          <ol className="space-y-2">
-            {ledgers.map((l, i) => {
-              const ds = displayStatus(l)
-              const paying = payTarget?.id === l.id
-              return (
-                <li key={l.id} className="rounded-xl bg-white p-3.5 ring-1 ring-slate-200/70">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-400">{i + 1}회차</span>
-                    <span className="text-sm font-medium text-slate-700">
-                      {l.periodStart} ~ {l.periodEnd}
-                    </span>
-                    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>
-                      {ds.label}
-                    </span>
-                    <span className="ml-auto text-sm text-slate-500">
-                      <span className="font-semibold text-slate-800">{won(l.paidTotal)}</span>
-                      <span className="text-slate-300"> / </span>
-                      {won(l.baseAmount + l.carriedOverIn + l.adjustmentTotal)}
-                    </span>
-                    {l.status === 'DRAFT' && isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => issueLedger(l)}
-                        className="rounded-lg border border-indigo-300 bg-white px-2.5 py-1 text-xs font-medium text-indigo-700 transition hover:bg-indigo-50"
-                      >
-                        발행
-                      </button>
+          {loading && (
+            <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
+              <Loader2 className="animate-spin" size={16} />
+              <span className="text-sm">정산 이력을 불러오는 중…</span>
+            </div>
+          )}
+
+          {!loading && ledgers.length === 0 && (
+            <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
+              아직 생성된 청구 회차가 없습니다.
+              {isAdmin ? ' 위 "청구서 생성"으로 이번 회차를 만들면 바로 입금을 기록할 수 있습니다.' : ' 원장은 매월 1일 자동 생성됩니다.'}
+            </p>
+          )}
+
+          {/* 회차를 탭하면 정산 화면과 같은 공용 상세 팝업이 열린다(발행·수금·조정·이월·환불·삭제 통합) */}
+          {!loading && ledgers.length > 0 && (
+            <ol className="space-y-2">
+              {ledgers.map((l, i) => {
+                const ds = displayStatus(l)
+                return (
+                  <li key={l.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLedgerId(l.id)}
+                      className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-white p-3.5 text-left ring-1 ring-slate-200/70 transition hover:bg-slate-50"
+                    >
+                      <span className="text-xs font-semibold text-slate-400">{i + 1}회차</span>
+                      <span className="text-sm font-medium text-slate-700">
+                        {l.periodStart} ~ {l.periodEnd}
+                      </span>
+                      <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>
+                        {ds.label}
+                      </span>
+                      <span className="ml-auto flex items-center gap-1.5 text-sm text-slate-500">
+                        <span className="font-semibold text-slate-800">{won(l.paidTotal)}</span>
+                        <span className="text-slate-300"> / </span>
+                        {won(l.baseAmount + l.carriedOverIn + l.adjustmentTotal)}
+                        <ChevronRight size={16} className="text-slate-300" />
+                      </span>
+                    </button>
+                    {l.carriedOverIn > 0 && (
+                      <p className="mt-1 pl-1 text-[11px] text-slate-400">전 회차 이월 미수 {won(l.carriedOverIn)} 포함</p>
                     )}
-                    {isOpenLedger(l) && l.balance > 0 && !paying && (
-                      <button
-                        type="button"
-                        onClick={() => openPay(l)}
-                        className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-indigo-700"
-                      >
-                        입금 기록
-                      </button>
-                    )}
-                  </div>
-                  {l.carriedOverIn > 0 && (
-                    <p className="mt-1 text-[11px] text-slate-400">전 회차 이월 미수 {won(l.carriedOverIn)} 포함</p>
-                  )}
+                  </li>
+                )
+              })}
+            </ol>
+          )}
+        </div>
+      </Modal>
 
-                  {/* 인라인 입금 기록 폼 */}
-                  {paying && (
-                    <form onSubmit={submitPay} className="mt-2.5 flex flex-wrap items-end gap-2 rounded-lg bg-slate-50 p-2.5">
-                      <div className="min-w-[8rem] flex-1">
-                        <label className="mb-0.5 block text-[11px] text-slate-500">입금액 (잔액 {won(l.balance)})</label>
-                        <MoneyInput value={amount} onChange={setAmount} required className={cn(inputCls, 'pr-8')} />
-                      </div>
-                      <div>
-                        <label className="mb-0.5 block text-[11px] text-slate-500">방법</label>
-                        <select value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)} className={inputCls}>
-                          <option value="BANK_TRANSFER">계좌이체</option>
-                          <option value="CASH">현금</option>
-                          <option value="CARD">카드</option>
-                          <option value="OTHER">기타</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="mb-0.5 block text-[11px] text-slate-500">입금일</label>
-                        <input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} className={inputCls} />
-                      </div>
-                      <div className="flex gap-1.5">
-                        <button type="submit" disabled={saving} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60">
-                          {saving ? '기록 중…' : '기록'}
-                        </button>
-                        <button type="button" onClick={() => setPayTarget(null)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-600 transition hover:bg-white">
-                          취소
-                        </button>
-                      </div>
-                      {payError && <p className="w-full text-xs text-red-600">{payError}</p>}
-                    </form>
-                  )}
-                </li>
-              )
-            })}
-          </ol>
-        )}
-      </div>
-    </Modal>
+      {selectedLedgerId != null && (
+        <LedgerDetailPanel
+          ledgerId={selectedLedgerId}
+          isAdmin={isAdmin}
+          onClose={() => setSelectedLedgerId(null)}
+          onChanged={() => load(target.id)}
+        />
+      )}
+    </>
   )
 }
 
