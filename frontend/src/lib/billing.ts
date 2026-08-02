@@ -51,7 +51,7 @@ export function displayStatus(l: BillingLedger): { label: string; cls: string } 
       return { label: `연체 ${daysFromDue(l.dueDate!)}일`, cls: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]' }
     }
     return {
-      label: l.status === 'PARTIALLY_PAID' ? '부분수금 · 입금예정' : '입금예정',
+      label: l.status === 'PARTIALLY_PAID' ? '부분입금 · 입금예정' : '입금예정',
       cls: 'bg-[#E9EEF3] text-[#5A748F] ring-[#D4DDE7]',
     }
   }

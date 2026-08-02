@@ -411,7 +411,7 @@ export default function DashboardPage() {
             <section className="grid gap-4 sm:grid-cols-3">
               <QuickLink to="/orders" icon={FileText} title="계약 등록" desc="새 보관 계약 만들기" />
               <QuickLink to="/yard" icon={Grid3x3} title="보관창고 현황" desc="배치·공실률 보기" />
-              <QuickLink to="/billing" icon={Wallet} title="청구·정산" desc="미수금·수금 관리" />
+              <QuickLink to="/billing" icon={Wallet} title="청구·정산" desc="미수금·입금 관리" />
             </section>
           </>
         )}

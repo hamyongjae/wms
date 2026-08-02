@@ -38,7 +38,7 @@ const inputCls =
 const STATUS_META: Record<BillingStatus, { label: string; cls: string }> = {
   DRAFT: { label: '작성중', cls: 'bg-slate-100 text-slate-500 ring-slate-200' },
   ISSUED: { label: '발행', cls: 'bg-[#E9EEF3] text-[#5A748F] ring-[#D4DDE7]' },
-  PARTIALLY_PAID: { label: '부분수금', cls: 'bg-[#EFEBE4] text-[#8A8172] ring-[#E2DCD1]' },
+  PARTIALLY_PAID: { label: '부분입금', cls: 'bg-[#EFEBE4] text-[#8A8172] ring-[#E2DCD1]' },
   PAID: { label: '완납', cls: 'bg-[#E9EFEA] text-[#5C7C6B] ring-[#D3DFD6]' },
   CARRIED_OVER: { label: '이월마감', cls: 'bg-violet-50 text-violet-700 ring-violet-200' },
   CANCELED: { label: '취소', cls: 'bg-slate-100 text-slate-400 ring-slate-200' },
@@ -170,7 +170,7 @@ export default function LedgerDetailPanel({
               <Info label="기본 청구액">{won(l.baseAmount)}</Info>
               <Info label="이월 유입">{won(l.carriedOverIn)}</Info>
               <Info label="조정 합계">{won(l.adjustmentTotal)}</Info>
-              <Info label="수금 합계" className="col-span-2">
+              <Info label="입금 합계" className="col-span-2">
                 {won(l.paidTotal)}
               </Info>
             </dl>
@@ -187,7 +187,7 @@ export default function LedgerDetailPanel({
             </div>
             {l.balance < 0 && !l.refundCompleted && (
               <p className="mt-1 text-right text-[11px] text-emerald-600">
-                중도출고로 실청구액이 수금액보다 작아 환불(선급금 반환) 대상입니다.
+                중도출고로 실청구액이 입금액보다 작아 환불(선급금 반환) 대상입니다.
               </p>
             )}
             {l.refundCompleted && l.refundedAt && (
@@ -201,7 +201,7 @@ export default function LedgerDetailPanel({
           <div className="flex flex-wrap gap-2">
             {canPay && (
               <ActionBtn onClick={() => setMode(mode === 'pay' ? null : 'pay')} icon={<HandCoins size={15} />} tone="emerald">
-                수금 기록
+                입금 기록
               </ActionBtn>
             )}
             {canAdjust && isAdmin && (
@@ -232,11 +232,11 @@ export default function LedgerDetailPanel({
           )}
           {mode === 'adjust' && <AdjustmentForm ledgerId={ledgerId} onDone={afterAction} onError={setActionError} />}
 
-          {/* 수금 이력 */}
+          {/* 입금 이력 */}
           <section>
-            <h4 className="mb-2 text-sm font-semibold text-slate-700">수금 이력</h4>
+            <h4 className="mb-2 text-sm font-semibold text-slate-700">입금 이력</h4>
             {detail!.payments.length === 0 ? (
-              <p className="rounded-lg bg-slate-50 px-3 py-4 text-center text-xs text-slate-400">수금 내역 없음</p>
+              <p className="rounded-lg bg-slate-50 px-3 py-4 text-center text-xs text-slate-400">입금 내역 없음</p>
             ) : (
               <ul className="space-y-2">
                 {detail!.payments.map((p) => (
@@ -258,12 +258,12 @@ export default function LedgerDetailPanel({
                       <button
                         type="button"
                         onClick={async () => {
-                          if (!window.confirm('이 수금 건을 취소(잔액 원복)할까요?')) return
+                          if (!window.confirm('이 입금 건을 취소(잔액 원복)할까요?')) return
                           try {
                             await billingApi.reversePayment(p.id)
                             afterAction()
                           } catch (err) {
-                            setActionError(errMsg(err, '수금 취소에 실패했습니다.'))
+                            setActionError(errMsg(err, '입금 취소에 실패했습니다.'))
                           }
                         }}
                         className="flex items-center gap-1 text-xs text-slate-400 transition hover:text-red-600"
@@ -276,12 +276,12 @@ export default function LedgerDetailPanel({
                       <button
                         type="button"
                         onClick={async () => {
-                          if (!window.confirm('이 수금 건을 다시 유효한 수금으로 되돌릴까요?')) return
+                          if (!window.confirm('이 입금 건을 다시 유효한 입금으로 되돌릴까요?')) return
                           try {
                             await billingApi.restorePayment(p.id)
                             afterAction()
                           } catch (err) {
-                            setActionError(errMsg(err, '수금 복원에 실패했습니다.'))
+                            setActionError(errMsg(err, '입금 복원에 실패했습니다.'))
                           }
                         }}
                         className="flex items-center gap-1 text-xs text-indigo-500 transition hover:text-indigo-700"
@@ -354,7 +354,7 @@ function PaymentForm({
       })
       onDone()
     } catch (err) {
-      onError(errMsg(err, '수금 기록에 실패했습니다.'))
+      onError(errMsg(err, '입금 기록에 실패했습니다.'))
     } finally {
       setSubmitting(false)
     }
@@ -362,9 +362,9 @@ function PaymentForm({
 
   return (
     <form onSubmit={submit} className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
-      <p className="text-sm font-semibold text-emerald-800">수금 기록</p>
+      <p className="text-sm font-semibold text-emerald-800">입금 기록</p>
       <div className="grid grid-cols-2 gap-3">
-        <Labeled label="수금액(원)">
+        <Labeled label="입금액(원)">
           <input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} required className={inputCls} />
         </Labeled>
         <Labeled label="수단">
@@ -383,7 +383,7 @@ function PaymentForm({
           <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} />
         </Labeled>
       </div>
-      <SubmitRow submitting={submitting} label="수금 저장" />
+      <SubmitRow submitting={submitting} label="입금 저장" />
     </form>
   )
 }

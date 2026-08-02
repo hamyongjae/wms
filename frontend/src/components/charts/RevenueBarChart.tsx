@@ -57,7 +57,7 @@ export default function RevenueBarChart({ data }: { data: RevenuePoint[] }) {
                 <title>{`${d.label} 청구 ${fmt(d.billed)}원`}</title>
               </rect>
               <rect x={collectedX} y={padT + plotH - collectedH} width={barW} height={collectedH} rx={3} fill="#10b981">
-                <title>{`${d.label} 수금 ${fmt(d.collected)}원`}</title>
+                <title>{`${d.label} 입금 ${fmt(d.collected)}원`}</title>
               </rect>
               <text x={cx} y={H - padB + 16} textAnchor="middle" fontSize={11} fill="#64748b">
                 {d.label}
@@ -76,7 +76,7 @@ export default function RevenueBarChart({ data }: { data: RevenuePoint[] }) {
           <span className="h-2.5 w-2.5 rounded-sm bg-indigo-500" /> 청구 총액
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> 수금액
+          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> 입금액
         </span>
       </div>
     </div>

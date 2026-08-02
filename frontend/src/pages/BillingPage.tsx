@@ -31,7 +31,7 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'ALL', label: '전체' },
   { key: 'OVERDUE', label: '연체' },
   { key: 'ISSUED', label: '입금예정' }, // 목록 행 배지(displayStatus)와 같은 말을 쓴다 — '발행'은 회계 용어라 배지 문구와 안 맞았다
-  { key: 'PARTIALLY_PAID', label: '부분수금' },
+  { key: 'PARTIALLY_PAID', label: '부분입금' },
   { key: 'PAID', label: '완납' },
 ]
 
@@ -141,17 +141,17 @@ export default function BillingPage() {
     return ledgers.filter((l) => l.status === statusFilter)
   }, [ledgers, statusFilter])
 
-  // [원터치] 전액 수금 처리 — 계좌이체·오늘 날짜로 잔액 전액을 즉시 수금 기록
+  // [원터치] 전액 입금 처리 — 계좌이체·오늘 날짜로 잔액 전액을 즉시 입금 기록
   async function handleQuickCollect(l: BillingLedger) {
     const amt = l.outstanding ?? l.balance
-    if (!window.confirm(`${l.customerName} · ${won(amt)}을 전액 수금(계좌이체)으로 처리할까요?`)) return
+    if (!window.confirm(`${l.customerName} · ${won(amt)}을 전액 입금(계좌이체)으로 처리할까요?`)) return
     try {
       await billingApi.recordPayment(l.id, { amount: amt, method: 'BANK_TRANSFER', paidOn: today() })
-      setNotice(`${l.customerName} ${won(amt)} 수금 완료`)
+      setNotice(`${l.customerName} ${won(amt)} 입금 완료`)
       reload()
       orderSync.emit() // 대시보드·매출 실시간 갱신
     } catch (err) {
-      setNotice(errMsg(err, '수금 처리에 실패했습니다.'))
+      setNotice(errMsg(err, '입금 처리에 실패했습니다.'))
     }
   }
 
@@ -234,14 +234,14 @@ export default function BillingPage() {
 
       {/* 모바일: 가로형 요약 2×2 (큰 숫자·경고 색상) */}
       <div className="grid grid-cols-2 gap-2 md:hidden">
-        <BillStat label="누적 수금액" value={won(kpi.collected)} tone="emerald" />
+        <BillStat label="누적 입금액" value={won(kpi.collected)} tone="emerald" />
         <BillStat label="정산 건수" value={`${kpi.count}건`} tone="slate" />
         <BillStat label="미수금 총액" value={won(kpi.outstanding)} tone="amber" alert={kpi.outstanding > 0} />
         <BillStat label="연체 건수" value={`${kpi.overdueCount}건`} tone="red" alert={kpi.overdueCount > 0} />
       </div>
       {/* 데스크톱: StatCard */}
       <div className="hidden gap-4 md:grid md:grid-cols-4">
-        <StatCard label="누적 수금액" value={won(kpi.collected)} icon={Coins} tone="emerald" />
+        <StatCard label="누적 입금액" value={won(kpi.collected)} icon={Coins} tone="emerald" />
         <StatCard label="정산 건수" value={`${kpi.count}건`} icon={FileText} tone="slate" />
         <StatCard
           label="미수금 총액"
@@ -397,7 +397,7 @@ export default function BillingPage() {
                         onClick={() => handleQuickCollect(l)}
                         className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-base font-bold text-white transition active:scale-[0.99]"
                       >
-                        <HandCoins size={18} /> 전액 수금 · {won(outstanding)}
+                        <HandCoins size={18} /> 전액 입금 · {won(outstanding)}
                       </button>
                     )}
                     {canRefund && isAdmin && (

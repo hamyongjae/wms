@@ -658,7 +658,7 @@ function EventCard({
       onAction('이미 완납된 건입니다.')
       return
     }
-    if (!window.confirm(`${event.customerName} · ${won(event.amount)} 전액 수금 완료로 처리할까요?`)) return
+    if (!window.confirm(`${event.customerName} · ${won(event.amount)} 전액 입금 완료로 처리할까요?`)) return
     setBusy(true)
     try {
       await billingApi.recordPayment(event.id, {
@@ -667,9 +667,9 @@ function EventCard({
         paidOn: todayStr(),
         memo: '캘린더 당일 입금 대사',
       })
-      onAction(`${event.customerName} 수금 완료 처리했습니다.`)
+      onAction(`${event.customerName} 입금 완료 처리했습니다.`)
     } catch (err) {
-      onAction(isAxiosError(err) ? (err.response?.data?.message ?? '수금 처리 실패') : '수금 처리 실패')
+      onAction(isAxiosError(err) ? (err.response?.data?.message ?? '입금 처리 실패') : '입금 처리 실패')
     } finally {
       setBusy(false)
     }
@@ -766,7 +766,7 @@ function EventCard({
             {event.status !== 'COMPLETED' && (
               <>
                 <QuickBtn onClick={settlePayment} disabled={busy} icon={<CheckCircle2 size={13} />} tone="emerald">
-                  수금 완료 처리
+                  입금 완료 처리
                 </QuickBtn>
                 {isAdmin && (
                   <QuickBtn onClick={resendNotify} disabled={busy} icon={<Bell size={13} />}>
