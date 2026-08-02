@@ -94,7 +94,6 @@ export default function LedgerDetailPanel({
   }
 
   const l = detail?.ledger
-  const canIssue = l?.status === 'DRAFT'
   const canPay = l != null && l.balance > 0 && (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
   const canAdjust = l != null && (l.status === 'DRAFT' || l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
   // [환불 완료] 환불 대상 금액이 있고 아직 미완료일 때만 (이중 방어 — 백엔드에서도 재검증)
@@ -103,15 +102,6 @@ export default function LedgerDetailPanel({
   //   수금·조정 흔적이 없고 다음 원장으로 이월되지 않은 원장만 — 실제 돈이 오간 기록은 지울 수 없다.
   const canDelete =
     isAdmin && l != null && l.paidTotal === 0 && l.adjustmentTotal === 0 && l.status !== 'CARRIED_OVER'
-
-  async function handleIssue() {
-    try {
-      await billingApi.issue(ledgerId)
-      afterAction()
-    } catch (err) {
-      setActionError(errMsg(err, '발행에 실패했습니다.'))
-    }
-  }
 
   async function handleCompleteRefund() {
     if (!window.confirm('환불 완료 처리하시겠습니까?\n환불 대상 금액을 지급 완료로 마감하고 잔액을 0원으로 정리합니다.')) return
@@ -209,11 +199,6 @@ export default function LedgerDetailPanel({
 
           {/* 액션 버튼 */}
           <div className="flex flex-wrap gap-2">
-            {canIssue && isAdmin && (
-              <ActionBtn onClick={handleIssue} icon={<BadgeCheck size={15} />} tone="indigo">
-                발행
-              </ActionBtn>
-            )}
             {canPay && (
               <ActionBtn onClick={() => setMode(mode === 'pay' ? null : 'pay')} icon={<HandCoins size={15} />} tone="emerald">
                 수금 기록
@@ -489,11 +474,10 @@ function ActionBtn({
 }: {
   onClick: () => void
   icon: ReactNode
-  tone: 'indigo' | 'emerald' | 'amber' | 'red'
+  tone: 'emerald' | 'amber' | 'red'
   children: ReactNode
 }) {
   const cls = {
-    indigo: 'bg-indigo-600 hover:bg-indigo-700 text-white',
     emerald: 'bg-emerald-600 hover:bg-emerald-700 text-white',
     amber: 'border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100',
     red: 'border border-red-300 bg-red-50 text-red-700 hover:bg-red-100',
