@@ -187,23 +187,35 @@ function ThemeSection() {
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2.5 sm:grid-cols-5">
-        {THEMES.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => pick(t.id)}
-            className={cn(
-              'flex flex-col items-center gap-1.5 rounded-xl border-2 p-3 transition',
-              t.id === current ? 'border-indigo-400 bg-indigo-50/60' : 'border-transparent hover:bg-slate-50',
-            )}
-          >
-            <span className="relative flex h-8 w-8 items-center justify-center rounded-full ring-1 ring-black/5" style={{ backgroundColor: t.color }}>
-              {t.id === current && <Check size={16} className="text-white" strokeWidth={3} />}
-            </span>
-            <span className="text-xs font-medium text-slate-600">{t.label}</span>
-          </button>
-        ))}
+      {/* [고령 사용자 접근성] 2열 고정 + 큼직한 터치 영역. 색 대비만으로 구분하지 않도록
+          스와치 안 체크 아이콘 + "적용됨" 텍스트로 선택 상태를 이중으로 표시한다. */}
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        {THEMES.map((t) => {
+          const active = t.id === current
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => pick(t.id)}
+              aria-pressed={active}
+              className={cn(
+                'flex min-h-[4.5rem] items-center gap-3 rounded-2xl border-2 p-4 text-left transition',
+                active ? 'border-slate-800 bg-slate-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50',
+              )}
+            >
+              <span
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ring-1 ring-black/5"
+                style={{ backgroundColor: t.color }}
+              >
+                {active && <Check size={22} className="text-white" strokeWidth={3} />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-base font-bold text-slate-800">{t.label}</span>
+                <span className="block text-xs text-slate-400">{active ? '적용됨' : '탭하여 적용'}</span>
+              </span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
