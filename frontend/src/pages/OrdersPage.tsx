@@ -14,7 +14,7 @@ import { yardApi } from '@/api/yardApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { validateContractPeriod } from '@/lib/dateValidation'
-import { calcDailyFee, storageDays } from '@/lib/fee'
+import { calcDailyFee, calcMonthlyFeeFromDaily, storageDays } from '@/lib/fee'
 import { extractOwner } from '@/lib/owner'
 import { orderSync } from '@/lib/orderEvents'
 import { today, addDays, addMonths, getDurationDays } from '@/lib/dates'
@@ -969,6 +969,12 @@ export function CreateOrderModal({
 
   // [보관료 수동 입력] 층 단가 × 보관일수 기반 자동 계산은 제거됐다.
   //   보관료는 담당자가 직접 입력한 값만 저장되며, 날짜·위치를 바꿔도 금액이 바뀌지 않는다.
+  //   다만 "하루 보관료"는 예외로 입력 가능하게 열어뒀다 — 그 값을 입력하는 순간에만
+  //   보관료 = 하루 보관료 × 보관일수로 채워주고, 그 뒤로는 보관료 필드를 그대로 직접 수정해도 된다.
+  function handleDailyFeeChange(v: number | null) {
+    const computed = calcMonthlyFeeFromDaily(v, storageStartDate, expectedEndDate)
+    if (computed != null) setMonthlyFee(computed)
+  }
 
   const periodError = validateContractPeriod(storageStartDate, expectedEndDate)
   // [예약 계약] 보관 시작일이 미래면 아직 실제로 입고된 게 아니므로 컨테이너를 물리적으로 배치할 수 없다
@@ -1273,9 +1279,16 @@ export function CreateOrderModal({
               <GridField label="보관일수" hint="보관 시작일 ~ 출고 예정일 (당일 포함)">
                 <div className={gridReadonlyCls}>{days != null ? `${days.toLocaleString()}일` : ''}</div>
               </GridField>
-              {/* 보관료·시작일·출고예정일이 모두 유효할 때만 실시간 표시(읽기 전용). 아니면 빈 값 */}
-              <GridField label="하루 보관료" hint="보관료 ÷ 보관일수 (당일 포함)">
-                <div className={gridReadonlyCls}>{dailyFee != null ? won(dailyFee) : ''}</div>
+              {/* 보관료÷보관일수를 실시간으로 보여주되, 여기에 직접 입력하면 반대로
+                  보관료 = 입력값 × 보관일수로 자동 채워진다(층 단가표 등으로 하루 단가를
+                  먼저 아는 경우를 위함). 보관일수 미확정 시엔 입력해도 반영되지 않는다. */}
+              <GridField label="하루 보관료" hint="입력하면 보관료 = 입력값 × 보관일수로 자동 계산">
+                <MoneyInput
+                  value={dailyFee}
+                  onChange={handleDailyFeeChange}
+                  placeholder="예: 6,000"
+                  className={cn(gridInputCls, 'pr-8')}
+                />
               </GridField>
             </FieldGrid>
 

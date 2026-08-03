@@ -25,3 +25,15 @@ export function calcDailyFee(fee: number | null, startStr: string, endStr: strin
   if (days == null) return null
   return Math.round(fee / days)
 }
+
+/**
+ * 보관료(월 합계) = 하루 보관료 × 보관일수. calcDailyFee의 역계산 — 담당자가 하루 단가를
+ * 먼저 정해뒀을 때(층별 단가표 등) 그 값으로 전체 보관료를 바로 채우기 위한 용도.
+ * 세 값이 모두 유효할 때만 숫자, 아니면 null(빈 값).
+ */
+export function calcMonthlyFeeFromDaily(dailyFee: number | null, startStr: string, endStr: string): number | null {
+  if (dailyFee == null || dailyFee <= 0) return null
+  const days = storageDays(startStr, endStr)
+  if (days == null) return null
+  return Math.round(dailyFee * days)
+}

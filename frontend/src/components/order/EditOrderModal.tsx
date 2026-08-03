@@ -13,7 +13,7 @@ import { yardApi } from '@/api/yardApi'
 import { cn } from '@/lib/cn'
 import { validateContractPeriod } from '@/lib/dateValidation'
 import { today } from '@/lib/dates'
-import { calcDailyFee, storageDays } from '@/lib/fee'
+import { calcDailyFee, calcMonthlyFeeFromDaily, storageDays } from '@/lib/fee'
 import { placeContainerAtSlot } from '@/lib/containerPlacement'
 import { orderSync } from '@/lib/orderEvents'
 import Modal from '@/components/ui/Modal'
@@ -37,7 +37,6 @@ import {
 } from './orderFormUi'
 
 const FORM_ID = 'edit-order-form'
-const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 
 function errMsg(err: unknown, fallback: string): string {
   return isAxiosError(err) ? (err.response?.data?.message ?? fallback) : fallback
@@ -176,6 +175,12 @@ export default function EditOrderModal({
   const periodError = validateContractPeriod(storageStartDate, expectedEndDate)
   const days = storageDays(storageStartDate, expectedEndDate)
   const dailyFee = calcDailyFee(monthlyFee, storageStartDate, expectedEndDate)
+  // 하루 보관료 칸에 직접 입력하면 그 순간 보관료 = 입력값 × 보관일수로 채운다(반대 방향은
+  // 위 dailyFee 파생값이 이미 실시간으로 보여준다 — 등록 폼과 동일 패턴).
+  function handleDailyFeeChange(v: number | null) {
+    const computed = calcMonthlyFeeFromDaily(v, storageStartDate, expectedEndDate)
+    if (computed != null) setMonthlyFee(computed)
+  }
   const locationChanged = slotId !== currentSlotId
   const locationLabel = hint?.locationLabel
   // [예약 계약] 보관 시작일을 미래로 바꾸면 아직 실제 입고가 아니므로 자리를 물리적으로 옮길 수 없다
@@ -386,8 +391,13 @@ export default function EditOrderModal({
             <div className={gridReadonlyCls}>{days != null ? `${days.toLocaleString()}일` : ''}</div>
           </GridField>
 
-          <GridField label="하루 보관료" hint="보관료 ÷ 보관일수 (당일 포함)">
-            <div className={gridReadonlyCls}>{dailyFee != null ? won(dailyFee) : ''}</div>
+          <GridField label="하루 보관료" hint="입력하면 보관료 = 입력값 × 보관일수로 자동 계산">
+            <MoneyInput
+              value={dailyFee}
+              onChange={handleDailyFeeChange}
+              placeholder="예: 6,000"
+              className={cn(gridInputCls, 'pr-8')}
+            />
           </GridField>
         </FieldGrid>
 
