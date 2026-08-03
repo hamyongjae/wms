@@ -8,6 +8,8 @@ import com.example.wms.user.entity.UserRole;
 import com.example.wms.warehouse.entity.Warehouse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 
@@ -22,7 +24,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 정말로 걸리는지 확인한다. 여기서 쓰는 조회 메서드들은 일부러 tenantId 파라미터가 없는
  * JpaRepository 기본 메서드(findById, findAll)를 쓴다 — "개발자가 조건을 깜빡해도 안전하다"는
  * 설계 취지 자체를 검증하려면, 조건을 아예 안 넘기는 경로로 테스트해야 의미가 있다.
+ *
+ * [트랜잭션 경계] Hibernate는 세션(=한 트랜잭션)을 열 때 테넌트 식별자를 딱 한 번만 확인하고
+ * 이후 다시 확인하지 않는다. 이 테스트는 한 메서드 안에서 A/B 두 업체를 오가며 만들고 조회하므로,
+ * IntegrationTestBase의 기본 클래스 레벨 {@code @Transactional}(전체를 한 세션으로 묶어 롤백)을
+ * 그대로 쓰면 첫 번째 업체로 세션이 고정돼 버려 이후의 로그인 전환이 무의미해진다. 그래서
+ * {@code NOT_SUPPORTED}로 오버라이드해 각 저장·조회가 매번 독립된(=올바른 테넌트로 새로 확정되는)
+ * 트랜잭션에서 실행되게 한다(IntegrationTestBase 클래스 주석에 문서화된 사용법).
  */
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class TenantIsolationIntegrationTest extends IntegrationTestBase {
 
     @Test

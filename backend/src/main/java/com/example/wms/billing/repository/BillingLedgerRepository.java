@@ -68,6 +68,15 @@ public interface BillingLedgerRepository extends JpaRepository<BillingLedger, Lo
     List<BillingLedger> findByStorageOrderId(Long storageOrderId);
 
     /**
+     * [롤링 청구 배치] 계약의 취소 아닌 원장 중 청구기간 종료일이 가장 늦은 것.
+     * 다음 회차의 시작일(=이 원장의 billingPeriodEnd + 1)을 구하는 기준이 된다.
+     * CARRIED_OVER는 기간 자체는 유효하므로 포함하고, CANCELED만 제외한다
+     * (existsActiveLedgerOverlapping과 동일한 판단 기준).
+     */
+    Optional<BillingLedger> findFirstByStorageOrderIdAndStatusNotOrderByBillingPeriodEndDesc(
+            Long storageOrderId, BillingStatus status);
+
+    /**
      * [동시성] 수금/조정 같은 임계 구간용 비관적 쓰기 락.
      * 같은 원장을 두 트랜잭션이 동시에 갱신하면 한쪽은 대기 → 갱신 유실 방지.
      * (낙관적 @Version 과 함께 이중 방어)

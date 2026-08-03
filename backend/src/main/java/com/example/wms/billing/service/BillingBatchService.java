@@ -1,28 +1,26 @@
 package com.example.wms.billing.service;
 
 import com.example.wms.billing.entity.BillingLedger;
-import com.example.wms.billing.entity.BillingType;
-import com.example.wms.billing.entity.SettlementType;
+import com.example.wms.billing.entity.BillingStatus;
 import com.example.wms.billing.notification.BillingNotification;
 import com.example.wms.billing.notification.BillingNotificationEvent;
 import com.example.wms.billing.notification.NotificationType;
 import com.example.wms.billing.repository.BillingLedgerRepository;
-import com.example.wms.billing.support.MoneyPolicy;
-import com.example.wms.security.tenant.TenantContext;
-import com.example.wms.billing.support.ProrationCalculator;
 import com.example.wms.order.entity.OrderStatus;
 import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.order.repository.StorageOrderRepository;
+import com.example.wms.security.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 청구 배치(스케줄러) 전용 서비스.
@@ -35,66 +33,113 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BillingBatchService {
 
+    private static final Logger log = LoggerFactory.getLogger(BillingBatchService.class);
+
     // 청구 대상 = 아직 출고되지 않은 활성 계약 (입고 상태)
     private static final List<OrderStatus> ACTIVE_STATUSES =
             List.of(OrderStatus.INBOUND);
 
     private final BillingLedgerRepository ledgerRepository;
     private final StorageOrderRepository storageOrderRepository;
-    private final ProrationCalculator prorationCalculator;
     private final ApplicationEventPublisher eventPublisher;
+    private final BillingLedgerIssuer ledgerIssuer;
+
+    // [폭주 방지] 계약당 1회 실행에서 소급 생성할 수 있는 최대 회차(약 2년). 장기 다운타임 복구 시
+    //   밀린 회차를 한 번에 캐치업하되, 데이터 이상(예: 원장이 영영 안 생기는 버그)으로 무한정 쌓이는
+    //   것을 막는 안전판이다.
+    private static final int MAX_PERIODS_PER_RUN = 24;
 
     /**
-     * 지정 월(targetMonth)의 청구 원장을 활성 계약마다 자동 생성한다.
-     * 이미 같은 계약·같은 기간 원장이 있으면 건너뛴다(중복 방지).
+     * [롤링 청구] 계약마다 "직전 원장 종료일 다음날"을 다음 회차 시작일로 삼아, 그날이 이미 지났으면
+     * (=asOfDate 이하) 그 회차 원장을 생성한다. 계약마다 원래 입고일 리듬을 유지한 채 생성일이
+     * 자연히 분산되고(매달 1일 일괄 생성 문제 해소), 계약이 이어붙는 구조라 별도 마이그레이션 없이도
+     * 항상 직전 원장과 정합된다.
+     *
+     * 서버가 며칠 멈췄다 복구된 경우 계약당 최대 {@link #MAX_PERIODS_PER_RUN}회차까지 한 번에
+     * 캐치업 생성한다 — 실제로 보관은 계속 진행 중이었으므로 매출 인식을 인위적으로 지연시키지 않는다.
+     *
+     * [트랜잭션 경계 주의] 이 메서드는 절대 {@code @Transactional}을 붙이면 안 된다 — 여러 테넌트를
+     * 순회하며 {@link BillingLedgerIssuer#issueIfNotOverlapping}(REQUIRES_NEW)을 반복 호출하는데,
+     * 이 메서드 자체가 이미 트랜잭션 안이면 그 REQUIRES_NEW가 "이미 활성인 트랜잭션을 suspend"하게
+     * 되어 재개(resume) 시 세션이 오염되는 문제가 있었다(재현·확인됨). 이 메서드가 트랜잭션 없이
+     * 시작해야 REQUIRES_NEW가 매번 완전히 새 최상위 트랜잭션으로만 동작해 안전하다.
+     * (읽기 쿼리들은 Spring Data 리포지토리가 메서드마다 자체적으로 짧은 트랜잭션을 열어준다.)
+     *
      * @return 생성된 원장 수
      */
-    @Transactional
-    public int generateMonthlyLedgers(YearMonth targetMonth) {
-        LocalDate periodStart = targetMonth.atDay(1);
-        LocalDate periodEnd = targetMonth.atEndOfMonth();
-
+    public int generateDueLedgers(LocalDate asOfDate) {
         List<StorageOrder> activeOrders = storageOrderRepository.findByStatusIn(ACTIVE_STATUSES);
         int created = 0;
 
         for (StorageOrder order : activeOrders) {
             // [수동 정산 계약 제외] 등록 시 최초 청구서는 이 값과 무관하게 항상 자동 발행되지만,
-            //   이후 매월 반복 자동 생성은 '자동'으로 설정된 계약만 대상으로 한다.
+            //   이후 반복 자동 생성은 '자동'으로 설정된 계약만 대상으로 한다.
             if (!Boolean.TRUE.equals(order.getAutoBillingEnabled())) {
                 continue;
             }
-            // [이중청구 방지] 이번 달 구간과 겹치는 원장(계약 등록 시 자동 발행분 포함)이 이미 있으면 건너뜀
-            if (ledgerRepository.existsActiveLedgerOverlapping(order.getId(), periodStart, periodEnd)) {
+            if (order.getMonthlyFee() == null || order.getMonthlyFee() <= 0) {
+                log.warn("[청구배치] monthlyFee 미설정/0 이하 — 갱신 건너뜀. orderId={}", order.getId());
                 continue;
             }
-            LocalDate dueDate = recurringDueDate(order, targetMonth);
-            BigDecimal base = prorationCalculator.prorateMonthly(
-                    BigDecimal.valueOf(order.getMonthlyFee()), periodStart, periodEnd);
 
-            BillingLedger ledger = new BillingLedger(
-                    order.getTenant(), order, order.getCustomer(), generateLedgerNo(),
-                    BillingType.MONTHLY, SettlementType.POSTPAID,
-                    periodStart, periodEnd, base, MoneyPolicy.ZERO, dueDate);
-            ledger.issue(dueDate);   // 자동 생성분은 바로 발행(청구 확정)
-            // [테넌트 격리] 배치는 로그인 사용자가 없어 ROOT 컨텍스트로 돈다. 읽기는 전 테넌트를
-            //   가로질러야 하므로 그대로 두고, 저장만 그 계약의 업체로 명시 전환한다.
-            //   (전환하지 않으면 tenant_id 가 채워지지 않아 FK 위반으로 즉시 실패한다 — 조용한 오염 없음)
-            TenantContext.runAs(order.getTenantId(), () -> ledgerRepository.save(ledger));
-            created++;
+            Optional<BillingLedger> last = ledgerRepository
+                    .findFirstByStorageOrderIdAndStatusNotOrderByBillingPeriodEndDesc(
+                            order.getId(), BillingStatus.CANCELED);
+            if (last.isEmpty()) {
+                // 정상 흐름에서는 발생하지 않는다(등록 시 항상 최초 원장이 생김). 원장이 하나도 없는
+                // 결손 계약은 backfillMissingLedgers()가 처리하도록 위임하고 여기서는 만들지 않는다.
+                log.warn("[청구배치] 원장 0건인 활성 계약 — backfill 대상, 이번 실행 skip. orderId={}", order.getId());
+                continue;
+            }
+
+            LocalDate nextStart = last.get().getBillingPeriodEnd().plusDays(1);
+            int guard = 0;
+            while (!nextStart.isAfter(asOfDate)) {
+                if (++guard > MAX_PERIODS_PER_RUN) {
+                    log.error("[청구배치] orderId={} 밀린 회차가 {}건을 초과 — 데이터 점검 필요, 이번 실행 중단",
+                            order.getId(), MAX_PERIODS_PER_RUN);
+                    break;
+                }
+
+                LocalDate periodStart = nextStart;
+                LocalDate periodEnd = periodStart.plusMonths(1).minusDays(1);
+                LocalDate dueDate = recurringDueDate(order, periodStart);
+
+                // [테넌트 격리] runAs override는 반드시 issuer 호출을 "감싸는" 형태여야 한다 — issuer의
+                //   @Transactional(REQUIRES_NEW) 프록시가 새 세션을 여는 시점에 override가 이미
+                //   걸려 있어야 그 세션이 정확한 테넌트로 확정된다(자세한 내용은 BillingLedgerIssuer 참고).
+                boolean issued = TenantContext.runAs(order.getTenantId(), () ->
+                        ledgerIssuer.issueIfNotOverlapping(order, periodStart, periodEnd, dueDate));
+                if (!issued) {
+                    // [이중청구 방지] 정상 흐름에선 발생하지 않지만, 동시 실행·수동 원장 개입에 대비한 안전망
+                    log.warn("[청구배치] orderId={} 기간[{}~{}]과 겹치는 원장이 이미 존재 — 이후 회차도 중단",
+                            order.getId(), periodStart, periodEnd);
+                    break;
+                }
+                created++;
+
+                nextStart = periodEnd.plusDays(1);
+            }
         }
         return created;
     }
 
     /**
-     * [계약별 납기일] 배치 생성 시점(매월 1일)은 전 계약 공통이지만, 실제 납기는 계약마다 다르다.
-     * 계약에 저장된 dueDate의 '일(day)' 값을 매월 반복되는 납기 기준일로 삼는다.
-     * 기준일이 그 달에 없는 날짜(31일 등)면 그 달의 마지막 날로 자동 보정한다(말일 클램프).
-     * dueDate가 없는 레거시 계약만 10일을 기본값으로 쓴다.
+     * [계약별 납기일] 계약에 저장된 dueDate의 '일(day)' 값을, 이번 회차가 시작하는 달 기준으로
+     * 재적용한다(말일 클램프, dueDate 없는 레거시 계약은 10일 기본값). 롤링 주기에서는 회차
+     * 시작일이 매번 달라지므로, 계산된 납기일이 회차 시작일보다 이르면(예: "매달 5일 납부"인데
+     * 이번 회차가 15일에 시작) 다음 달의 같은 날짜로 굴려 보내 "매달 N일 납부"라는 원래 협의
+     * 의미를 그대로 보존한다. 단순히 회차 시작일로 당겨버리면 이 의미가 사라진다.
      */
-    private LocalDate recurringDueDate(StorageOrder order, YearMonth targetMonth) {
+    private LocalDate recurringDueDate(StorageOrder order, LocalDate periodStart) {
         int anchorDay = order.getDueDate() != null ? order.getDueDate().getDayOfMonth() : 10;
-        int day = Math.min(anchorDay, targetMonth.lengthOfMonth());
-        return targetMonth.atDay(day);
+        YearMonth ym = YearMonth.from(periodStart);
+        LocalDate candidate = ym.atDay(Math.min(anchorDay, ym.lengthOfMonth()));
+        if (candidate.isBefore(periodStart)) {
+            YearMonth nextYm = ym.plusMonths(1);
+            candidate = nextYm.atDay(Math.min(anchorDay, nextYm.lengthOfMonth()));
+        }
+        return candidate;
     }
 
     /**
@@ -106,9 +151,11 @@ public class BillingBatchService {
      * 효율: NOT EXISTS 단일 쿼리로 결손 계약만 선별(findActiveWithoutLedger) → 전체 스캔 없음.
      * 멱등: 이미 원장이 있으면 대상에서 빠지므로 반복 실행해도 안전(재실행 시 0건).
      *
+     * [트랜잭션 경계 주의] generateDueLedgers와 동일한 이유로 이 메서드도 {@code @Transactional}을
+     * 붙이지 않는다.
+     *
      * @return 새로 발행한 청구서 수
      */
-    @Transactional
     public int backfillMissingLedgers() {
         List<StorageOrder> missing = storageOrderRepository.findActiveWithoutLedger();
         int created = 0;
@@ -120,17 +167,9 @@ public class BillingBatchService {
                     ? order.getExpectedEndDate() : periodStart.plusMonths(1).minusDays(1);
             LocalDate dueDate = periodEnd;   // 후불 소급분 납기 = 보관 종료일
 
-            BigDecimal base = prorationCalculator.prorateMonthly(
-                    BigDecimal.valueOf(order.getMonthlyFee()), periodStart, periodEnd);
-
-            BillingLedger ledger = new BillingLedger(
-                    order.getTenant(), order, order.getCustomer(), generateLedgerNo(),
-                    BillingType.MONTHLY, SettlementType.POSTPAID,
-                    periodStart, periodEnd, base, MoneyPolicy.ZERO, dueDate);
-            ledger.issue(dueDate);   // 발행(입금예정, 미납=전액)
-            // [테넌트 격리] 위와 동일 — 저장 시점에만 해당 업체로 전환한다
-            TenantContext.runAs(order.getTenantId(), () -> ledgerRepository.save(ledger));
-            created++;
+            boolean issued = TenantContext.runAs(order.getTenantId(), () ->
+                    ledgerIssuer.issueIfNotOverlapping(order, periodStart, periodEnd, dueDate));
+            if (issued) created++;
         }
         return created;
     }
@@ -151,15 +190,5 @@ public class BillingBatchService {
             eventPublisher.publishEvent(new BillingNotificationEvent(notification));
         }
         return overdue.size();
-    }
-
-    private String generateLedgerNo() {
-        String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String ledgerNo;
-        do {
-            int random = (int) (Math.random() * 10000);
-            ledgerNo = String.format("LDG-%s-%04d", datePart, random);
-        } while (ledgerRepository.existsByLedgerNo(ledgerNo));
-        return ledgerNo;
     }
 }

@@ -7,6 +7,8 @@ import com.example.wms.tenant.entity.Tenant;
 import com.example.wms.warehouse.entity.Warehouse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -22,7 +24,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 필터가 적용되지 않고, 쿼리 안에 손으로 넣은 {@code where l.tenant_id = :tenantId}만이 유일한 방어선이다.
  * 이 조건이 실수로 빠지면 다른 업체 매출이 그대로 합산되어 노출된다 — 그래서 로그인 여부와 무관하게
  * (심지어 아무도 로그인하지 않은 상태에서도) 정확히 그 테넌트의 금액만 나오는지 직접 확인한다.
+ *
+ * [트랜잭션 경계] 한 메서드 안에서 A/B 두 업체를 만들어야 해서 {@code NOT_SUPPORTED}로 오버라이드한다
+ * (이유는 {@link com.example.wms.security.tenant.TenantIsolationIntegrationTest} 클래스 주석 참고 —
+ * Hibernate가 세션당 테넌트 식별자를 최초 1회만 확인하는 제약 때문).
  */
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class BillingLedgerRepositoryIntegrationTest extends IntegrationTestBase {
 
     @Test
