@@ -774,7 +774,7 @@ function MiniCalendar({
               type="button"
               key={idx}
               onClick={() => onSelect?.(d)}
-              className={`flex h-16 flex-col items-center gap-0.5 rounded-xl pt-1.5 text-base transition ${
+              className={`flex min-h-16 flex-col items-center gap-0.5 rounded-xl pb-1 pt-1.5 text-base transition ${
                 isSel
                   ? 'bg-indigo-600 font-bold text-white'
                   : isToday
