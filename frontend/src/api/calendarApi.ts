@@ -3,8 +3,8 @@ import { api } from '@/lib/api'
 /** 캘린더 이벤트 유형. */
 export type CalendarEventType = 'INBOUND' | 'OUTBOUND' | 'BILLING'
 
-/** 이벤트 진행 상태. */
-export type CalendarEventStatus = 'PENDING' | 'COMPLETED' | 'OVERDUE'
+/** 이벤트 진행 상태. INDEFINITE = 출고일 미정 장기 계약의 입고 이벤트 전용. */
+export type CalendarEventStatus = 'PENDING' | 'COMPLETED' | 'OVERDUE' | 'INDEFINITE'
 
 /**
  * 백엔드 시계열 API 연동 규격.

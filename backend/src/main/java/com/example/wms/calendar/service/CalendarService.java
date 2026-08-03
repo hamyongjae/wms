@@ -51,11 +51,15 @@ public class CalendarService {
             LocalDate periodEnd = order.getActualEndDate() != null
                     ? order.getActualEndDate() : order.getExpectedEndDate();
 
-            // 입고 이벤트
+            // 입고 이벤트 — 출고일 미정(장기 보관) 계약은 예정/완료 대신 전용 상태로 구분한다.
             LocalDate inDate = order.getStorageStartDate();
             if (inDate != null && inRange(inDate, from, to)) {
-                CalendarEventStatus status =
-                        inDate.isAfter(today) ? CalendarEventStatus.PENDING : CalendarEventStatus.COMPLETED;
+                CalendarEventStatus status;
+                if (!order.isOutbound() && order.getExpectedEndDate() == null) {
+                    status = CalendarEventStatus.INDEFINITE;
+                } else {
+                    status = inDate.isAfter(today) ? CalendarEventStatus.PENDING : CalendarEventStatus.COMPLETED;
+                }
                 events.add(event(order.getId(), "[" + customer + "] 입고", inDate,
                         CalendarEventType.INBOUND, status, customer, null, periodStart, periodEnd, fee));
             }

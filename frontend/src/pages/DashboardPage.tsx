@@ -30,10 +30,12 @@ import { orderSync } from '@/lib/orderEvents'
 
 import { isOverdue, isOpenLedger, daysFromDue } from '@/lib/billing'
 import { today, getDurationDays } from '@/lib/dates'
+import { isActive, inboundCategory, outboundCategory, SCHEDULE_META, type ScheduleCategory } from '@/lib/orderSchedule'
 
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
-const isActive = (s: StorageOrder['status']) => s === 'INBOUND'
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
+/** 5분류 표시 우선순위 — 미니달력 칸/상세 목록이 공통으로 쓴다. */
+const SCHEDULE_CATEGORY_ORDER: ScheduleCategory[] = ['IN_PENDING', 'IN_INDEFINITE', 'IN_DONE', 'OUT_PENDING', 'OUT_DONE']
 
 /**
  * 계약 가격 표시: "보관료 / 보관일수" 형식.
@@ -557,35 +559,46 @@ function MobileScheduleCard({
   const dateStr = `${view.year}-${pad(view.month)}-${pad(selected)}`
 
   /**
-   * [달력 이벤트] 보고 있는 달의 일자별 입고/출고 건수.
+   * [달력 이벤트] 보고 있는 달의 일자별 입고예정/입고/출고일미정/출고예정/출고 5분류 집계.
    * 월을 넘길 때마다 그 달 기준으로 다시 집계한다. 서버 재조회 없이 이미 받아둔
-   * orders 를 필터링하므로 월 이동이 즉각 반영된다.
+   * orders 를 필터링하므로 월 이동이 즉각 반영된다. 분류 규칙은 lib/orderSchedule 이
+   * 백엔드 CalendarService 와 동일하게 정의해둔 것을 그대로 쓴다.
    */
+  const todayIso = `${year}-${pad(month)}-${pad(todayDay)}`
   const events = useMemo(() => {
-    const cal = new Map<number, { inNames: string[]; outNames: string[] }>()
-    const add = (ds: string | null | undefined, key: 'inNames' | 'outNames', name: string) => {
-      if (!ds) return
+    const cal = new Map<number, Partial<Record<ScheduleCategory, string[]>>>()
+    const add = (ds: string | null | undefined, cat: ScheduleCategory | null, name: string) => {
+      if (!ds || !cat) return
       const [y, m, d] = ds.split('-').map(Number)
       if (y !== view.year || m !== view.month) return
-      const e = cal.get(d) ?? { inNames: [], outNames: [] }
-      e[key].push(name)
+      const e = cal.get(d) ?? {}
+      const list = e[cat] ?? (e[cat] = [])
+      list.push(name)
       cal.set(d, e)
     }
     for (const o of orders) {
-      add(o.storageStartDate, 'inNames', o.customerName)
-      add(o.actualEndDate ?? o.expectedEndDate, 'outNames', o.customerName)
+      add(o.storageStartDate, inboundCategory(o, o.storageStartDate, todayIso), o.customerName)
+      const outDs = isActive(o.status) ? o.expectedEndDate : (o.actualEndDate ?? o.expectedEndDate)
+      add(outDs, outDs ? outboundCategory(o, outDs) : null, o.customerName)
     }
     return cal
-  }, [orders, view.year, view.month])
-  // 같은 고객이 여러 건이어도 이름은 한 번만 (중복 제거)
-  const inNames = [...new Set(orders.filter((o) => o.storageStartDate === dateStr).map((o) => o.customerName))]
-  const outNames = [
-    ...new Set(
-      orders
-        .filter((o) => o.actualEndDate === dateStr || (o.expectedEndDate === dateStr && isActive(o.status)))
-        .map((o) => o.customerName),
-    ),
-  ]
+  }, [orders, view.year, view.month, todayIso])
+
+  // 선택한 날짜의 카테고리별 화주명 (같은 고객이 여러 건이어도 이름은 한 번만)
+  const dayNames = useMemo(() => {
+    const map = new Map<ScheduleCategory, string[]>()
+    const add = (cat: ScheduleCategory | null, name: string) => {
+      if (!cat) return
+      const list = map.get(cat) ?? []
+      if (!list.includes(name)) list.push(name)
+      map.set(cat, list)
+    }
+    for (const o of orders) {
+      add(inboundCategory(o, dateStr, todayIso), o.customerName)
+      add(outboundCategory(o, dateStr), o.customerName)
+    }
+    return map
+  }, [orders, dateStr, todayIso])
 
   return (
     <section className="rounded-2xl bg-white p-5 shadow-soft ring-1 ring-slate-200/60">
@@ -665,20 +678,23 @@ function MobileScheduleCard({
         </div>
       </div>
 
-      {/* 선택한 날짜의 입고·출고 화주 */}
+      {/* 선택한 날짜의 입출고 화주 — 5분류(입고예정/입고/출고일미정/출고예정/출고) */}
       <div className="mt-4 rounded-2xl bg-slate-50 p-4">
         <p className="text-base font-bold text-slate-700">
           {view.month}월 {selected}일{isCurrentMonth && selected === todayDay ? ' (오늘)' : ''} 입출고 화주
         </p>
         <div className="mt-2.5 space-y-2.5">
-          <div className="flex items-start gap-2">
-            <span className="mt-0.5 shrink-0 rounded-md bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">입고</span>
-            <span className="text-base font-medium text-slate-700">{inNames.length ? inNames.join(', ') : '없음'}</span>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="mt-0.5 shrink-0 rounded-md bg-orange-100 px-2 py-1 text-xs font-bold text-orange-700">출고</span>
-            <span className="text-base font-medium text-slate-700">{outNames.length ? outNames.join(', ') : '없음'}</span>
-          </div>
+          {SCHEDULE_CATEGORY_ORDER.filter((cat) => (dayNames.get(cat)?.length ?? 0) > 0).map((cat) => (
+            <div key={cat} className="flex items-start gap-2">
+              <span className={`mt-0.5 shrink-0 rounded-md px-2 py-1 text-xs font-bold ring-1 ${SCHEDULE_META[cat].badge}`}>
+                {SCHEDULE_META[cat].label}
+              </span>
+              <span className="text-base font-medium text-slate-700">{dayNames.get(cat)!.join(', ')}</span>
+            </div>
+          ))}
+          {[...dayNames.values()].every((v) => v.length === 0) && (
+            <p className="text-sm text-slate-400">이 날은 입출고 일정이 없습니다.</p>
+          )}
         </div>
       </div>
 
@@ -699,7 +715,7 @@ function MobileScheduleCard({
   )
 }
 
-/* ===== 모바일 미니 달력 (이번 달, 입고=파랑·출고=주황 점, 날짜 탭 선택) ===== */
+/* ===== 모바일 미니 달력 (이번 달, 입고예정/입고/출고일미정/출고예정/출고 5색 구분, 날짜 탭 선택) ===== */
 function MiniCalendar({
   year,
   month,
@@ -712,7 +728,7 @@ function MiniCalendar({
   month: number
   /** 오늘 강조할 일자. 이번 달이 아닌 달을 보고 있으면 undefined */
   todayDay?: number
-  events: Map<number, { inNames: string[]; outNames: string[] }>
+  events: Map<number, Partial<Record<ScheduleCategory, string[]>>>
   selectedDay?: number
   onSelect?: (day: number) => void
 }) {
@@ -737,6 +753,10 @@ function MiniCalendar({
           const e = events.get(d)
           const isToday = d === todayDay
           const isSel = d === selectedDay
+          // 그 날 값이 있는 카테고리를 우선순위 순으로, 칸 안에는 최대 2개까지만 보여준다
+          const activeCats = e ? SCHEDULE_CATEGORY_ORDER.filter((cat) => (e[cat]?.length ?? 0) > 0) : []
+          const shownCats = activeCats.slice(0, 2)
+          const hiddenCatCount = activeCats.length - shownCats.length
           return (
             <button
               type="button"
@@ -751,26 +771,25 @@ function MiniCalendar({
               }`}
             >
               <span>{d}</span>
-              {/* 입고·출고 화주명 — 여러 건이면 첫 명 + "외N" 으로 줄여 칸 안에 맞춘다 */}
+              {/* 5분류 화주명 칩 — 여러 건이면 첫 명 + "외N", 카테고리 자체가 많으면 "+N종류 더" */}
               <div className="flex w-full flex-col gap-0.5 px-0.5">
-                {e && e.inNames.length > 0 && (
-                  <span
-                    className={`w-full truncate rounded px-1 text-[9px] font-semibold leading-tight ${
-                      isSel ? 'bg-white/25 text-white' : 'bg-blue-100 text-blue-700'
-                    }`}
-                  >
-                    {e.inNames[0]}
-                    {e.inNames.length > 1 ? ` 외${e.inNames.length - 1}` : ''}
-                  </span>
-                )}
-                {e && e.outNames.length > 0 && (
-                  <span
-                    className={`w-full truncate rounded px-1 text-[9px] font-semibold leading-tight ${
-                      isSel ? 'bg-white/25 text-white' : 'bg-orange-100 text-orange-700'
-                    }`}
-                  >
-                    {e.outNames[0]}
-                    {e.outNames.length > 1 ? ` 외${e.outNames.length - 1}` : ''}
+                {shownCats.map((cat) => {
+                  const names = e![cat]!
+                  return (
+                    <span
+                      key={cat}
+                      className={`w-full truncate rounded px-1 text-[9px] font-semibold leading-tight ${
+                        isSel ? 'bg-white/25 text-white' : SCHEDULE_META[cat].badge
+                      }`}
+                    >
+                      {names[0]}
+                      {names.length > 1 ? ` 외${names.length - 1}` : ''}
+                    </span>
+                  )
+                })}
+                {hiddenCatCount > 0 && (
+                  <span className={`truncate text-[9px] font-medium leading-tight ${isSel ? 'text-white/80' : 'text-slate-400'}`}>
+                    +{hiddenCatCount}종류 더
                   </span>
                 )}
               </div>
@@ -778,9 +797,13 @@ function MiniCalendar({
           )
         })}
       </div>
-      <div className="mt-3 flex items-center justify-center gap-5 text-sm text-slate-500">
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" />입고</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" />출고</span>
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-slate-500">
+        {SCHEDULE_CATEGORY_ORDER.map((cat) => (
+          <span key={cat} className="flex items-center gap-1.5">
+            <span className={`h-2.5 w-2.5 rounded-full ${SCHEDULE_META[cat].dot}`} />
+            {SCHEDULE_META[cat].label}
+          </span>
+        ))}
       </div>
     </div>
   )

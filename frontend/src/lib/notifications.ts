@@ -1,5 +1,6 @@
 import { billingApi, type BillingLedger } from '@/api/billingApi'
 import { orderApi, type StorageOrder } from '@/api/orderApi'
+import { isActive } from './orderSchedule'
 
 export type NotiTone = 'red' | 'amber' | 'slate'
 
@@ -17,8 +18,6 @@ const today = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
-// 상태 모델은 INBOUND/OUTBOUND 이진 — 예전 RECEIVED/IN_STORAGE 값은 폐기됨. 활성=아직 출고 안 됨(INBOUND).
-const isActive = (s: StorageOrder['status']) => s === 'INBOUND'
 const isOverdue = (l: BillingLedger) =>
   l.balance > 0 &&
   (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID') &&

@@ -27,6 +27,7 @@ import { customerApi, type Customer } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
+import { SCHEDULE_META, type ScheduleCategory } from '@/lib/orderSchedule'
 import { orderSync } from '@/lib/orderEvents'
 import { CreateOrderModal, StatusChangeModal, OrderBillingModal } from './OrdersPage'
 import EditOrderModal from '@/components/order/EditOrderModal'
@@ -55,6 +56,15 @@ const TYPE_META: Record<CalendarEventType, { label: string; emoji: string; badge
     badge: 'bg-[#EFEBE4] text-[#8A8172] ring-[#E2DCD1]',
     dot: 'bg-[#8A8172]',
   },
+}
+
+/** (type,status) → 5분류 색상 키. OVERDUE는 별도 색 없이 출고예정에 합류(연체 텍스트 배지는 별도 유지). */
+function eventColorKey(e: CalendarEvent): ScheduleCategory {
+  if (e.type === 'INBOUND') {
+    if (e.status === 'INDEFINITE') return 'IN_INDEFINITE'
+    return e.status === 'COMPLETED' ? 'IN_DONE' : 'IN_PENDING'
+  }
+  return e.status === 'COMPLETED' ? 'OUT_DONE' : 'OUT_PENDING'
 }
 
 const FILTERS: Array<{ key: FilterMode; label: string }> = [
@@ -390,7 +400,7 @@ export default function ScheduleCalendarPage() {
                         {dayEvents.slice(0, 2).map((e) => (
                           <span
                             key={e.id}
-                            className={cn('w-full truncate rounded px-1 py-0.5 text-[10px] font-semibold leading-tight ring-1', TYPE_META[e.type].badge)}
+                            className={cn('w-full truncate rounded px-1 py-0.5 text-[10px] font-semibold leading-tight ring-1', SCHEDULE_META[eventColorKey(e)].badge)}
                           >
                             {e.customerName ?? eventLabel(e)}
                           </span>
@@ -407,7 +417,7 @@ export default function ScheduleCalendarPage() {
                             key={e.id}
                             className={cn(
                               'truncate rounded px-1 py-0.5 text-[11px] font-medium ring-1',
-                              TYPE_META[e.type].badge,
+                              SCHEDULE_META[eventColorKey(e)].badge,
                             )}
                             title={e.customerName ?? eventLabel(e)}
                           >
@@ -672,7 +682,7 @@ function EventCard({
   actionLoading: boolean
 }) {
   const [busy, setBusy] = useState(false)
-  const meta = TYPE_META[event.type]
+  const meta = event.type === 'BILLING' ? TYPE_META.BILLING : SCHEDULE_META[eventColorKey(event)]
 
   async function settlePayment() {
     if (!event.amount || event.amount <= 0) {
