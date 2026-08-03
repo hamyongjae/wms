@@ -562,18 +562,18 @@ function MobileScheduleCard({
    * orders 를 필터링하므로 월 이동이 즉각 반영된다.
    */
   const events = useMemo(() => {
-    const cal = new Map<number, { in: number; out: number }>()
-    const add = (ds: string | null | undefined, key: 'in' | 'out') => {
+    const cal = new Map<number, { inNames: string[]; outNames: string[] }>()
+    const add = (ds: string | null | undefined, key: 'inNames' | 'outNames', name: string) => {
       if (!ds) return
       const [y, m, d] = ds.split('-').map(Number)
       if (y !== view.year || m !== view.month) return
-      const e = cal.get(d) ?? { in: 0, out: 0 }
-      e[key] += 1
+      const e = cal.get(d) ?? { inNames: [], outNames: [] }
+      e[key].push(name)
       cal.set(d, e)
     }
     for (const o of orders) {
-      add(o.storageStartDate, 'in')
-      add(o.actualEndDate ?? o.expectedEndDate, 'out')
+      add(o.storageStartDate, 'inNames', o.customerName)
+      add(o.actualEndDate ?? o.expectedEndDate, 'outNames', o.customerName)
     }
     return cal
   }, [orders, view.year, view.month])
@@ -712,7 +712,7 @@ function MiniCalendar({
   month: number
   /** 오늘 강조할 일자. 이번 달이 아닌 달을 보고 있으면 undefined */
   todayDay?: number
-  events: Map<number, { in: number; out: number }>
+  events: Map<number, { inNames: string[]; outNames: string[] }>
   selectedDay?: number
   onSelect?: (day: number) => void
 }) {
@@ -742,7 +742,7 @@ function MiniCalendar({
               type="button"
               key={idx}
               onClick={() => onSelect?.(d)}
-              className={`relative flex h-11 flex-col items-center justify-center rounded-xl text-base transition ${
+              className={`flex h-16 flex-col items-center gap-0.5 rounded-xl pt-1.5 text-base transition ${
                 isSel
                   ? 'bg-indigo-600 font-bold text-white'
                   : isToday
@@ -751,12 +751,29 @@ function MiniCalendar({
               }`}
             >
               <span>{d}</span>
-              {e && (
-                <span className="absolute bottom-1 flex gap-0.5">
-                  {e.in > 0 && <span className={`h-1.5 w-1.5 rounded-full ${isSel ? 'bg-white' : 'bg-blue-500'}`} />}
-                  {e.out > 0 && <span className={`h-1.5 w-1.5 rounded-full ${isSel ? 'bg-white' : 'bg-orange-500'}`} />}
-                </span>
-              )}
+              {/* 입고·출고 화주명 — 여러 건이면 첫 명 + "외N" 으로 줄여 칸 안에 맞춘다 */}
+              <div className="flex w-full flex-col gap-0.5 px-0.5">
+                {e && e.inNames.length > 0 && (
+                  <span
+                    className={`w-full truncate rounded px-1 text-[9px] font-semibold leading-tight ${
+                      isSel ? 'bg-white/25 text-white' : 'bg-blue-100 text-blue-700'
+                    }`}
+                  >
+                    {e.inNames[0]}
+                    {e.inNames.length > 1 ? ` 외${e.inNames.length - 1}` : ''}
+                  </span>
+                )}
+                {e && e.outNames.length > 0 && (
+                  <span
+                    className={`w-full truncate rounded px-1 text-[9px] font-semibold leading-tight ${
+                      isSel ? 'bg-white/25 text-white' : 'bg-orange-100 text-orange-700'
+                    }`}
+                  >
+                    {e.outNames[0]}
+                    {e.outNames.length > 1 ? ` 외${e.outNames.length - 1}` : ''}
+                  </span>
+                )}
+              </div>
             </button>
           )
         })}

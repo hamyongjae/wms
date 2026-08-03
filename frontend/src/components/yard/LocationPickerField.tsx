@@ -117,7 +117,7 @@ export default function LocationPickerField({
                 <p className="mb-1.5 inline-flex items-center gap-1.5 rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">
                   {tier}층 <span className="font-medium text-slate-400">· {cells.length}칸</span>
                 </p>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="grid grid-cols-5 justify-items-center gap-1.5">
                   {cells.map((s) => {
                     const isSelected = s.id === value
                     const isCurrent = s.id === currentSlotId
