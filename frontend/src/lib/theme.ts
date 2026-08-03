@@ -22,16 +22,21 @@ export const THEMES: ThemeOption[] = [
 ]
 
 const KEY = 'wms.theme'
-const DEFAULT: ThemeId = 'teal'
+export const DEFAULT_THEME: ThemeId = 'teal'
 
 export function getTheme(): ThemeId {
   const v = localStorage.getItem(KEY) as ThemeId | null
-  return v && THEMES.some((t) => t.id === v) ? v : DEFAULT
+  return v && THEMES.some((t) => t.id === v) ? v : DEFAULT_THEME
+}
+
+/** 미리보기만 적용(저장하지 않음) — 설정 팝업에서 고르는 즉시 화면에 비춰보기 위함 */
+export function previewTheme(id: ThemeId): void {
+  document.documentElement.dataset.theme = id
 }
 
 /** 테마 적용 + 저장 */
 export function applyTheme(id: ThemeId): void {
-  document.documentElement.dataset.theme = id
+  previewTheme(id)
   localStorage.setItem(KEY, id)
 }
 
