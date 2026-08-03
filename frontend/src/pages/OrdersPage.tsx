@@ -29,6 +29,7 @@ import PaymentAccountPicker from '@/components/order/PaymentAccountPicker'
 import { placeContainerAtSlot } from '@/lib/containerPlacement'
 import {
   AutoBillingToggle,
+  HistoricalContractToggle,
   CalendarField,
   Field,
   FieldGrid,
@@ -903,6 +904,8 @@ export function CreateOrderModal({
   const [staffList, setStaffList] = useState<Staff[]>([])
   // [정산서 생성 방식] 기본값은 수동 생성 — 담당자가 명시적으로 켜야만 매월 자동 청구가 시작된다.
   const [autoBillingEnabled, setAutoBillingEnabled] = useState(false)
+  // [과거 계약 등록] 보관 시작일이 과거인 계약을 지금 처음 등록할 때만 의미 있는 1회성 옵션
+  const [historicalContract, setHistoricalContract] = useState(false)
   const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -946,6 +949,7 @@ export function CreateOrderModal({
       setSettlementUserId(null)
       setDueDate('')
       setAutoBillingEnabled(false)
+      setHistoricalContract(false)
       setMemo('')
       setFormError(null)
       setDormantConfirm(false)
@@ -1040,6 +1044,7 @@ export function CreateOrderModal({
         capacityTons: capacityTons ?? undefined,
         memo: memo || undefined,
         autoBillingEnabled,
+        historicalContract,
       })
       // 위치를 지정했으면 컨테이너 생성·배정·적재까지 이어서 처리(미지정이면 생략)
       if (slotId != null) {
@@ -1329,6 +1334,11 @@ export function CreateOrderModal({
             )}
 
             <AutoBillingToggle checked={autoBillingEnabled} onChange={setAutoBillingEnabled} dueDate={dueDate} />
+
+            {/* [과거 계약 등록] 보관 시작일이 과거일 때만 노출 — 오늘/미래 시작일이면 켜도 의미 없음 */}
+            {storageStartDate !== '' && storageStartDate < today() && (
+              <HistoricalContractToggle checked={historicalContract} onChange={setHistoricalContract} />
+            )}
 
             <div>
               <label className={labelCls}>메모</label>

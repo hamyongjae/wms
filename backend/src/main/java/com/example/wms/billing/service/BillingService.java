@@ -170,6 +170,24 @@ public class BillingService {
     }
 
     /**
+     * [과거 계약 등록 - 소급분 일괄 정산] 실제 과거 입고일부터 존재해온 계약을 지금 처음 등록할 때,
+     * 이 시스템 밖에서 이미 끝난 과거 기간 전체를 0원·완료(PAID) 원장 1건으로 묶어 남긴다.
+     * 월별로 쪼개 소급 청구하지 않는다 — 오늘부터의 진짜 청구는 이 메서드 호출 직후
+     * settlePrepaid/issuePostpaid로 별도 생성한다(StorageOrderService.createOrder 참고).
+     * baseAmount가 0이면 issue() 직후 recompute()가 balance<=0을 보고 즉시 PAID로 전이하므로
+     * 별도 조정(BillingAdjustment)이 필요 없다.
+     */
+    @Transactional
+    public void settleHistoricalBundle(StorageOrder order, LocalDate periodStart, LocalDate periodEnd) {
+        BillingLedger ledger = new BillingLedger(
+                order.getTenant(), order, order.getCustomer(), generateLedgerNo(),
+                BillingType.MONTHLY, SettlementType.POSTPAID,
+                periodStart, periodEnd, BigDecimal.ZERO, BigDecimal.ZERO, periodEnd);
+        ledger.issue(periodEnd);
+        ledgerRepository.save(ledger);
+    }
+
+    /**
      * [계약 수정 - 청구 조건 재정산] 활성 원장을 계약의 새 결제 방식·납기일에 맞춰 재정렬한다.
      * 계약 등록과 동일한 정산 논리를 소급 적용해 "계약 화면과 원장"이 항상 일치하도록 한다.
      *

@@ -99,16 +99,32 @@ public class StorageOrderService {
         }
 
         // [청구 조건] 결제 방식(미지정 시 후불)과 납기일을 계약에 영속화 — 수정 시 재정산의 기준이 된다.
+        LocalDate today = LocalDate.now();
         LocalDate periodStart = order.getStorageStartDate();
         // [출고일 미정 임시 기간] 월 단위(MONTHLY) 청구이므로 임시 기간도 한 달로 잡는다.
         //   예전엔 +7일(어정쩡한 일주일)이라 정산서 화면에 "8/2~8/9"처럼 표시돼 혼동을 줬다.
         LocalDate periodEnd = order.getExpectedEndDate() != null
                 ? order.getExpectedEndDate() : periodStart.plusMonths(1).minusDays(1);
+
+        // [과거 계약 등록] 실제 과거 입고일부터 지금 처음 등록하는 계약 — 과거분은 소급 청구하지
+        //   않고 0원·완료 원장 1건으로 묶어 남긴 뒤, 오늘부터의 진짜 청구만 새로 시작한다.
+        //   이미 과거에 끝난 계약(종료일이 오늘보다 과거)까지 "오늘부터 청구"로 되살리지 않도록,
+        //   종료일이 없거나(미정) 오늘 이후일 때만 적용한다.
+        boolean bundleHistory = Boolean.TRUE.equals(request.getHistoricalContract())
+                && periodStart.isBefore(today)
+                && (order.getExpectedEndDate() == null || !order.getExpectedEndDate().isBefore(today));
+        LocalDate billingPeriodStart = bundleHistory ? today : periodStart;
+        LocalDate billingPeriodEnd = bundleHistory && order.getExpectedEndDate() == null
+                ? today.plusMonths(1).minusDays(1)
+                : periodEnd;
+
         com.example.wms.billing.entity.SettlementType payType =
                 request.getPaymentType() != null ? request.getPaymentType() : SettlementType.POSTPAID;
         // 납기 기본값: 선불=보관 시작일 / 후불=보관 종료일 (프론트와 동일 규칙, 서버가 이중 방어)
+        //   과거 계약 묶음 처리 시엔 '오늘부터의 진짜 원장' 기준(billingPeriod*)으로 잡아야
+        //   납기일이 2019년 같은 과거 날짜로 잘못 채워지지 않는다.
         LocalDate due = request.getDueDate() != null ? request.getDueDate()
-                : (payType == SettlementType.PREPAID ? periodStart : periodEnd);
+                : (payType == SettlementType.PREPAID ? billingPeriodStart : billingPeriodEnd);
         order.setPaymentType(payType);
         order.setDueDate(due);
 
@@ -122,12 +138,16 @@ public class StorageOrderService {
         //   (같은 트랜잭션 — 실패 시 계약까지 롤백되어 "계약은 됐는데 청구 없음" 매출 구멍이 사라진다)
         if (request.getMonthlyFee() != null && request.getMonthlyFee() > 0) {
             java.math.BigDecimal amount = java.math.BigDecimal.valueOf(request.getMonthlyFee());
+            if (bundleHistory) {
+                // [과거 계약 등록] 입고일~어제까지를 0원·완료 원장 1건으로 묶어 소급 청구를 대신한다.
+                billingService.settleHistoricalBundle(saved, periodStart, today.minusDays(1));
+            }
             if (payType == SettlementType.PREPAID) {
                 // 선불: 원장 생성 → 발행 → 전액 수금(완납, 미납 0원)
-                billingService.settlePrepaid(saved, periodStart, periodEnd, amount, due, saved.getPaymentMethod());
+                billingService.settlePrepaid(saved, billingPeriodStart, billingPeriodEnd, amount, due, saved.getPaymentMethod());
             } else {
                 // 후불: 원장 생성 → 발행(입금예정, 미납=전액)
-                billingService.issuePostpaid(saved, periodStart, periodEnd, amount, due);
+                billingService.issuePostpaid(saved, billingPeriodStart, billingPeriodEnd, amount, due);
             }
         }
 
