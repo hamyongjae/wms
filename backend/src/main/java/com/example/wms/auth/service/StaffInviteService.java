@@ -2,16 +2,12 @@ package com.example.wms.auth.service;
 
 import com.example.wms.auth.dto.StaffInviteRequest;
 import com.example.wms.auth.invite.InviteStatus;
-import com.example.wms.auth.invite.StaffInvite;
 import com.example.wms.auth.invite.StaffInviteRepository;
 import com.example.wms.security.SecurityUtils;
 import com.example.wms.security.tenant.TenantContext;
-import com.example.wms.tenant.entity.Tenant;
-import com.example.wms.tenant.repository.TenantRepository;
 import com.example.wms.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * [케이스 B] 직원 초대 등록 서비스 (ADMIN 전용).
@@ -22,14 +18,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class StaffInviteService {
 
     private final StaffInviteRepository staffInviteRepository;
-    private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
+    private final StaffInviteWriter staffInviteWriter;
 
-    @Transactional
+    /**
+     * [트랜잭션 경계 주의] 이 메서드는 절대 {@code @Transactional}을 붙이면 안 된다. 아래
+     * {@code TenantContext.runAsRoot} 전역 검사와 {@link StaffInviteWriter#create}(실제 저장)가
+     * 서로 다른 세션이어야 각자 올바른 테넌트 문맥으로 확정된다 — 하나의 트랜잭션(세션) 안에 두면
+     * Hibernate가 세션당 테넌트 식별자를 최초 1회만 확인하는 특성 때문에 뒤의 호출이 앞의 세션
+     * 상태를 그대로 물려받아 버린다(청구 배치에서 재현·확인된 것과 동일한 근본 원인).
+     */
     public Long invite(StaffInviteRequest req) {
         Long tenantId = SecurityUtils.getCurrentTenantId();
-        Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 업체입니다. tenantId=" + tenantId));
 
         // 이미 가입된 이메일은 초대 불가 (User 는 테넌트 필터 대상이 아니라 전역 조회된다)
         if (userRepository.existsByEmail(req.getEmail())) {
@@ -44,7 +44,6 @@ public class StaffInviteService {
             throw new IllegalStateException("이미 대기 중인 초대가 있습니다: " + req.getEmail());
         }
 
-        StaffInvite invite = new StaffInvite(tenant, req.getEmail(), req.getName(), req.getRole());
-        return staffInviteRepository.save(invite).getId();
+        return staffInviteWriter.create(tenantId, req);
     }
 }
