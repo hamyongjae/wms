@@ -18,7 +18,7 @@ import StatCard from '@/components/ui/StatCard'
 import LedgerDetailPanel from '@/components/billing/LedgerDetailPanel'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
-import { isOverdue, daysFromDue, displayStatus } from '@/lib/billing'
+import { isOverdue, daysFromDue, displayStatus, accruedPaidInRange } from '@/lib/billing'
 import { orderSync } from '@/lib/orderEvents'
 import { today, ymdKorean } from '@/lib/dates'
 import { CalendarField } from '@/components/order/orderFormUi'
@@ -130,10 +130,15 @@ export default function BillingPage() {
     // [계정 과목 분리] 미수금은 양수 잔액(outstanding)만 합산 — 음수(과오납)가 미수금을 갉아먹지 않도록.
     const outstanding = active.reduce((s, l) => s + (l.outstanding ?? Math.max(l.balance, 0)), 0)
     const refundDue = active.reduce((s, l) => s + (l.refundDue ?? Math.max(-l.balance, 0)), 0)
-    const collected = active.reduce((s, l) => s + l.paidTotal, 0)
+    // [조회기간 일할 입금액] 기간이 지정돼 있으면(전체 조회가 아니면) 원장 청구기간과 겹친
+    // 일수만큼만 입금액을 잘라 인식 — '전체'(무기한) 조회는 자를 기준이 없으므로 누적 그대로.
+    const collected =
+      range.from && range.to
+        ? active.reduce((s, l) => s + accruedPaidInRange(l, range.from, range.to), 0)
+        : active.reduce((s, l) => s + l.paidTotal, 0)
     const overdueCount = ledgers.filter(isOverdue).length
     return { outstanding, refundDue, collected, overdueCount, count: ledgers.length }
-  }, [ledgers])
+  }, [ledgers, range])
 
   const visible = useMemo(() => {
     if (statusFilter === 'ALL') return ledgers
@@ -234,14 +239,14 @@ export default function BillingPage() {
 
       {/* 모바일: 가로형 요약 2×2 (큰 숫자·경고 색상) */}
       <div className="grid grid-cols-2 gap-2 md:hidden">
-        <BillStat label="누적 입금액" value={won(kpi.collected)} tone="emerald" />
+        <BillStat label="기간 입금액" value={won(kpi.collected)} tone="emerald" />
         <BillStat label="정산 건수" value={`${kpi.count}건`} tone="slate" />
         <BillStat label="미수금 총액" value={won(kpi.outstanding)} tone="amber" alert={kpi.outstanding > 0} />
         <BillStat label="연체 건수" value={`${kpi.overdueCount}건`} tone="red" alert={kpi.overdueCount > 0} />
       </div>
       {/* 데스크톱: StatCard */}
       <div className="hidden gap-4 md:grid md:grid-cols-4">
-        <StatCard label="누적 입금액" value={won(kpi.collected)} icon={Coins} tone="emerald" />
+        <StatCard label="기간 입금액" value={won(kpi.collected)} icon={Coins} tone="emerald" />
         <StatCard label="정산 건수" value={`${kpi.count}건`} icon={FileText} tone="slate" />
         <StatCard
           label="미수금 총액"

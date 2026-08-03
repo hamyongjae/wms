@@ -43,7 +43,7 @@ const maxDate = (a: string, b: string) => (a >= b ? a : b)
 const minDate = (a: string, b: string) => (a <= b ? a : b)
 
 /** 두 구간의 겹친 일수(당일 포함). 안 겹치면 0 */
-function overlapDays(aStart: string, aEnd: string, bStart: string, bEnd: string): number {
+export function overlapDays(aStart: string, aEnd: string, bStart: string, bEnd: string): number {
   const s = maxDate(aStart, bStart)
   const e = minDate(aEnd, bEnd)
   if (s > e) return 0

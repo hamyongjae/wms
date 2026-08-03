@@ -1,4 +1,6 @@
 import type { BillingLedger } from '@/api/billingApi'
+import { getDurationDays } from './dates'
+import { overlapDays } from './revenue'
 
 /**
  * [파생 상태] 청구 원장의 화면 표시 상태 — 저장하지 않고 시점에 계산한다 (운영 가이드 2.2).
@@ -61,4 +63,19 @@ export function displayStatus(l: BillingLedger): { label: string; cls: string } 
 /** 미결(잔액이 남을 수 있는) 원장인지 — 정산 대상 판별용 */
 export function isOpenLedger(l: BillingLedger): boolean {
   return l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID'
+}
+
+/**
+ * [조회기간 일할 입금액] 원장 하나의 누적 입금액(paidTotal)을 청구기간 전체에 걸쳐 고르게
+ * 번 것으로 보고, [rangeStart, rangeEnd]와 겹친 일수만큼만 잘라 인식한다.
+ * (매출 화면의 발생주의 일할 계산 - revenue.ts의 accruedInRange - 과 동일한 방식을
+ *  입금액에도 적용 - 조회기간이 원장의 청구월 중간에서 끊겨도 그 기간 몫만 잡히게 한다)
+ */
+export function accruedPaidInRange(l: BillingLedger, rangeStart: string, rangeEnd: string): number {
+  if (l.status === 'CANCELED' || l.paidTotal <= 0) return 0
+  const durationDays = getDurationDays(l.periodStart, l.periodEnd)
+  if (durationDays <= 0) return 0
+  const dailyRate = l.paidTotal / durationDays
+  const days = overlapDays(l.periodStart, l.periodEnd, rangeStart, rangeEnd)
+  return Math.round(dailyRate * days)
 }
