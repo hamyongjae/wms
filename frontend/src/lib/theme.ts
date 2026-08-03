@@ -1,7 +1,7 @@
 // 앱 포인트 컬러(테마) 관리 유틸.
 // <html data-theme="..."> 를 바꾸면 index.css 의 --brand-* 변수가 교체되어 전역 색이 실시간으로 바뀐다.
 
-export type ThemeId = 'teal' | 'blue' | 'violet' | 'emerald' | 'rose'
+export type ThemeId = 'teal' | 'blue' | 'violet' | 'emerald' | 'rose' | 'indigo' | 'amber' | 'sky' | 'slate'
 
 export interface ThemeOption {
   id: ThemeId
@@ -12,9 +12,13 @@ export interface ThemeOption {
 export const THEMES: ThemeOption[] = [
   { id: 'teal', label: '틸', color: '#0d8a89' },
   { id: 'blue', label: '블루', color: '#2563eb' },
+  { id: 'sky', label: '스카이', color: '#0284c7' },
+  { id: 'indigo', label: '인디고', color: '#4f46e5' },
   { id: 'violet', label: '바이올렛', color: '#7c3aed' },
-  { id: 'emerald', label: '그린', color: '#059669' },
   { id: 'rose', label: '로즈', color: '#e11d48' },
+  { id: 'amber', label: '앰버', color: '#d97706' },
+  { id: 'emerald', label: '그린', color: '#059669' },
+  { id: 'slate', label: '슬레이트', color: '#475569' },
 ]
 
 const KEY = 'wms.theme'

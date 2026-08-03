@@ -94,6 +94,50 @@ body {
   --color-violet-900: #881337; --color-violet-950: #4c0519;
   --hero-from: #881337; --hero-via: #e11d48; --hero-to: #f43f5e; --hero-glow: 251, 113, 133;
 }
+[data-theme='indigo'] {
+  --color-indigo-50: #eef2ff;  --color-indigo-100: #e0e7ff; --color-indigo-200: #c7d2fe;
+  --color-indigo-300: #a5b4fc; --color-indigo-400: #818cf8; --color-indigo-500: #6366f1;
+  --color-indigo-600: #4f46e5; --color-indigo-700: #4338ca; --color-indigo-800: #3730a3;
+  --color-indigo-900: #312e81; --color-indigo-950: #1e1b4b;
+  --color-violet-50: #eef2ff;  --color-violet-100: #e0e7ff; --color-violet-200: #c7d2fe;
+  --color-violet-300: #a5b4fc; --color-violet-400: #818cf8; --color-violet-500: #6366f1;
+  --color-violet-600: #4f46e5; --color-violet-700: #4338ca; --color-violet-800: #3730a3;
+  --color-violet-900: #312e81; --color-violet-950: #1e1b4b;
+  --hero-from: #312e81; --hero-via: #4f46e5; --hero-to: #6366f1; --hero-glow: 129, 140, 248;
+}
+[data-theme='amber'] {
+  --color-indigo-50: #fffbeb;  --color-indigo-100: #fef3c7; --color-indigo-200: #fde68a;
+  --color-indigo-300: #fcd34d; --color-indigo-400: #fbbf24; --color-indigo-500: #f59e0b;
+  --color-indigo-600: #d97706; --color-indigo-700: #b45309; --color-indigo-800: #92400e;
+  --color-indigo-900: #78350f; --color-indigo-950: #451a03;
+  --color-violet-50: #fffbeb;  --color-violet-100: #fef3c7; --color-violet-200: #fde68a;
+  --color-violet-300: #fcd34d; --color-violet-400: #fbbf24; --color-violet-500: #f59e0b;
+  --color-violet-600: #d97706; --color-violet-700: #b45309; --color-violet-800: #92400e;
+  --color-violet-900: #78350f; --color-violet-950: #451a03;
+  --hero-from: #78350f; --hero-via: #d97706; --hero-to: #f59e0b; --hero-glow: 251, 191, 36;
+}
+[data-theme='sky'] {
+  --color-indigo-50: #f0f9ff;  --color-indigo-100: #e0f2fe; --color-indigo-200: #bae6fd;
+  --color-indigo-300: #7dd3fc; --color-indigo-400: #38bdf8; --color-indigo-500: #0ea5e9;
+  --color-indigo-600: #0284c7; --color-indigo-700: #0369a1; --color-indigo-800: #075985;
+  --color-indigo-900: #0c4a6e; --color-indigo-950: #082f49;
+  --color-violet-50: #f0f9ff;  --color-violet-100: #e0f2fe; --color-violet-200: #bae6fd;
+  --color-violet-300: #7dd3fc; --color-violet-400: #38bdf8; --color-violet-500: #0ea5e9;
+  --color-violet-600: #0284c7; --color-violet-700: #0369a1; --color-violet-800: #075985;
+  --color-violet-900: #0c4a6e; --color-violet-950: #082f49;
+  --hero-from: #0c4a6e; --hero-via: #0284c7; --hero-to: #0ea5e9; --hero-glow: 56, 189, 248;
+}
+[data-theme='slate'] {
+  --color-indigo-50: #f8fafc;  --color-indigo-100: #f1f5f9; --color-indigo-200: #e2e8f0;
+  --color-indigo-300: #cbd5e1; --color-indigo-400: #94a3b8; --color-indigo-500: #64748b;
+  --color-indigo-600: #475569; --color-indigo-700: #334155; --color-indigo-800: #1e293b;
+  --color-indigo-900: #0f172a; --color-indigo-950: #020617;
+  --color-violet-50: #f8fafc;  --color-violet-100: #f1f5f9; --color-violet-200: #e2e8f0;
+  --color-violet-300: #cbd5e1; --color-violet-400: #94a3b8; --color-violet-500: #64748b;
+  --color-violet-600: #475569; --color-violet-700: #334155; --color-violet-800: #1e293b;
+  --color-violet-900: #0f172a; --color-violet-950: #020617;
+  --hero-from: #0f172a; --hero-via: #334155; --hero-to: #475569; --hero-glow: 148, 163, 184;
+}
 
 /* 앱 전체가 화면 높이를 채우도록 */
 html,
