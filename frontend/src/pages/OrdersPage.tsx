@@ -972,6 +972,14 @@ export function CreateOrderModal({
   //   다만 "하루 보관료"는 예외로 입력 가능하게 열어뒀다 — 그 값을 입력하는 순간에만
   //   보관료 = 하루 보관료 × 보관일수로 채워주고, 그 뒤로는 보관료 필드를 그대로 직접 수정해도 된다.
   function handleDailyFeeChange(v: number | null) {
+    // [빈 값 전파] 이 칸은 자체 상태 없이 monthlyFee 에서 파생된 값을 보여준다.
+    //   비웠을 때 아무것도 안 하면 monthlyFee 가 그대로 남아 파생값이 즉시 되살아나고,
+    //   결과적으로 마지막 한 자리가 지워지지 않는다. 두 값은 같은 금액의 두 표현이므로
+    //   한쪽을 비우면 다른 쪽도 비운다. (0 이하도 유효한 금액이 아니라 같이 취급)
+    if (v == null || v <= 0) {
+      setMonthlyFee(null)
+      return
+    }
     const computed = calcMonthlyFeeFromDaily(v, storageStartDate, expectedEndDate)
     if (computed != null) setMonthlyFee(computed)
   }

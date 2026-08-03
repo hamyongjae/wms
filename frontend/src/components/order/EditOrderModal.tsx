@@ -178,6 +178,14 @@ export default function EditOrderModal({
   // 하루 보관료 칸에 직접 입력하면 그 순간 보관료 = 입력값 × 보관일수로 채운다(반대 방향은
   // 위 dailyFee 파생값이 이미 실시간으로 보여준다 — 등록 폼과 동일 패턴).
   function handleDailyFeeChange(v: number | null) {
+    // [빈 값 전파] 이 칸은 자체 상태 없이 monthlyFee 에서 파생된 값을 보여준다.
+    //   비웠을 때 아무것도 안 하면 monthlyFee 가 그대로 남아 파생값이 즉시 되살아나고,
+    //   결과적으로 마지막 한 자리가 지워지지 않는다. 두 값은 같은 금액의 두 표현이므로
+    //   한쪽을 비우면 다른 쪽도 비운다. (0 이하도 유효한 금액이 아니라 같이 취급)
+    if (v == null || v <= 0) {
+      setMonthlyFee(null)
+      return
+    }
     const computed = calcMonthlyFeeFromDaily(v, storageStartDate, expectedEndDate)
     if (computed != null) setMonthlyFee(computed)
   }
