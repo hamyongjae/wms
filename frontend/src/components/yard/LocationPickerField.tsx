@@ -147,7 +147,7 @@ export default function LocationPickerField({
                             : isCurrent
                               ? 'border-dashed border-indigo-500 bg-indigo-50 text-indigo-700'
                               : s.occupied
-                                ? 'cursor-not-allowed border-slate-700 bg-slate-700 text-white shadow-inner'
+                                ? 'cursor-not-allowed border-indigo-900 bg-indigo-900 text-white shadow-inner'
                                 : 'border-dashed border-emerald-500 bg-emerald-50 text-emerald-700 hover:border-emerald-600 hover:bg-emerald-100',
                         )}
                       >
@@ -159,7 +159,7 @@ export default function LocationPickerField({
                           </span>
                         )}
                         {showOwner && (
-                          <span className="max-w-full truncate px-0.5 text-[10px] font-semibold leading-tight text-slate-200">
+                          <span className="max-w-full truncate px-0.5 text-[10px] font-semibold leading-tight text-indigo-100">
                             {s.ownerName}
                           </span>
                         )}
@@ -184,7 +184,7 @@ export default function LocationPickerField({
           <span className="h-4 w-4 rounded border-2 border-dashed border-emerald-500 bg-emerald-50" /> 빈자리
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-4 w-4 rounded border-2 border-slate-700 bg-slate-700" /> 사용중
+          <span className="h-4 w-4 rounded border-2 border-indigo-900 bg-indigo-900" /> 사용중
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-4 w-4 rounded bg-indigo-600" /> 선택
