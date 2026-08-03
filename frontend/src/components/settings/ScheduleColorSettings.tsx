@@ -37,11 +37,12 @@ export default function ScheduleColorSettings() {
   const [draft, setDraft] = useState(saved)
   const [editing, setEditing] = useState<ScheduleCategory>('IN_PENDING')
 
-  function openModal() {
+  /** 미리보기 배지를 탭하면 그 상태가 이미 선택된 채로 팝업이 뜬다(따로 여는 버튼 없이 바로 진입) */
+  function openModal(cat: ScheduleCategory) {
     const current = getScheduleColors()
     setSaved(current)
     setDraft(current)
-    setEditing('IN_PENDING')
+    setEditing(cat)
     setOpen(true)
   }
 
@@ -81,22 +82,21 @@ export default function ScheduleColorSettings() {
         </div>
       </div>
 
-      {/* 현재 색 미리보기 — 실제 달력에 쓰이는 배지 모양 그대로 보여준다 */}
-      <div className="mt-4 flex flex-wrap gap-2">
+      {/* 현재 색 미리보기 — 각 배지를 탭하면 그 상태의 색상 선택 팝업이 바로 뜬다 */}
+      <p className="mt-4 text-xs text-slate-400">상태를 눌러 색을 바꾸세요</p>
+      <div className="mt-2 flex flex-wrap gap-2">
         {SCHEDULE_CATEGORY_ORDER.map((cat) => (
-          <span key={cat} className="rounded-md px-2.5 py-1.5 text-xs font-bold" style={scheduleBadgeStyle(cat)}>
+          <button
+            key={cat}
+            type="button"
+            onClick={() => openModal(cat)}
+            className="rounded-md px-2.5 py-1.5 text-xs font-bold transition active:scale-95"
+            style={scheduleBadgeStyle(cat)}
+          >
             {SCHEDULE_META[cat].label}
-          </span>
+          </button>
         ))}
       </div>
-
-      <button
-        type="button"
-        onClick={openModal}
-        className="mt-4 w-full rounded-xl border-2 border-slate-200 py-3 text-sm font-bold text-slate-700 transition active:scale-[0.99] hover:bg-slate-50 sm:w-auto sm:px-5"
-      >
-        색상 바꾸기
-      </button>
 
       <Modal
         open={open}
