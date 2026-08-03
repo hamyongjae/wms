@@ -1,15 +1,27 @@
 import { getDurationDays } from './dates'
-import type { StorageOrder } from '@/api/orderApi'
+import type { BillingLedger } from '@/api/billingApi'
 
 /**
- * [보관 매출 파생 계산]
+ * [정산서 기준 매출 파생 계산]
  *
- * 매출은 별도로 저장하지 않고 '계약(StorageOrder)'에서 그때그때 계산한다(파생 모델).
- *  → 계약을 삭제·수정하면 매출도 자동으로 즉시 재계산되어 유령 데이터·정합성 오류가 원천 차단된다.
+ * 매출은 별도로 저장하지 않고 '정산 원장(BillingLedger)'에서 그때그때 계산한다(파생 모델).
+ *  → 원장이 발행·조정·취소되면 매출도 자동으로 즉시 재계산되어 유령 데이터·정합성 오류가 원천 차단된다.
  *
- * [누적 규칙] 계약의 보관료(monthlyFee)는 보관기간 전체에 대한 총 보관료로 보고,
- *   하루 매출 = 총 보관료 ÷ 보관일수(당일 포함). 특정 달 매출 = 하루 매출 × 그 달과 겹친 일수.
- *   출고 완료 계약은 실제 출고일까지, 진행 중 계약은 출고예정일까지 인식한다.
+ * [정산서를 기준으로 삼는 이유] 계약의 monthlyFee를 그대로 쓰던 예전 방식은 조정(할인·가산)이
+ *   반영되지 않아 실제 청구액과 어긋날 수 있었다. 원장의 baseAmount+adjustmentTotal(=실제
+ *   확정 청구액)을 쓰면 그 어긋남이 사라진다.
+ *
+ * [누적 규칙] 원장 하나의 확정 청구액(baseAmount+adjustmentTotal)은 그 청구기간
+ *   [periodStart, periodEnd] 전체에 대한 금액으로 보고, 하루 매출 = 확정 청구액 ÷ 청구일수(당일
+ *   포함). 특정 구간 매출 = 하루 매출 × 그 구간과 겹친 일수 — 이러면 원장 기간이 달력 월을
+ *   걸쳐도(예: 8/15~9/14) 8월·9월에 일수만큼 정확히 나뉘어 잡힌다(원장 시작월에 통째로 몰리지 않음).
+ *
+ * [제외 항목]
+ *  - carriedOverIn(전 원장에서 넘어온 미수금)은 이번 기간에 새로 발생한 매출이 아니라 예전
+ *    매출의 수금 상태일 뿐이라 더하면 이중 계상된다 — 제외.
+ *  - paidTotal(수금액)은 발생주의가 아닌 현금주의 지표라 별도 화면(정산 관리)의 몫 — 제외.
+ *  - CANCELED 원장은 청구 자체가 무효화된 것이라 제외. CARRIED_OVER는 원래 청구가 유효했던
+ *    것이므로(잔액만 다음 원장으로 넘어간 것) 포함한다.
  */
 
 export interface CustomerRevenue {
@@ -21,14 +33,10 @@ export interface CustomerRevenue {
 
 export interface RevenueSummary {
   total: number
-  contractCount: number // 이번 달 매출이 발생한 계약 수
+  contractCount: number // 이 구간에 매출이 발생한 계약(정산 대상) 수
   customerCount: number
   customers: CustomerRevenue[] // 매출 큰 순
 }
-
-const pad = (n: number) => String(n).padStart(2, '0')
-const monthStartStr = (y: number, m1: number) => `${y}-${pad(m1)}-01`
-const monthEndStr = (y: number, m1: number) => `${y}-${pad(m1)}-${pad(new Date(y, m1, 0).getDate())}`
 
 /** ISO(yyyy-MM-dd) 문자열은 사전식 비교가 곧 날짜 비교 */
 const maxDate = (a: string, b: string) => (a >= b ? a : b)
@@ -42,50 +50,37 @@ function overlapDays(aStart: string, aEnd: string, bStart: string, bEnd: string)
   return getDurationDays(s, e)
 }
 
-/** 한 계약이 [rangeStart, rangeEnd] 구간에 인식하는 매출액 */
-function accruedInRange(o: StorageOrder, rangeStart: string, rangeEnd: string): number {
-  if (!o.storageStartDate || !o.monthlyFee) return 0
-  const start = o.storageStartDate
-  // 출고 완료면 실제 출고일, 진행 중이면 출고예정일. 둘 다 없으면 구간 끝까지 진행으로 간주.
-  const periodEnd = o.actualEndDate ?? o.expectedEndDate ?? rangeEnd
-  const durationDays = getDurationDays(start, periodEnd)
+/** 원장 하나가 [rangeStart, rangeEnd] 구간에 일할로 인식하는 매출액 */
+function accruedInRange(l: BillingLedger, rangeStart: string, rangeEnd: string): number {
+  if (l.status === 'CANCELED') return 0
+  const confirmedAmount = l.baseAmount + l.adjustmentTotal
+  const durationDays = getDurationDays(l.periodStart, l.periodEnd)
   if (durationDays <= 0) return 0
-  const dailyRate = o.monthlyFee / durationDays
-  const days = overlapDays(start, periodEnd, rangeStart, rangeEnd)
+  const dailyRate = confirmedAmount / durationDays
+  const days = overlapDays(l.periodStart, l.periodEnd, rangeStart, rangeEnd)
   return Math.round(dailyRate * days)
 }
 
 /**
- * 임의 기간 [from, to]의 보관 매출 요약을 계약 목록에서 계산한다. (yyyy-MM-dd)
+ * 임의 기간 [from, to]의 정산서 기준 매출 요약을 원장 목록에서 계산한다. (yyyy-MM-dd)
  */
-export function computeRangeRevenue(orders: StorageOrder[], from: string, to: string): RevenueSummary {
-  return aggregate(orders, from, to)
-}
-
-/**
- * 특정 연·월의 보관 매출 요약. (내부적으로 1일~말일 구간 계산)
- */
-export function computeMonthlyRevenue(orders: StorageOrder[], year: number, month1: number): RevenueSummary {
-  return aggregate(orders, monthStartStr(year, month1), monthEndStr(year, month1))
-}
-
-function aggregate(orders: StorageOrder[], rangeStart: string, rangeEnd: string): RevenueSummary {
+export function computeRangeRevenue(ledgers: BillingLedger[], from: string, to: string): RevenueSummary {
   const byCustomer = new Map<number, CustomerRevenue>()
+  const contractIds = new Set<number>()
   let total = 0
-  let contractCount = 0
 
-  for (const o of orders) {
-    const amount = accruedInRange(o, rangeStart, rangeEnd)
+  for (const l of ledgers) {
+    const amount = accruedInRange(l, from, to)
     if (amount <= 0) continue
     total += amount
-    contractCount++
-    const prev = byCustomer.get(o.customerId)
+    contractIds.add(l.storageOrderId)
+    const prev = byCustomer.get(l.customerId)
     if (prev) {
       prev.amount += amount
     } else {
-      byCustomer.set(o.customerId, {
-        customerId: o.customerId,
-        customerName: o.customerName,
+      byCustomer.set(l.customerId, {
+        customerId: l.customerId,
+        customerName: l.customerName,
         amount,
         share: 0,
       })
@@ -95,5 +90,5 @@ function aggregate(orders: StorageOrder[], rangeStart: string, rangeEnd: string)
   const customers = [...byCustomer.values()].sort((a, b) => b.amount - a.amount)
   for (const c of customers) c.share = total > 0 ? c.amount / total : 0
 
-  return { total, contractCount, customerCount: customers.length, customers }
+  return { total, contractCount: contractIds.size, customerCount: customers.length, customers }
 }

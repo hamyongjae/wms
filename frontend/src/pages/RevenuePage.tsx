@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, TrendingUp, FileText, Users, Loader2, PieChart } from 'lucide-react'
-import { orderApi, type StorageOrder } from '@/api/orderApi'
+import { billingApi, type BillingLedger } from '@/api/billingApi'
 import { computeRangeRevenue } from '@/lib/revenue'
 import { orderSync } from '@/lib/orderEvents'
 import { addDays, ymdKorean } from '@/lib/dates'
@@ -29,7 +29,7 @@ function fullMonthOf(from: string, to: string): number | null {
 const BAR_COLORS = ['#6366f1', '#818cf8', '#38bdf8', '#34d399', '#fbbf24', '#f472b6', '#a78bfa', '#94a3b8']
 
 export default function RevenuePage() {
-  const [orders, setOrders] = useState<StorageOrder[]>([])
+  const [ledgers, setLedgers] = useState<BillingLedger[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -40,24 +40,25 @@ export default function RevenuePage() {
     return monthBounds(n.getFullYear(), n.getMonth() + 1)
   })
 
-  // 계약은 진입 즉시 자동 로드 (조회 버튼 없음)
+  // 정산 원장은 진입 즉시 자동 로드 (조회 버튼 없음) — 기간 필터 없이 전체를 가져와
+  // 클라이언트에서 현재/직전 기간을 자유롭게 재계산한다(정산 관리 화면과 동일 패턴)
   useEffect(() => {
     setLoading(true)
     setError(null)
-    orderApi
+    billingApi
       .list()
-      .then(setOrders)
+      .then(setLedgers)
       .catch(() => setError('매출 데이터를 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [refreshKey])
 
-  // [실시간 동기화] 계약 수정·삭제·상태전환 시 매출 즉시 재계산 (새로고침 없음)
+  // [실시간 동기화] 계약 수정·삭제·상태전환 및 정산 처리 시 매출 즉시 재계산 (새로고침 없음)
   useEffect(() => orderSync.subscribe(() => setRefreshKey((k) => k + 1)), [])
 
-  // 기간이나 계약이 바뀌면 자동 재계산
+  // 기간이나 원장이 바뀌면 자동 재계산
   const summary = useMemo(
-    () => (range.from && range.to ? computeRangeRevenue(orders, range.from, range.to) : computeRangeRevenue(orders, range.from, range.from)),
-    [orders, range],
+    () => (range.from && range.to ? computeRangeRevenue(ledgers, range.from, range.to) : computeRangeRevenue(ledgers, range.from, range.from)),
+    [ledgers, range],
   )
 
   // 직전 '동일 길이' 기간 대비 증감
@@ -66,8 +67,8 @@ export default function RevenuePage() {
     const prevTo = addDays(range.from, -1)
     const spanDays = Math.max(1, Math.round((new Date(range.to).getTime() - new Date(range.from).getTime()) / 86_400_000) + 1)
     const prevFrom = addDays(prevTo, -(spanDays - 1))
-    return computeRangeRevenue(orders, prevFrom, prevTo).total
-  }, [orders, range])
+    return computeRangeRevenue(ledgers, prevFrom, prevTo).total
+  }, [ledgers, range])
   const delta = summary.total - prevTotal
   const deltaPct = prevTotal > 0 ? Math.round((delta / prevTotal) * 100) : null
 
