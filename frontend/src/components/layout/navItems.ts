@@ -7,8 +7,8 @@ import {
   Grid3x3,
   CreditCard,
   TrendingUp,
-  Building2,
   UserCog,
+  Settings,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -32,5 +32,5 @@ export const navItems: NavItem[] = [
   { to: '/billing', label: '정산', description: '청구 원장·미수금·세금계산서', icon: CreditCard },
   { to: '/revenue', label: '매출', description: '월 매출 요약·고객사별 비중', icon: TrendingUp },
   { to: '/staff', label: '직원', description: '계정 추가·권한 관리', icon: UserCog, adminOnly: true },
-  { to: '/settings', label: '회사 정보', description: '업체 기본 정보 설정', icon: Building2, adminOnly: true },
+  { to: '/settings', label: '설정', description: '테마 색상·회사 정보 설정', icon: Settings },
 ]

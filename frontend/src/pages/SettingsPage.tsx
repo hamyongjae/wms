@@ -1,8 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
-import { Loader2, Save, Building2, CheckCircle2 } from 'lucide-react'
+import { Loader2, Save, Building2, CheckCircle2, Palette, Check } from 'lucide-react'
 import { tenantApi, type TenantInfo } from '@/api/tenantApi'
 import { authStorage } from '@/lib/auth'
+import { THEMES, getTheme, applyTheme, type ThemeId } from '@/lib/theme'
+import { cn } from '@/lib/cn'
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-500'
@@ -68,7 +70,14 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-slate-800">회사 정보</h2>
+        <h2 className="text-xl font-bold text-slate-800">설정</h2>
+        <p className="mt-1 text-sm text-slate-500">테마 색상과 회사 기본 정보를 관리합니다.</p>
+      </div>
+
+      <ThemeSection />
+
+      <div>
+        <h3 className="text-lg font-bold text-slate-800">회사 정보</h3>
         <p className="mt-1 text-sm text-slate-500">업체 기본 정보를 관리합니다. 사업자번호는 변경할 수 없습니다.</p>
       </div>
 
@@ -153,6 +162,49 @@ export default function SettingsPage() {
           )}
         </form>
       )}
+    </div>
+  )
+}
+
+/* ===== 테마(포인트 컬러) 선택 — 헤더에 있던 걸 설정 화면으로 이전 ===== */
+function ThemeSection() {
+  const [current, setCurrent] = useState<ThemeId>(() => getTheme())
+
+  function pick(id: ThemeId) {
+    applyTheme(id)
+    setCurrent(id)
+  }
+
+  return (
+    <div className="rounded-2xl bg-white p-6 shadow-soft ring-1 ring-slate-200/60">
+      <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+          <Palette size={20} />
+        </span>
+        <div>
+          <p className="text-sm font-semibold text-slate-800">테마 색상</p>
+          <p className="text-xs text-slate-400">앱 전체의 포인트 색상을 바꿉니다. (이 기기에만 저장)</p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-3 gap-2.5 sm:grid-cols-5">
+        {THEMES.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => pick(t.id)}
+            className={cn(
+              'flex flex-col items-center gap-1.5 rounded-xl border-2 p-3 transition',
+              t.id === current ? 'border-indigo-400 bg-indigo-50/60' : 'border-transparent hover:bg-slate-50',
+            )}
+          >
+            <span className="relative flex h-8 w-8 items-center justify-center rounded-full ring-1 ring-black/5" style={{ backgroundColor: t.color }}>
+              {t.id === current && <Check size={16} className="text-white" strokeWidth={3} />}
+            </span>
+            <span className="text-xs font-medium text-slate-600">{t.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
