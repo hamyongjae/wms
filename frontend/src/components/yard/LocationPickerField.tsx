@@ -114,8 +114,8 @@ export default function LocationPickerField({
           <div className="space-y-4">
             {floors.map(({ tier, cells }) => (
               <div key={tier}>
-                <p className="mb-1.5 text-[11px] font-semibold text-slate-400">
-                  {tier}층 <span className="text-slate-300">· {cells.length}칸</span>
+                <p className="mb-1.5 inline-flex items-center gap-1.5 rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">
+                  {tier}층 <span className="font-medium text-slate-400">· {cells.length}칸</span>
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {cells.map((s) => {
