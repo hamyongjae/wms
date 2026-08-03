@@ -12,6 +12,7 @@ import OrdersPage from '@/pages/OrdersPage'
 import CustomersPage from '@/pages/CustomersPage'
 import StaffPage from '@/pages/StaffPage'
 import SettingsPage from '@/pages/SettingsPage'
+import CompanyInfoPage from '@/pages/CompanyInfoPage'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 
@@ -35,6 +36,7 @@ function App() {
           <Route path="/revenue" element={<RevenuePage />} />
           <Route path="/staff" element={<StaffPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/company-info" element={<CompanyInfoPage />} />
         </Route>
       </Route>
 
