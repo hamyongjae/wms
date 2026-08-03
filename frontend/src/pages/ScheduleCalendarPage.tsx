@@ -27,7 +27,7 @@ import { customerApi, type Customer } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
-import { scheduleBadgeStyle, SCHEDULE_META, type ScheduleCategory } from '@/lib/orderSchedule'
+import { scheduleBadgeStyle, scheduleDotStyle, SCHEDULE_CATEGORY_ORDER, SCHEDULE_META, type ScheduleCategory } from '@/lib/orderSchedule'
 import { orderSync } from '@/lib/orderEvents'
 import { CreateOrderModal, StatusChangeModal, OrderBillingModal } from './OrdersPage'
 import EditOrderModal from '@/components/order/EditOrderModal'
@@ -72,6 +72,12 @@ const FILTERS: Array<{ key: FilterMode; label: string }> = [
   { key: 'INBOUND', label: '입고' },
   { key: 'OUTBOUND', label: '출고' }
 ]
+
+/** 필터 칩의 점 색 — 사용자가 설정한 달력 상태 색상을 그대로 대표색으로 쓴다(입고/출고 각 첫 상태) */
+const FILTER_REPRESENTATIVE: Record<'INBOUND' | 'OUTBOUND', ScheduleCategory> = {
+  INBOUND: 'IN_PENDING',
+  OUTBOUND: 'OUT_PENDING',
+}
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -300,7 +306,9 @@ export default function ScheduleCalendarPage() {
                   : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50',
               )}
             >
-              {f.key !== 'ALL' && <span className={cn('h-2 w-2 rounded-full', TYPE_META[f.key].dot)} />}
+              {f.key !== 'ALL' && f.key !== 'BILLING' && (
+                <span className="h-2 w-2 rounded-full" style={scheduleDotStyle(FILTER_REPRESENTATIVE[f.key])} />
+              )}
               {f.label}
               {f.key !== 'ALL' && <span className="opacity-70">{monthCounts[f.key]}</span>}
             </button>
@@ -432,6 +440,16 @@ export default function ScheduleCalendarPage() {
                 })}
               </div>
             )}
+          </div>
+
+          {/* 색상 범례 — 대시보드 미니달력과 동일하게 5분류(사용자 지정 색) 안내 */}
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 rounded-xl bg-white px-4 py-3 text-xs text-slate-500 shadow-soft ring-1 ring-slate-200/60">
+            {SCHEDULE_CATEGORY_ORDER.map((cat) => (
+              <span key={cat} className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full" style={scheduleDotStyle(cat)} />
+                {SCHEDULE_META[cat].label}
+              </span>
+            ))}
           </div>
         </div>
 
