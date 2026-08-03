@@ -32,6 +32,7 @@ export interface YardSlot {
   active?: boolean // false = 미사용(운영 중지). 구버전 응답 호환 위해 optional
   containerId: number | null
   containerNo: string | null
+  ownerName: string | null // 사용중인 칸의 화주(고객)명 — 미배정 컨테이너는 null
 }
 
 // Spring Data Page 응답의 최소 형태

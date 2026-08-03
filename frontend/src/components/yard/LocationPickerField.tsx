@@ -122,6 +122,9 @@ export default function LocationPickerField({
                     const isSelected = s.id === value
                     const isCurrent = s.id === currentSlotId
                     const selectable = !disabled && (!s.occupied || isCurrent)
+                    // 사용중(남의 자리) 칸은 칸 안에 화주명까지 보여준다 — 굳이 하나씩 눌러보거나
+                    // 마우스를 올려보지 않아도 누구 자리인지 한눈에 보이도록.
+                    const showOwner = s.occupied && !isCurrent && s.ownerName
                     return (
                       <button
                         key={s.id}
@@ -132,9 +135,13 @@ export default function LocationPickerField({
                           onChange(next ? next.id : null)
                           onPickSlot?.(next)
                         }}
-                        title={s.occupied && !isCurrent ? `사용중 (${s.containerNo ?? '점유'})` : `빈자리 (${s.locationLabel})`}
+                        title={
+                          s.occupied && !isCurrent
+                            ? `사용중 (${s.containerNo ?? '점유'}${s.ownerName ? ` · ${s.ownerName}` : ''})`
+                            : `빈자리 (${s.locationLabel})`
+                        }
                         className={cn(
-                          'relative flex h-12 w-12 items-center justify-center rounded-lg border-2 text-base font-extrabold tabular-nums transition',
+                          'relative flex h-14 w-14 flex-col items-center justify-center rounded-lg border-2 tabular-nums transition',
                           isSelected
                             ? 'border-indigo-600 bg-indigo-600 text-white shadow-md'
                             : isCurrent
@@ -144,7 +151,18 @@ export default function LocationPickerField({
                                 : 'border-dashed border-emerald-500 bg-emerald-50 text-emerald-700 hover:border-emerald-600 hover:bg-emerald-100',
                         )}
                       >
-                        {isSelected ? <Check size={20} strokeWidth={3} /> : s.columnNo}
+                        {isSelected ? (
+                          <Check size={20} strokeWidth={3} />
+                        ) : (
+                          <span className={cn('font-extrabold', showOwner ? 'text-sm leading-tight' : 'text-base')}>
+                            {s.columnNo}
+                          </span>
+                        )}
+                        {showOwner && (
+                          <span className="max-w-full truncate px-0.5 text-[10px] font-semibold leading-tight text-slate-200">
+                            {s.ownerName}
+                          </span>
+                        )}
                         {isCurrent && !isSelected && (
                           <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded bg-indigo-500 px-1 text-[9px] font-bold leading-tight text-white">
                             현재
