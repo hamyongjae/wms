@@ -187,9 +187,9 @@ function ThemeSection() {
         </div>
       </div>
 
-      {/* [고령 사용자 접근성] 2열 고정 + 큼직한 터치 영역. 색 대비만으로 구분하지 않도록
-          스와치 안 체크 아이콘 + "적용됨" 텍스트로 선택 상태를 이중으로 표시한다. */}
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      {/* [고령 사용자 접근성] 화면 폭에 맞춰 자연스럽게 줄바꿈되는 원형 스와치 칩.
+          선택 상태는 스와치 안 체크 아이콘 + 테두리 강조로 이중 표시한다. */}
+      <div className="mt-4 flex flex-wrap gap-3">
         {THEMES.map((t) => {
           const active = t.id === current
           return (
@@ -199,20 +199,17 @@ function ThemeSection() {
               onClick={() => pick(t.id)}
               aria-pressed={active}
               className={cn(
-                'flex min-h-[4.5rem] items-center gap-3 rounded-2xl border-2 p-4 text-left transition',
-                active ? 'border-slate-800 bg-slate-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50',
+                'flex w-20 flex-col items-center gap-1.5 rounded-2xl border-2 py-3 transition',
+                active ? 'border-slate-800 bg-slate-50' : 'border-transparent hover:bg-slate-50',
               )}
             >
               <span
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ring-1 ring-black/5"
+                className="flex h-12 w-12 items-center justify-center rounded-full ring-1 ring-black/5"
                 style={{ backgroundColor: t.color }}
               >
-                {active && <Check size={22} className="text-white" strokeWidth={3} />}
+                {active && <Check size={20} className="text-white" strokeWidth={3} />}
               </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-base font-bold text-slate-800">{t.label}</span>
-                <span className="block text-xs text-slate-400">{active ? '적용됨' : '탭하여 적용'}</span>
-              </span>
+              <span className="text-xs font-semibold text-slate-700">{t.label}</span>
             </button>
           )
         })}
