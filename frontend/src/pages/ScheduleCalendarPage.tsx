@@ -34,7 +34,7 @@ import EditOrderModal from '@/components/order/EditOrderModal'
 import Modal from '@/components/ui/Modal'
 import YearPickerModal from '@/components/ui/YearPickerModal'
 
-type FilterMode = 'ALL' | CalendarEventType
+type FilterMode = 'ALL' | ScheduleCategory
 
 /* [뮤티드 상태색] 원색(파랑·주황·빨강) 대신 채도를 눌러 익힌 톤 (마스터플랜 2.1) */
 const TYPE_META: Record<CalendarEventType, { label: string; emoji: string; badge: string; dot: string }> = {
@@ -67,17 +67,11 @@ function eventColorKey(e: CalendarEvent): ScheduleCategory {
   return e.status === 'COMPLETED' ? 'OUT_DONE' : 'OUT_PENDING'
 }
 
+/** 상단 필터 — 입고/출고 2분류 대신 5분류(입고예정/입고/출고일미정/출고예정/출고)로 세분화 */
 const FILTERS: Array<{ key: FilterMode; label: string }> = [
   { key: 'ALL', label: '전체보기' },
-  { key: 'INBOUND', label: '입고' },
-  { key: 'OUTBOUND', label: '출고' }
+  ...SCHEDULE_CATEGORY_ORDER.map((cat) => ({ key: cat as FilterMode, label: SCHEDULE_META[cat].label })),
 ]
-
-/** 필터 칩의 점 색 — 사용자가 설정한 달력 상태 색상을 그대로 대표색으로 쓴다(입고/출고 각 첫 상태) */
-const FILTER_REPRESENTATIVE: Record<'INBOUND' | 'OUTBOUND', ScheduleCategory> = {
-  INBOUND: 'IN_PENDING',
-  OUTBOUND: 'OUT_PENDING',
-}
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -213,7 +207,7 @@ export default function ScheduleCalendarPage() {
   useEffect(() => orderSync.subscribe(() => setRefreshKey((k) => k + 1)), [])
 
   const filtered = useMemo(
-    () => (filter === 'ALL' ? events : events.filter((e) => e.type === filter)),
+    () => (filter === 'ALL' ? events : events.filter((e) => eventColorKey(e) === filter)),
     [events, filter],
   )
 
@@ -232,8 +226,14 @@ export default function ScheduleCalendarPage() {
   const selectedEvents = selectedDate ? (eventsByDate.get(selectedDate) ?? []) : []
 
   const monthCounts = useMemo(() => {
-    const c = { INBOUND: 0, OUTBOUND: 0, BILLING: 0 }
-    for (const e of events) c[e.type]++
+    const c: Record<ScheduleCategory, number> = {
+      IN_PENDING: 0,
+      IN_DONE: 0,
+      IN_INDEFINITE: 0,
+      OUT_PENDING: 0,
+      OUT_DONE: 0,
+    }
+    for (const e of events) c[eventColorKey(e)]++
     return c
   }, [events])
 
@@ -306,9 +306,7 @@ export default function ScheduleCalendarPage() {
                   : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50',
               )}
             >
-              {f.key !== 'ALL' && f.key !== 'BILLING' && (
-                <span className="h-2 w-2 rounded-full" style={scheduleDotStyle(FILTER_REPRESENTATIVE[f.key])} />
-              )}
+              {f.key !== 'ALL' && <span className="h-2 w-2 rounded-full" style={scheduleDotStyle(f.key)} />}
               {f.label}
               {f.key !== 'ALL' && <span className="opacity-70">{monthCounts[f.key]}</span>}
             </button>
@@ -440,16 +438,6 @@ export default function ScheduleCalendarPage() {
                 })}
               </div>
             )}
-          </div>
-
-          {/* 색상 범례 — 대시보드 미니달력과 동일하게 5분류(사용자 지정 색) 안내 */}
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 rounded-xl bg-white px-4 py-3 text-xs text-slate-500 shadow-soft ring-1 ring-slate-200/60">
-            {SCHEDULE_CATEGORY_ORDER.map((cat) => (
-              <span key={cat} className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full" style={scheduleDotStyle(cat)} />
-                {SCHEDULE_META[cat].label}
-              </span>
-            ))}
           </div>
         </div>
 
