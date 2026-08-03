@@ -5,6 +5,7 @@ import { tenantApi, type TenantInfo } from '@/api/tenantApi'
 import { authStorage } from '@/lib/auth'
 import { THEMES, getTheme, applyTheme, type ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/cn'
+import ScheduleColorSettings from '@/components/settings/ScheduleColorSettings'
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-500'
@@ -71,10 +72,12 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h2 className="text-xl font-bold text-slate-800">설정</h2>
-        <p className="mt-1 text-sm text-slate-500">테마 색상과 회사 기본 정보를 관리합니다.</p>
+        <p className="mt-1 text-sm text-slate-500">테마 색상·달력 상태 색상과 회사 기본 정보를 관리합니다.</p>
       </div>
 
       <ThemeSection />
+
+      <ScheduleColorSettings />
 
       <div>
         <h3 className="text-lg font-bold text-slate-800">회사 정보</h3>

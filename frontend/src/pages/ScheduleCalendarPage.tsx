@@ -27,7 +27,7 @@ import { customerApi, type Customer } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
-import { SCHEDULE_META, type ScheduleCategory } from '@/lib/orderSchedule'
+import { scheduleBadgeStyle, SCHEDULE_META, type ScheduleCategory } from '@/lib/orderSchedule'
 import { orderSync } from '@/lib/orderEvents'
 import { CreateOrderModal, StatusChangeModal, OrderBillingModal } from './OrdersPage'
 import EditOrderModal from '@/components/order/EditOrderModal'
@@ -400,7 +400,8 @@ export default function ScheduleCalendarPage() {
                         {dayEvents.slice(0, 2).map((e) => (
                           <span
                             key={e.id}
-                            className={cn('w-full truncate rounded px-1 py-0.5 text-[10px] font-semibold leading-tight ring-1', SCHEDULE_META[eventColorKey(e)].badge)}
+                            className="w-full truncate rounded px-1 py-0.5 text-[10px] font-semibold leading-tight"
+                            style={scheduleBadgeStyle(eventColorKey(e))}
                           >
                             {e.customerName ?? eventLabel(e)}
                           </span>
@@ -415,10 +416,8 @@ export default function ScheduleCalendarPage() {
                         {dayEvents.slice(0, 3).map((e) => (
                           <span
                             key={e.id}
-                            className={cn(
-                              'truncate rounded px-1 py-0.5 text-[11px] font-medium ring-1',
-                              SCHEDULE_META[eventColorKey(e)].badge,
-                            )}
+                            className="truncate rounded px-1 py-0.5 text-[11px] font-medium"
+                            style={scheduleBadgeStyle(eventColorKey(e))}
                             title={e.customerName ?? eventLabel(e)}
                           >
                             {e.customerName ?? eventLabel(e)}
@@ -682,7 +681,9 @@ function EventCard({
   actionLoading: boolean
 }) {
   const [busy, setBusy] = useState(false)
-  const meta = event.type === 'BILLING' ? TYPE_META.BILLING : SCHEDULE_META[eventColorKey(event)]
+  const isBilling = event.type === 'BILLING'
+  // 청구(BILLING)는 상태 색상 설정 대상이 아니라 기존 고정 톤을 유지한다
+  const meta = isBilling ? TYPE_META.BILLING : SCHEDULE_META[eventColorKey(event)]
 
   async function settlePayment() {
     if (!event.amount || event.amount <= 0) {
@@ -723,7 +724,13 @@ function EventCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1', meta.badge)}>
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                isBilling && `ring-1 ${TYPE_META.BILLING.badge}`,
+              )}
+              style={isBilling ? undefined : scheduleBadgeStyle(eventColorKey(event))}
+            >
               {meta.label}
             </span>
             {event.status === 'OVERDUE' && (

@@ -8,13 +8,44 @@ import type { StorageOrder } from '@/api/orderApi'
  */
 export type ScheduleCategory = 'IN_PENDING' | 'IN_DONE' | 'IN_INDEFINITE' | 'OUT_PENDING' | 'OUT_DONE'
 
-/* [뮤티드 상태색] 원색 대신 채도를 눌러 익힌 톤 (마스터플랜 2.1과 동일 계열) */
-export const SCHEDULE_META: Record<ScheduleCategory, { label: string; badge: string; dot: string }> = {
-  IN_PENDING: { label: '입고예정', badge: 'bg-[#E9EEF3] text-[#5A748F] ring-[#D4DDE7]', dot: 'bg-[#5A748F]' },
-  IN_DONE: { label: '입고', badge: 'bg-[#DCE4EC] text-[#3E5C76] ring-[#C7D3E0]', dot: 'bg-[#3E5C76]' },
-  IN_INDEFINITE: { label: '출고일미정', badge: 'bg-[#EDE9F5] text-[#6B5B95] ring-[#DDD4EC]', dot: 'bg-[#6B5B95]' },
-  OUT_PENDING: { label: '출고예정', badge: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]', dot: 'bg-[#A65B44]' },
-  OUT_DONE: { label: '출고', badge: 'bg-[#E9D9D2] text-[#7A3F2D] ring-[#DBC2B6]', dot: 'bg-[#7A3F2D]' },
+/** 상태별 표시 이름. 색은 사용자가 설정에서 바꿀 수 있어 여기 두지 않는다(scheduleColors 참조). */
+export const SCHEDULE_META: Record<ScheduleCategory, { label: string }> = {
+  IN_PENDING: { label: '입고예정' },
+  IN_DONE: { label: '입고' },
+  IN_INDEFINITE: { label: '출고일미정' },
+  OUT_PENDING: { label: '출고예정' },
+  OUT_DONE: { label: '출고' },
+}
+
+/** 상태 표시 순서 (범례·설정 화면·집계에서 공용) */
+export const SCHEDULE_CATEGORY_ORDER: ScheduleCategory[] = [
+  'IN_PENDING',
+  'IN_INDEFINITE',
+  'IN_DONE',
+  'OUT_PENDING',
+  'OUT_DONE',
+]
+
+/**
+ * [상태 배지 스타일] 색은 <html> 에 심어둔 CSS 변수에서 읽는다.
+ *
+ * Tailwind 임의값 클래스(`bg-[#5A748F]`)는 빌드 시점에 컴파일되므로 런타임에 만든 색은 먹지 않는다.
+ * 그래서 배경·글자·테두리를 인라인 style 로 넘긴다. 변수는 설정에서 색을 저장하는 순간
+ * 브라우저가 알아서 전파하므로 리렌더 신호가 따로 필요 없다.
+ *
+ * ring-1 대신 box-shadow 를 직접 쓴다(Tailwind ring 도 결국 box-shadow 다).
+ */
+export function scheduleBadgeStyle(cat: ScheduleCategory): React.CSSProperties {
+  return {
+    backgroundColor: `var(--sched-${cat}-bg)`,
+    color: `var(--sched-${cat}-fg)`,
+    boxShadow: `0 0 0 1px var(--sched-${cat}-ring)`,
+  }
+}
+
+/** [상태 점] 미니달력의 색 점·범례에서 쓰는 단색 */
+export function scheduleDotStyle(cat: ScheduleCategory): React.CSSProperties {
+  return { backgroundColor: `var(--sched-${cat}-fg)` }
 }
 
 /** 상태 모델은 INBOUND/OUTBOUND 이진 — 활성=아직 출고 안 됨(INBOUND). */

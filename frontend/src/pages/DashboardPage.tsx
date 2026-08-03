@@ -26,16 +26,25 @@ import YearPickerModal from '@/components/ui/YearPickerModal'
 import RevenueBarChart, { type RevenuePoint } from '@/components/charts/RevenueBarChart'
 import WarehouseArt from '@/components/brand/WarehouseArt'
 import { authStorage } from '@/lib/auth'
+import { cn } from '@/lib/cn'
 import { orderSync } from '@/lib/orderEvents'
 
 import { isOverdue, isOpenLedger, daysFromDue } from '@/lib/billing'
 import { today, getDurationDays } from '@/lib/dates'
-import { isActive, inboundCategory, outboundCategory, SCHEDULE_META, type ScheduleCategory } from '@/lib/orderSchedule'
+import {
+  isActive,
+  inboundCategory,
+  outboundCategory,
+  scheduleBadgeStyle,
+  scheduleDotStyle,
+  SCHEDULE_CATEGORY_ORDER,
+  SCHEDULE_META,
+  type ScheduleCategory,
+} from '@/lib/orderSchedule'
 
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
 /** 5분류 표시 우선순위 — 미니달력 칸/상세 목록이 공통으로 쓴다. */
-const SCHEDULE_CATEGORY_ORDER: ScheduleCategory[] = ['IN_PENDING', 'IN_INDEFINITE', 'IN_DONE', 'OUT_PENDING', 'OUT_DONE']
 
 /**
  * 계약 가격 표시: "보관료 / 보관일수" 형식.
@@ -686,7 +695,10 @@ function MobileScheduleCard({
         <div className="mt-2.5 space-y-2.5">
           {SCHEDULE_CATEGORY_ORDER.filter((cat) => (dayNames.get(cat)?.length ?? 0) > 0).map((cat) => (
             <div key={cat} className="flex items-start gap-2">
-              <span className={`mt-0.5 shrink-0 rounded-md px-2 py-1 text-xs font-bold ring-1 ${SCHEDULE_META[cat].badge}`}>
+              <span
+                className="mt-0.5 shrink-0 rounded-md px-2 py-1 text-xs font-bold"
+                style={scheduleBadgeStyle(cat)}
+              >
                 {SCHEDULE_META[cat].label}
               </span>
               <span className="text-base font-medium text-slate-700">{dayNames.get(cat)!.join(', ')}</span>
@@ -778,9 +790,12 @@ function MiniCalendar({
                   return (
                     <span
                       key={cat}
-                      className={`w-full truncate rounded px-1 text-[9px] font-semibold leading-tight ${
-                        isSel ? 'bg-white/25 text-white' : SCHEDULE_META[cat].badge
-                      }`}
+                      className={cn(
+                        'w-full truncate rounded px-1 text-[9px] font-semibold leading-tight',
+                        isSel && 'bg-white/25 text-white',
+                      )}
+                      /* 선택된 날짜 칸은 인디고 배경 위라 반전색(위 클래스)을 그대로 쓴다 */
+                      style={isSel ? undefined : scheduleBadgeStyle(cat)}
                     >
                       {names[0]}
                       {names.length > 1 ? ` 외${names.length - 1}` : ''}
@@ -800,7 +815,7 @@ function MiniCalendar({
       <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-slate-500">
         {SCHEDULE_CATEGORY_ORDER.map((cat) => (
           <span key={cat} className="flex items-center gap-1.5">
-            <span className={`h-2.5 w-2.5 rounded-full ${SCHEDULE_META[cat].dot}`} />
+            <span className="h-2.5 w-2.5 rounded-full" style={scheduleDotStyle(cat)} />
             {SCHEDULE_META[cat].label}
           </span>
         ))}
