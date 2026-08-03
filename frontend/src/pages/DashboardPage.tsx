@@ -22,6 +22,7 @@ import { yardApi, type WarehouseOccupancy, type YardSlot } from '@/api/yardApi'
 import { containerApi, type Container } from '@/api/containerApi'
 import StatCard from '@/components/ui/StatCard'
 import DateRangeLabel from '@/components/ui/DateRangeLabel'
+import YearPickerModal from '@/components/ui/YearPickerModal'
 import RevenueBarChart, { type RevenuePoint } from '@/components/charts/RevenueBarChart'
 import WarehouseArt from '@/components/brand/WarehouseArt'
 import { authStorage } from '@/lib/auth'
@@ -486,6 +487,14 @@ function MobileScheduleCard({
     setSlideFrom(delta) // 넘어온 방향으로 슬라이드 애니메이션
   }
 
+  // [연도 빠른 이동] 월 화살표만으로는 몇 년 전/후로 가기 번거로워, 연도 라벨 탭으로 바로 이동한다
+  const [yearPickerOpen, setYearPickerOpen] = useState(false)
+  function selectYear(y: number) {
+    setView((v) => ({ year: y, month: v.month }))
+    setSelected(y === year && view.month === month ? todayDay : 1)
+    setYearPickerOpen(false)
+  }
+
   /*
    * ===== [스와이프 월 이동] =====
    * 달력을 좌우로 밀어서 달을 넘긴다. 이 카드는 세로 스크롤 컨테이너 안에 있으므로
@@ -601,9 +610,13 @@ function MobileScheduleCard({
           <ChevronLeft size={20} />
         </button>
         <div className="flex min-w-0 flex-col items-center">
-          <p className="text-base font-bold text-slate-700">
+          <button
+            type="button"
+            onClick={() => setYearPickerOpen(true)}
+            className="rounded-lg px-1.5 text-base font-bold text-slate-700 transition active:bg-slate-100"
+          >
             {view.year}년 {view.month}월
-          </p>
+          </button>
           {!isCurrentMonth && (
             <button
               type="button"
@@ -675,6 +688,13 @@ function MobileScheduleCard({
       >
         전체 일정 보기 <ArrowRight size={18} />
       </Link>
+
+      <YearPickerModal
+        open={yearPickerOpen}
+        onClose={() => setYearPickerOpen(false)}
+        year={view.year}
+        onSelect={selectYear}
+      />
     </section>
   )
 }

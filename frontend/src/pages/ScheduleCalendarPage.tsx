@@ -31,6 +31,7 @@ import { orderSync } from '@/lib/orderEvents'
 import { CreateOrderModal, StatusChangeModal, OrderBillingModal } from './OrdersPage'
 import EditOrderModal from '@/components/order/EditOrderModal'
 import Modal from '@/components/ui/Modal'
+import YearPickerModal from '@/components/ui/YearPickerModal'
 
 type FilterMode = 'ALL' | CalendarEventType
 
@@ -233,6 +234,13 @@ export default function ScheduleCalendarPage() {
     setSelectedDate(todayStr())
   }
 
+  const [yearPickerOpen, setYearPickerOpen] = useState(false)
+  function selectYear(y: number) {
+    setSelectedDate(null)
+    setCursor((c) => ({ year: y, month0: c.month0 }))
+    setYearPickerOpen(false)
+  }
+
   // [스와이프로 달력 넘기기] 세로 스크롤과 헷갈리지 않도록, 가로 이동이 세로 이동보다
   // 뚜렷하고(가로>세로*1.5) 일정 거리(48px) 이상일 때만 달을 넘긴다. 손을 뗄 때 한 번만 판정.
   const SWIPE_THRESHOLD = 48
@@ -290,9 +298,14 @@ export default function ScheduleCalendarPage() {
         </div>
 
         <div className="flex items-center justify-between gap-2 sm:justify-end">
-          <span className="text-base font-bold text-slate-800 sm:min-w-28 sm:text-center sm:text-sm sm:font-semibold sm:text-slate-700">
+          <button
+            type="button"
+            onClick={() => setYearPickerOpen(true)}
+            className="rounded-lg px-1.5 text-base font-bold text-slate-800 transition hover:bg-slate-100 sm:min-w-28 sm:text-center sm:text-sm sm:font-semibold sm:text-slate-700"
+            title="연도 빠른 선택"
+          >
             {cursor.year}년 {cursor.month0 + 1}월
-          </span>
+          </button>
           <div className="flex items-center rounded-xl border border-slate-200 bg-white sm:rounded-lg">
             <button type="button" onClick={() => moveMonth(-1)} className="p-2.5 text-slate-500 hover:text-slate-800 sm:p-1.5" title="이전 달">
               <ChevronLeft size={18} />
@@ -525,6 +538,14 @@ export default function ScheduleCalendarPage() {
           setNotice('계약을 수정했습니다.')
           setRefreshKey((k) => k + 1)
         }}
+      />
+
+      {/* [연도 빠른 이동] 상단 "YYYY년 MM월" 라벨 탭으로 연다 */}
+      <YearPickerModal
+        open={yearPickerOpen}
+        onClose={() => setYearPickerOpen(false)}
+        year={cursor.year}
+        onSelect={selectYear}
       />
     </div>
   )
