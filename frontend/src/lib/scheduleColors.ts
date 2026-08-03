@@ -25,28 +25,28 @@ export interface DerivedColor {
   ring: string
 }
 
-/* 상태별 기본 색 — 기존 하드코딩 값(뮤티드 톤)을 그대로 승계해 업그레이드 후에도 화면이 같아 보인다 */
+/* 상태별 기본 색 — 원색에 가까운 채도 높은 톤. '예정'은 한 단계 옅게, '완료'는 진하게 짝지었다 */
 export const DEFAULT_SCHEDULE_COLORS: Record<ScheduleCategory, string> = {
-  IN_PENDING: '#5A748F',
-  IN_DONE: '#3E5C76',
-  IN_INDEFINITE: '#6B5B95',
-  OUT_PENDING: '#A65B44',
-  OUT_DONE: '#7A3F2D',
+  IN_PENDING: '#3B82F6',
+  IN_DONE: '#2563EB',
+  IN_INDEFINITE: '#7C3AED',
+  OUT_PENDING: '#F97316',
+  OUT_DONE: '#EA580C',
 }
 
 /**
  * 선택 팔레트 — 7개 색상 계열 × 5단계 농도.
- * 원색을 그대로 쓰면 현장 화면이 번잡해지므로 채도를 눌러 익힌 톤으로 구성했다.
+ * 채도를 눌러 죽인 톤 대신 원색에 가까운 선명한 색으로 구성했다.
  * 가로 = 계열, 세로 = 진한 것 → 옅은 것 (요청 화면과 동일한 배치).
  */
 export const SCHEDULE_PALETTE: string[][] = [
-  ['#8C4A4A', '#A9635F', '#C08A83', '#D6B0A9', '#EBD6D1'], // 레드
-  ['#8A5133', '#A97049', '#C29173', '#D8B79F', '#EDDCCE'], // 브라운
-  ['#8A6A2A', '#A98C46', '#C2AC72', '#D8C99F', '#EDE3CE'], // 올리브
-  ['#3F6B5E', '#5A8C7B', '#83AC9C', '#AECABD', '#D7E5DC'], // 그린
-  ['#3E5C76', '#5A748F', '#8095AC', '#AAB9C8', '#D4DDE7'], // 블루
-  ['#584B7C', '#6B5B95', '#8E82AE', '#B4ACC8', '#DAD6E4'], // 퍼플
-  ['#4A4F55', '#666C74', '#8D939A', '#B5BABF', '#DCDEE1'], // 그레이
+  ['#DC2626', '#EF4444', '#F87171', '#FCA5A5', '#FECACA'], // 레드
+  ['#EA580C', '#F97316', '#FB923C', '#FDBA74', '#FED7AA'], // 오렌지
+  ['#D97706', '#F59E0B', '#FBBF24', '#FCD34D', '#FDE68A'], // 앰버
+  ['#16A34A', '#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0'], // 그린
+  ['#2563EB', '#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE'], // 블루
+  ['#7C3AED', '#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE'], // 퍼플
+  ['#475569', '#64748B', '#94A3B8', '#CBD5E1', '#E2E8F0'], // 슬레이트
 ]
 
 const STORAGE_KEY = 'wms.scheduleColors'
@@ -55,13 +55,13 @@ const HEX = /^#[0-9a-fA-F]{6}$/
 
 /**
  * 기준색에서 배지용 3색을 만든다.
- *   bg   = 흰색과 87% 섞은 아주 옅은 톤 (글자가 또렷하게 얹히는 바탕)
- *   ring = 흰색과 75% 섞은 톤 (경계만 살짝 잡아주는 테두리)
+ *   bg   = 흰색과 78% 섞은 톤 (원색이 옅게나마 배경에도 비치도록 — 너무 하얗게 씻기지 않게)
+ *   ring = 흰색과 58% 섞은 톤 (경계가 배경보다 한 톤 진하게 잡히도록)
  *   fg   = 기준색 그대로 (가장 진한 값이라 대비를 확보)
  * 한 색만 고르면 세 값이 자동으로 따라오므로, 사용자는 색을 하나만 선택하면 된다.
  */
 export function deriveColor(base: string): DerivedColor {
-  return { bg: mixWithWhite(base, 0.87), fg: base, ring: mixWithWhite(base, 0.75) }
+  return { bg: mixWithWhite(base, 0.78), fg: base, ring: mixWithWhite(base, 0.58) }
 }
 
 /** hex 를 흰색과 ratio(0~1) 만큼 섞는다. ratio 가 클수록 옅어진다. */
