@@ -6,7 +6,10 @@ import com.example.wms.billing.entity.SettlementType;
 import com.example.wms.billing.repository.BillingLedgerRepository;
 import com.example.wms.billing.support.MoneyPolicy;
 import com.example.wms.billing.support.ProrationCalculator;
+import com.example.wms.container.entity.Container;
+import com.example.wms.container.repository.ContainerRepository;
 import com.example.wms.order.entity.StorageOrder;
+import com.example.wms.order.repository.StorageOrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -48,6 +51,8 @@ public class BillingLedgerIssuer {
 
     private final BillingLedgerRepository ledgerRepository;
     private final ProrationCalculator prorationCalculator;
+    private final StorageOrderRepository storageOrderRepository;
+    private final ContainerRepository containerRepository;
 
     /**
      * 계약(order)의 [periodStart, periodEnd] 회차 원장을 발행한다. 같은 계약·기간과 겹치는
@@ -69,7 +74,36 @@ public class BillingLedgerIssuer {
                 periodStart, periodEnd, base, MoneyPolicy.ZERO, dueDate);
         ledger.issue(dueDate);
         ledgerRepository.save(ledger);
+        extendOrderPeriod(order.getId(), periodEnd);
         return true;
+    }
+
+    /**
+     * [보관기간 동기화] {@code BillingService.createLedger}(수동 정산서 생성)의 extendOrderPeriod와
+     * 동일한 규칙 — 이번 회차 청구기간 종료일이 계약의 출고예정일보다 늦으면 계약을 그 날짜까지
+     * 늘린다. 이게 없으면 계약이 계속 자동 청구·연장되는 동안에도 출고예정일이 옛 값에 머물러,
+     * 실제로는 정상 진행 중인 계약이 "출고 지연"으로 잘못 표시된다.
+     *
+     * [세션 경계] {@code order} 매개변수는 이 메서드 밖(다른 트랜잭션)에서 조회된 detached 객체라
+     * 그대로 수정해도 반영되지 않는다. 이 REQUIRES_NEW 트랜잭션 안에서 다시 조회한 managed 엔티티를
+     * 수정해야 커밋 시 실제로 반영된다(트랜잭션 안이므로 별도 save() 호출 없이 dirty checking으로 저장).
+     *
+     * [미정 계약 보존] 출고예정일이 원래 null("출고일 미정" 장기 계약)이면 건드리지 않는다. 이걸
+     * 건드리면 매달 배치가 돌 때마다 "미정"이 임의의 날짜로 계속 바뀌어버려, 의도된 "미정" 상태
+     * 자체가 사라진다 — 이미 날짜가 정해져 있던 계약을 그 이후로 늘리는 경우만 대상으로 한다.
+     */
+    private void extendOrderPeriod(Long orderId, LocalDate periodEnd) {
+        if (periodEnd == null) return;
+        StorageOrder managed = storageOrderRepository.findById(orderId).orElse(null);
+        if (managed == null || managed.isOutbound()) return;
+        LocalDate current = managed.getExpectedEndDate();
+        if (current == null) return; // 미정 계약은 그대로 미정으로 둔다
+        if (periodEnd.isAfter(current)) {
+            managed.setExpectedEndDate(periodEnd);
+            for (Container c : containerRepository.findByTenantIdAndCurrentOrderId(managed.getTenantId(), managed.getId())) {
+                c.setStorageDates(managed.getStorageStartDate(), periodEnd);
+            }
+        }
     }
 
     private String generateLedgerNo() {

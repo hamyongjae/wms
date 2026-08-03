@@ -188,6 +188,36 @@ class BillingBatchServiceIntegrationTest extends IntegrationTestBase {
         assertThat(ledgersB.get(1).getTenant().getId()).isEqualTo(tenantB.getId());
     }
 
+    @Test
+    @DisplayName("[회귀] 출고예정일이 이미 정해진 계약은 회차 청구 때마다 그 종료일로 자동 연장된다("
+            + "안 그러면 실제론 정상 진행 중인데 옛 출고예정일 기준으로 '출고 지연'이 잘못 뜬다)")
+    void extendsExpectedEndDateWhenAlreadySet() {
+        Tenant tenant = createTenant("연장테스트업체");
+        Warehouse warehouse = createWarehouse(tenant);
+        Customer customer = createCustomer(tenant);
+        // 출고예정일을 최초 원장 종료일과 똑같이 맞춰서 시작 — "이미 날짜가 정해져 있던" 상태를 재현
+        StorageOrder order = createOrder(tenant, customer, warehouse,
+                LocalDate.of(2026, 8, 15), LocalDate.of(2026, 9, 14), 100_000);
+        createLedger(tenant, order, customer,
+                LocalDate.of(2026, 8, 15), LocalDate.of(2026, 9, 14), new BigDecimal("100000.00"));
+
+        billingBatchService.generateDueLedgers(LocalDate.of(2026, 9, 15));
+
+        StorageOrder refreshed = storageOrderRepository.findById(order.getId()).orElseThrow();
+        assertThat(refreshed.getExpectedEndDate()).isEqualTo(LocalDate.of(2026, 10, 14));
+    }
+
+    @Test
+    @DisplayName("[회귀] 출고일 미정(null) 장기 계약은 회차 청구가 계속돼도 출고예정일이 임의로 채워지지 않는다")
+    void preservesNullExpectedEndDateForIndefiniteContracts() {
+        StorageOrder order = seedOrderWithInitialLedger(); // expectedEndDate=null(미정)로 생성됨
+
+        billingBatchService.generateDueLedgers(LocalDate.of(2026, 11, 20)); // 3회차 캐치업
+
+        StorageOrder refreshed = storageOrderRepository.findById(order.getId()).orElseThrow();
+        assertThat(refreshed.getExpectedEndDate()).isNull();
+    }
+
     /** 8/15 시작, 최초 원장 [8/15~9/14](월경계 아닌 롤링 기간)까지 세팅된 계약을 만든다. */
     private StorageOrder seedOrderWithInitialLedger() {
         Tenant tenant = createTenant("테스트업체");
