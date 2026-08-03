@@ -156,8 +156,15 @@ public class StorageOrder {
     /**
      * 실제 출고일을 기록하며 보관 종료일(expectedEndDate)을 그 날짜로 강제 마감한다.
      * 롤백을 위해 마감 전 종료일·보관료를 스냅샷으로 보존한다.
+     *
+     * [이중 출고 방어] INBOUND에서만 호출 가능하다. 이미 OUTBOUND인 계약에 다시 호출되면(중복
+     * 요청·재시도 등) 이미 마감된 값을 "원래 값"으로 스냅샷해 버려, 이후 출고취소(unreleased)가
+     * 진짜 원래 보관기간·보관료가 아니라 잘못된 값으로 복구되는 사고로 이어진다.
      */
     public void release(LocalDate actualEndDate) {
+        if (this.status != OrderStatus.INBOUND) {
+            throw new IllegalStateException("출고 처리는 입고(INBOUND) 상태에서만 가능합니다. 현재=" + status);
+        }
         this.originalEndDate = this.expectedEndDate;   // 롤백 스냅샷
         this.originalMonthlyFee = this.monthlyFee;
         this.status = OrderStatus.OUTBOUND;
