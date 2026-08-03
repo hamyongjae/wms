@@ -178,14 +178,22 @@ export function CalendarField({
   format?: (iso: string) => string
 }) {
   const [open, setOpen] = useState(false)
+  // [연도 빠른 이동] 월 화살표만 있으면 몇 년 전 날짜를 고를 때 수십 번 눌러야 한다.
+  //   'day'(평소 날짜 그리드) / 'year'(연도 선택 그리드) 두 화면을 헤더 탭으로 오간다.
+  const [mode, setMode] = useState<'day' | 'year'>('day')
   const now = new Date()
   const [viewY, setViewY] = useState(() => parseIso(value)?.y ?? now.getFullYear())
   const [viewM, setViewM] = useState(() => parseIso(value)?.m0 ?? now.getMonth())
+  // 연도 그리드에 보여줄 12개 중 첫 연도 (현재 연도가 그리드 중간쯤 오도록)
+  const [yearGridStart, setYearGridStart] = useState(viewY - 5)
 
   function openPicker() {
     const p = parseIso(value)
-    setViewY(p?.y ?? now.getFullYear())
+    const y = p?.y ?? now.getFullYear()
+    setViewY(y)
     setViewM(p?.m0 ?? now.getMonth())
+    setYearGridStart(y - 5)
+    setMode('day')
     setOpen(true)
   }
 
@@ -195,7 +203,29 @@ export function CalendarField({
     setViewM(d.getMonth())
   }
 
-  // [스와이프 월 이동] 좌우로 훑으면 이전/다음 달 — 화살표 버튼과 동일한 동작을 손가락으로도
+  function openYearGrid() {
+    setYearGridStart(viewY - 5)
+    setMode('year')
+  }
+
+  function pickYear(y: number) {
+    setViewY(y)
+    setMode('day')
+  }
+
+  function shiftYearGrid(delta: number) {
+    setYearGridStart((s) => s + delta * 12)
+  }
+
+  /** 연도 전체가 [min, max] 밖이면 어차피 고를 수 있는 날짜가 없으므로 그리드에서 비활성화 */
+  function yearDisabled(y: number): boolean {
+    if (min != null && `${y}-12-31` < min) return true
+    if (max != null && `${y}-01-01` > max) return true
+    return false
+  }
+
+  // [스와이프 이동] 좌우로 훑으면 이전/다음 달(연도 그리드에서는 이전/다음 12년) — 화살표 버튼과
+  //   동일한 동작을 손가락으로도
   const touchStartX = useRef<number | null>(null)
   function onSwipeStart(e: TouchEvent) {
     touchStartX.current = e.touches[0].clientX
@@ -203,7 +233,11 @@ export function CalendarField({
   function onSwipeEnd(e: TouchEvent) {
     if (touchStartX.current == null) return
     const delta = e.changedTouches[0].clientX - touchStartX.current
-    if (Math.abs(delta) > 40) shiftMonth(delta > 0 ? -1 : 1)
+    if (Math.abs(delta) > 40) {
+      const dir = delta > 0 ? -1 : 1
+      if (mode === 'day') shiftMonth(dir)
+      else shiftYearGrid(dir)
+    }
     touchStartX.current = null
   }
 
@@ -227,66 +261,117 @@ export function CalendarField({
             <div className="flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => shiftMonth(-1)}
+                onClick={() => (mode === 'day' ? shiftMonth(-1) : shiftYearGrid(-1))}
                 className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
+                title={mode === 'day' ? '이전 달' : '이전 12년'}
               >
                 <ChevronLeft size={20} />
               </button>
-              <span className="text-lg font-bold text-slate-800">
-                {viewY}년 {viewM + 1}월
-              </span>
+              {mode === 'day' ? (
+                <button
+                  type="button"
+                  onClick={openYearGrid}
+                  className="rounded-lg px-2 py-1 text-lg font-bold text-slate-800 transition hover:bg-slate-100"
+                  title="연도 빠른 선택"
+                >
+                  {viewY}년 {viewM + 1}월
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMode('day')}
+                  className="rounded-lg px-2 py-1 text-lg font-bold text-slate-800 transition hover:bg-slate-100"
+                  title="날짜 선택으로 돌아가기"
+                >
+                  {yearGridStart} - {yearGridStart + 11}
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => shiftMonth(1)}
+                onClick={() => (mode === 'day' ? shiftMonth(1) : shiftYearGrid(1))}
                 className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
+                title={mode === 'day' ? '다음 달' : '다음 12년'}
               >
                 <ChevronRight size={20} />
               </button>
             </div>
 
-            <div className="grid grid-cols-7 text-center text-xs font-semibold text-slate-400">
-              {WEEKDAYS.map((w) => (
-                <div key={w} className="py-1">
-                  {w}
+            {mode === 'year' ? (
+              <div className="grid grid-cols-3 gap-1.5">
+                {Array.from({ length: 12 }).map((_, i) => {
+                  const y = yearGridStart + i
+                  const disabled = yearDisabled(y)
+                  const selected = y === viewY
+                  const isThisYear = y === now.getFullYear()
+                  return (
+                    <button
+                      key={y}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => pickYear(y)}
+                      className={cn(
+                        'flex h-12 items-center justify-center rounded-xl text-base font-semibold transition active:scale-95 disabled:cursor-not-allowed',
+                        selected
+                          ? 'bg-indigo-600 text-white'
+                          : disabled
+                            ? 'text-slate-300'
+                            : isThisYear
+                              ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200'
+                              : 'text-slate-700 hover:bg-slate-100',
+                      )}
+                    >
+                      {y}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-7 text-center text-xs font-semibold text-slate-400">
+                  {WEEKDAYS.map((w) => (
+                    <div key={w} className="py-1">
+                      {w}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: firstWeekday }).map((_, i) => (
-                <div key={`blank-${i}`} />
-              ))}
-              {Array.from({ length: dayCount }).map((_, i) => {
-                const d = i + 1
-                const iso = toIso(viewY, viewM, d)
-                const disabled = (min != null && iso < min) || (max != null && iso > max)
-                const selected = iso === value
-                const isToday = iso === todayIso
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => {
-                      onChange(iso)
-                      setOpen(false)
-                    }}
-                    className={cn(
-                      'flex h-11 items-center justify-center rounded-xl text-base font-semibold transition active:scale-95 disabled:cursor-not-allowed',
-                      selected
-                        ? 'bg-indigo-600 text-white'
-                        : disabled
-                          ? 'text-slate-300'
-                          : isToday
-                            ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200'
-                            : 'text-slate-700 hover:bg-slate-100',
-                    )}
-                  >
-                    {d}
-                  </button>
-                )
-              })}
-            </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {Array.from({ length: firstWeekday }).map((_, i) => (
+                    <div key={`blank-${i}`} />
+                  ))}
+                  {Array.from({ length: dayCount }).map((_, i) => {
+                    const d = i + 1
+                    const iso = toIso(viewY, viewM, d)
+                    const disabled = (min != null && iso < min) || (max != null && iso > max)
+                    const selected = iso === value
+                    const isToday = iso === todayIso
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => {
+                          onChange(iso)
+                          setOpen(false)
+                        }}
+                        className={cn(
+                          'flex h-11 items-center justify-center rounded-xl text-base font-semibold transition active:scale-95 disabled:cursor-not-allowed',
+                          selected
+                            ? 'bg-indigo-600 text-white'
+                            : disabled
+                              ? 'text-slate-300'
+                              : isToday
+                                ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200'
+                                : 'text-slate-700 hover:bg-slate-100',
+                        )}
+                      >
+                        {d}
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
           </div>
         </Modal>
       )}
