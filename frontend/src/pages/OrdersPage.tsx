@@ -1714,20 +1714,20 @@ function OrderLocationBadge({ locs, overdue }: { locs: string[]; overdue?: boole
     return (
       <span
         className={cn(
-          'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
+          'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm font-medium',
           overdue
             ? 'border-red-200 bg-red-50 text-red-600'
             : 'border-dashed border-[#E2DCD1] bg-[#EFEBE4]/60 text-[#8A8172]',
         )}
       >
-        {overdue && <AlertTriangle size={11} />}
+        {overdue && <AlertTriangle size={13} />}
         위치 미지정
       </span>
     )
   return (
-    <span title={locs.join(', ')} className="inline-flex items-center gap-1">
-      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">{locs[0]}</span>
-      {locs.length > 1 && <span className="text-xs text-slate-400">외 {locs.length - 1}</span>}
+    <span title={locs.join(', ')} className="inline-flex items-center gap-1.5">
+      <span className="rounded bg-slate-100 px-2 py-1 text-sm font-medium text-slate-600">{locs[0]}</span>
+      {locs.length > 1 && <span className="text-sm text-slate-400">외 {locs.length - 1}</span>}
     </span>
   )
 }
