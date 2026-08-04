@@ -923,6 +923,16 @@ export function CreateOrderModal({
     [monthlyFee, storageStartDate, expectedEndDate],
   )
 
+  // [과거 계약 등록 기본값] 보관 시작일이 두 달(60일) 이상 과거면 체크박스를 자동으로 켠다 —
+  //   직원이 깜빡하고 안 켠 채 등록해 소급 연체가 무더기로 생기는 사고가 두 번 있었다.
+  //   사용자가 수동으로 끈 뒤에도 시작일을 다시 고르면 이 효과가 재평가되어 다시 켜질 수 있는데,
+  //   "날짜를 새로 고른 시점의 합리적 기본값"이라는 취지에 맞으므로 의도된 동작이다.
+  useEffect(() => {
+    if (!storageStartDate) return
+    const daysAgo = storageDays(storageStartDate, today())
+    if (daysAgo != null && daysAgo > 60) setHistoricalContract(true)
+  }, [storageStartDate])
+
   const isBlacklisted = selectedCustomer?.status === 'BLACKLISTED'
   const isDormant = selectedCustomer?.status === 'DORMANT'
 
