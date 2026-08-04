@@ -100,9 +100,9 @@ export function LedgerDetailContent({
   // [환불 완료] 환불 대상 금액이 있고 아직 미완료일 때만 (이중 방어 — 백엔드에서도 재검증)
   const canRefund = l != null && (l.refundDue ?? Math.max(-l.balance, 0)) > 0 && !l.refundCompleted
   // [삭제 가능 조건] 서버가 최종 재검증하지만, 화면에서도 미리 걸러 헛클릭을 막는다.
-  //   입금·조정 흔적이 없고 다음 원장으로 이월되지 않은 원장만 — 실제 돈이 오간 기록은 지울 수 없다.
-  const canDelete =
-    isAdmin && l != null && l.paidTotal === 0 && l.adjustmentTotal === 0 && l.status !== 'CARRIED_OVER'
+  //   실제 입금이 없고 다음 원장으로 이월되지 않은 원장만 — 실제 돈이 오간 기록은 지울 수 없다.
+  //   조정(할인/가산) 이력은 막지 않는다(청구 후 전액 할인으로 0원 처리된 과거 데이터 정리용).
+  const canDelete = isAdmin && l != null && l.paidTotal === 0 && l.status !== 'CARRIED_OVER'
   // [한 줄 고정] 버튼 개수가 상황마다 달라(입금/조정/납기일변경/환불완료/삭제) flex-wrap이면
   //   두 번째 줄로 밀리기 쉽다 — 실제로 보일 개수만큼 그리드 칸을 나눠 항상 한 줄에 맞춘다.
   const visibleActionCount = [

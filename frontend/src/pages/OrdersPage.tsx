@@ -880,7 +880,9 @@ function LedgerHistoryRow({
   onChanged: () => void
 }) {
   const ds = displayStatus(l)
-  const canDelete = isAdmin && l.paidTotal === 0 && l.adjustmentTotal === 0 && l.status !== 'CARRIED_OVER'
+  // 실제 입금이 없으면 삭제 가능 — 조정(할인) 이력은 막지 않는다(청구 후 전액 할인으로
+  // 0원 처리된 과거 회차 정리용). 삭제 시 서버가 앞뒤 회차를 자동으로 이어붙인다.
+  const canDelete = isAdmin && l.paidTotal === 0 && l.status !== 'CARRIED_OVER'
   const canEdit = isAdmin && l.status !== 'CARRIED_OVER' && l.status !== 'CANCELED'
   const totalDue = l.baseAmount + l.carriedOverIn + l.adjustmentTotal
   const isNoCharge = totalDue === 0
