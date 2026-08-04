@@ -3,6 +3,7 @@ import { isAxiosError } from 'axios'
 import { Loader2, BadgeCheck, HandCoins, SlidersHorizontal, CalendarClock, CalendarCog, Undo2, Trash2 } from 'lucide-react'
 import {
   billingApi,
+  type BillingLedger,
   type LedgerDetail,
   type PaymentMethod,
   type AdjustmentType,
@@ -15,15 +16,17 @@ import Modal from '@/components/ui/Modal'
 import { CalendarField } from '@/components/order/orderFormUi'
 
 /**
- * ===== [정산 상세 팝업 — 단일 공용 템플릿] =====
+ * ===== [정산 상세 — 단일 공용 템플릿] =====
  *
  * '정산 관리' 화면에서 원장을 클릭했을 때와, 컨테이너 관리·입출고 일정에서 계약의 정산
  * 이력 중 한 회차를 열었을 때가 서로 다른 화면이면 사용자는 같은 일을 두 가지 방식으로
  * 배워야 한다. 그래서 원장 하나에 대한 조회·발행·수금·조정·이월·환불·삭제는 이 파일
- * 하나에만 구현하고, 두 진입 경로 모두 이 컴포넌트를 그대로 가져다 쓴다.
+ * 하나에만 구현한다.
  *
- * 진입 경로별 차이는 오직 '원장을 어떻게 골랐는가' 뿐이다 — 목록에서 바로 고르든,
- * 계약의 회차 목록에서 고르든, 골라진 ledgerId 하나만 이 컴포넌트에 넘기면 된다.
+ * 다만 두 진입 경로의 "담는 그릇"은 다르다 — 정산 관리(BillingPage)는 팝업 위에 올리고,
+ * 계약별 정산 이력(OrderBillingModal)은 행을 탭하면 그 자리에서 펼친다(팝업 위에 팝업이
+ * 뜨는 걸 피하려고). 그래서 내용(`LedgerDetailContent`)과 모달 껍데기(`LedgerDetailPanel`,
+ * 기본 export)를 분리했다 — 로직은 한 곳, 담는 방식만 호출부가 고른다.
  */
 
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
@@ -48,17 +51,21 @@ const ADJ_LABEL: Record<AdjustmentType, string> = {
   CORRECTION: '정정',
 }
 
-export default function LedgerDetailPanel({
+export function LedgerDetailContent({
   ledgerId,
   isAdmin,
-  onClose,
   onChanged,
+  onDeleted,
+  onLoaded,
 }: {
   ledgerId: number
   isAdmin: boolean
-  onClose: () => void
   /** 발행·수금·조정·이월·환불·삭제 등으로 원장이 바뀌었을 때 호출 — 호출부 목록을 새로 읽는다 */
   onChanged: () => void
+  /** 삭제 성공 시 추가로 호출 — 모달이면 닫기, 인라인이면 펼침 접기 */
+  onDeleted?: () => void
+  /** 상세 로드 완료 시 원장을 전달 — 모달 래퍼가 제목 등에 사용 */
+  onLoaded?: (ledger: BillingLedger) => void
 }) {
   const [detail, setDetail] = useState<LedgerDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -70,9 +77,13 @@ export default function LedgerDetailPanel({
     setLoading(true)
     billingApi
       .detail(ledgerId)
-      .then(setDetail)
+      .then((d) => {
+        setDetail(d)
+        onLoaded?.(d.ledger)
+      })
       .catch(() => setActionError('상세를 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ledgerId, reloadKey])
 
   function afterAction() {
@@ -119,21 +130,19 @@ export default function LedgerDetailPanel({
       await billingApi.remove(ledgerId)
       onChanged() // 목록 갱신
       orderSync.emit()
-      onClose() // 삭제된 원장이라 상세를 계속 보여줄 수 없음 — 패널 닫기
+      onDeleted?.() // 삭제된 원장이라 상세를 계속 보여줄 수 없음 — 담는 쪽(모달 닫기/펼침 접기)에 위임
     } catch (err) {
       setActionError(errMsg(err, '삭제에 실패했습니다.'))
     }
   }
 
-  return (
-    <Modal open onClose={onClose} title={l?.customerName ? `${l.customerName} 정산서` : '정산서'} widthClass="max-w-2xl">
-      {loading || !l ? (
-        <div className="flex items-center justify-center gap-2 py-24 text-slate-400">
-          <Loader2 className="animate-spin" size={18} />
-          <span className="text-sm">불러오는 중…</span>
-        </div>
-      ) : (
-        <div className="space-y-6">
+  return loading || !l ? (
+    <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
+      <Loader2 className="animate-spin" size={18} />
+      <span className="text-sm">불러오는 중…</span>
+    </div>
+  ) : (
+    <div className="space-y-6">
           {/* 요약 */}
           <section className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
             <div className="mb-3 flex items-center justify-between">
@@ -350,7 +359,35 @@ export default function LedgerDetailPanel({
             )}
           </section>
         </div>
-      )}
+  )
+}
+
+/**
+ * [모달 껍데기] 전역 '정산 관리'(BillingPage) 등에서 팝업으로 띄울 때 쓰는 얇은 래퍼.
+ * 계약별 '정산 이력'(OrderBillingModal)은 이 래퍼 없이 `LedgerDetailContent`를 행 안에
+ * 직접 펼쳐 넣는다 — 팝업 위에 팝업이 뜨는 걸 피하기 위해.
+ */
+export default function LedgerDetailPanel({
+  ledgerId,
+  isAdmin,
+  onClose,
+  onChanged,
+}: {
+  ledgerId: number
+  isAdmin: boolean
+  onClose: () => void
+  onChanged: () => void
+}) {
+  const [title, setTitle] = useState('정산서')
+  return (
+    <Modal open onClose={onClose} title={title} widthClass="max-w-2xl">
+      <LedgerDetailContent
+        ledgerId={ledgerId}
+        isAdmin={isAdmin}
+        onChanged={onChanged}
+        onDeleted={onClose}
+        onLoaded={(l) => setTitle(`${l.customerName} 정산서`)}
+      />
     </Modal>
   )
 }
