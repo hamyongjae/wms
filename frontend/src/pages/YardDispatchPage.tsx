@@ -27,7 +27,6 @@ import MoneyInput from '@/components/ui/MoneyInput'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
-import { extractOwner } from '@/lib/owner'
 import { CreateOrderModal, OrderBillingModal, StatusChangeModal } from './OrdersPage' // [통합] 계약등록·정산·출고 공용 폼(컨테이너 관리 입고에서 창고·자리 고정)
 import EditOrderModal from '@/components/order/EditOrderModal' // [통합] 계약수정 공용 폼(계약관리와 완전히 동일한 화면)
 
@@ -560,7 +559,7 @@ export default function YardDispatchPage() {
                           setDragging({
                             containerId: s.containerId,
                             fromSlotId: s.id,
-                            label: extractOwner(s.containerId != null ? containersById.get(s.containerId)?.memo : null) ?? s.containerNo ?? '컨테이너',
+                            label: s.ownerName ?? s.containerNo ?? '컨테이너',
                           })
                         }
                       }}
@@ -735,7 +734,7 @@ export default function YardDispatchPage() {
                 setDragging({
                   containerId: s.containerId,
                   fromSlotId: s.id,
-                  label: extractOwner(containersById.get(s.containerId)?.memo) ?? s.containerNo ?? '컨테이너',
+                  label: s.ownerName ?? s.containerNo ?? '컨테이너',
                 })
               }
               setActionSlot(null)
@@ -831,7 +830,7 @@ function SlotCell({
   onDropCell: () => void
   onDragEndCell: () => void
 }) {
-  const owner = extractOwner(container?.memo)
+  const owner = slot.ownerName
   const inactive = !slot.occupied && effectiveInactive // 미사용(운영 중지) — 저장 전 대기 상태 포함
   const bulkLocked = bulkMode && slot.occupied // 편집 모드에선 사용 중인 자리는 절대 터치 불가
   const cellLabel = slot.occupied ? (owner ?? slot.containerNo ?? `${slot.tier}층`) : ''
@@ -949,7 +948,7 @@ function MobileSlotTile({
         bulkLocked
           ? `${slot.locationLabel} · 사용 중 — 편집 모드에서는 변경 불가`
           : slot.occupied
-            ? `${slot.locationLabel} · ${extractOwner(container?.memo) ?? '사용중'}`
+            ? `${slot.locationLabel} · ${slot.ownerName ?? '사용중'}`
             : bulkMode
               ? `${slot.locationLabel} · 눌러서 미사용 지정 ${inactive ? '해제' : '켜기'}`
               : inactive
@@ -979,7 +978,7 @@ function MobileSlotTile({
             {slot.columnNo}번
           </span>
           <span className="line-clamp-2 max-w-full break-words px-1.5 text-center text-xs font-extrabold leading-tight">
-            {extractOwner(container?.memo) ?? container?.containerNo ?? '—'}
+            {slot.ownerName ?? container?.containerNo ?? '—'}
           </span>
           {maint && !bulkLocked && (
             <span className="absolute inset-x-0 bottom-1 text-center text-[9px] font-bold leading-none opacity-80">점검</span>
@@ -1030,12 +1029,12 @@ function ActionPanel({
   const end = order?.actualEndDate ?? order?.expectedEndDate ?? container?.expectedOutboundDate
   const fee = order?.monthlyFee
   return (
-    <Modal open onClose={onClose} title={`${extractOwner(container?.memo) ?? '컨테이너'} · ${slot.locationLabel}`}>
+    <Modal open onClose={onClose} title={`${slot.ownerName ?? '컨테이너'} · ${slot.locationLabel}`}>
       <div className="space-y-3">
         <dl className="grid grid-cols-2 gap-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-sm">
           <div className="col-span-2">
             <dt className="text-xs text-slate-400">화주(고객)</dt>
-            <dd className="font-semibold text-slate-800">{extractOwner(container?.memo) ?? '—'}</dd>
+            <dd className="font-semibold text-slate-800">{slot.ownerName ?? '—'}</dd>
           </div>
           <Info label="보관기간">{start ? `${fmtDate(start)} ~ ${fmtDate(end)}` : '—'}</Info>
           <Info label="보관료">{fee != null ? `${fmt(fee)}원` : '—'}</Info>
