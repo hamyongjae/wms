@@ -71,6 +71,10 @@ public class BillingService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "존재하지 않는 계약입니다. id=" + req.getStorageOrderId()));
 
+        if (ledgerRepository.existsActiveLedgerOverlapping(order.getId(), req.getPeriodStart(), req.getPeriodEnd())) {
+            throw new IllegalArgumentException("이미 같은 기간에 정산서가 있습니다. 기간이 겹치지 않게 입력하세요.");
+        }
+
         BigDecimal baseAmount = resolveBaseAmount(req, order);
         BigDecimal carriedOverIn = MoneyPolicy.nvl(req.getCarriedOverIn());
 
@@ -334,6 +338,27 @@ public class BillingService {
     public BillingLedgerResponse changeDueDate(Long ledgerId, java.time.LocalDate newDueDate) {
         BillingLedger ledger = lockLedger(ledgerId);
         ledger.changeDueDate(newDueDate);
+        return new BillingLedgerResponse(ledger);
+    }
+
+    /**
+     * [정산 일정 수정] 이미 만든 회차의 청구기간·기본 청구액을 관리자가 직접 고친다.
+     * 자동 배치가 잘못 잡은 회차를 삭제 후 재생성 없이 그 자리에서 바로잡을 수 있게 한다.
+     * 다른 회차와 기간이 겹치면 막고(자기 자신은 제외), 기간이 늘어나면 계약 종료일도 함께
+     * 확장한다(createLedger와 동일 규칙 — 출고일 미정 계약은 그대로 미정 유지).
+     */
+    @Transactional
+    public BillingLedgerResponse editLedger(Long ledgerId, LedgerEditRequest req) {
+        BillingLedger ledger = lockLedger(ledgerId);
+        Long orderId = ledger.getStorageOrder().getId();
+
+        if (ledgerRepository.existsActiveLedgerOverlappingExcluding(
+                orderId, req.getPeriodStart(), req.getPeriodEnd(), ledgerId)) {
+            throw new IllegalArgumentException("이미 같은 기간에 정산서가 있습니다. 기간이 겹치지 않게 입력하세요.");
+        }
+
+        ledger.reviseSchedule(req.getPeriodStart(), req.getPeriodEnd(), req.getBaseAmount());
+        extendOrderPeriod(ledger.getStorageOrder(), ledger.getBillingPeriodEnd());
         return new BillingLedgerResponse(ledger);
     }
 

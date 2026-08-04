@@ -1,9 +1,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { isAxiosError } from 'axios'
-import { Loader2, BadgeCheck, HandCoins, SlidersHorizontal, CalendarClock, Undo2, Trash2 } from 'lucide-react'
+import { Loader2, BadgeCheck, HandCoins, SlidersHorizontal, CalendarClock, CalendarCog, Undo2, Trash2 } from 'lucide-react'
 import {
   billingApi,
-  type BillingStatus,
   type LedgerDetail,
   type PaymentMethod,
   type AdjustmentType,
@@ -11,6 +10,7 @@ import {
 import { cn } from '@/lib/cn'
 import { orderSync } from '@/lib/orderEvents'
 import { today, ymdKorean } from '@/lib/dates'
+import { displayStatus } from '@/lib/billing'
 import Modal from '@/components/ui/Modal'
 import { CalendarField } from '@/components/order/orderFormUi'
 
@@ -33,16 +33,6 @@ function errMsg(err: unknown, fallback: string): string {
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-
-/* [뮤티드 상태색] 채도를 눌러 익힌 톤 — 경고조차 품위 있게 */
-const STATUS_META: Record<BillingStatus, { label: string; cls: string }> = {
-  DRAFT: { label: '작성중', cls: 'bg-slate-100 text-slate-500 ring-slate-200' },
-  ISSUED: { label: '발행', cls: 'bg-[#E9EEF3] text-[#5A748F] ring-[#D4DDE7]' },
-  PARTIALLY_PAID: { label: '부분입금', cls: 'bg-[#EFEBE4] text-[#8A8172] ring-[#E2DCD1]' },
-  PAID: { label: '완납', cls: 'bg-[#E9EFEA] text-[#5C7C6B] ring-[#D3DFD6]' },
-  CARRIED_OVER: { label: '이월마감', cls: 'bg-violet-50 text-violet-700 ring-violet-200' },
-  CANCELED: { label: '취소', cls: 'bg-slate-100 text-slate-400 ring-slate-200' },
-}
 
 const METHOD_LABEL: Record<PaymentMethod, string> = {
   BANK_TRANSFER: '계좌이체',
@@ -72,7 +62,7 @@ export default function LedgerDetailPanel({
 }) {
   const [detail, setDetail] = useState<LedgerDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [mode, setMode] = useState<'pay' | 'adjust' | 'duedate' | null>(null)
+  const [mode, setMode] = useState<'pay' | 'adjust' | 'duedate' | 'schedule' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -108,6 +98,7 @@ export default function LedgerDetailPanel({
     canPay,
     canAdjust && isAdmin,
     canAdjust && isAdmin, // 납기일 변경 — 조정과 같은 조건으로 함께 뜬다
+    canAdjust && isAdmin, // 일정 수정 — 조정과 같은 조건으로 함께 뜬다
     canRefund && isAdmin,
     canDelete,
   ].filter(Boolean).length
@@ -150,10 +141,10 @@ export default function LedgerDetailPanel({
                 <span
                   className={cn(
                     'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1',
-                    STATUS_META[l.status].cls,
+                    displayStatus(l).cls,
                   )}
                 >
-                  {STATUS_META[l.status].label}
+                  {displayStatus(l).label}
                 </span>
                 {l.refundCompleted ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-[#E9EFEA] px-2 py-0.5 text-xs font-medium text-[#5C7C6B] ring-1 ring-[#D3DFD6]">
@@ -231,6 +222,15 @@ export default function LedgerDetailPanel({
                 납기일 변경
               </ActionBtn>
             )}
+            {canAdjust && isAdmin && (
+              <ActionBtn
+                onClick={() => setMode(mode === 'schedule' ? null : 'schedule')}
+                icon={<CalendarCog size={15} />}
+                tone="amber"
+              >
+                일정 수정
+              </ActionBtn>
+            )}
             {canRefund && isAdmin && (
               <ActionBtn onClick={handleCompleteRefund} icon={<BadgeCheck size={15} />} tone="emerald">
                 환불 완료
@@ -251,6 +251,16 @@ export default function LedgerDetailPanel({
           {mode === 'adjust' && <AdjustmentForm ledgerId={ledgerId} onDone={afterAction} onError={setActionError} />}
           {mode === 'duedate' && (
             <DueDateForm ledgerId={ledgerId} currentDueDate={l.dueDate} onDone={afterAction} onError={setActionError} />
+          )}
+          {mode === 'schedule' && (
+            <ScheduleEditForm
+              ledgerId={ledgerId}
+              currentPeriodStart={l.periodStart}
+              currentPeriodEnd={l.periodEnd}
+              currentBaseAmount={l.baseAmount}
+              onDone={afterAction}
+              onError={setActionError}
+            />
           )}
 
           {/* 입금 이력 */}
@@ -521,6 +531,67 @@ function DueDateForm({
         <CalendarField value={dueDate} onChange={setDueDate} format={ymdKorean} className={inputCls} />
       </Labeled>
       <SubmitRow submitting={submitting} label="납기일 저장" />
+    </form>
+  )
+}
+
+/* ===== 일정 수정 폼 ===== */
+function ScheduleEditForm({
+  ledgerId,
+  currentPeriodStart,
+  currentPeriodEnd,
+  currentBaseAmount,
+  onDone,
+  onError,
+}: {
+  ledgerId: number
+  currentPeriodStart: string
+  currentPeriodEnd: string
+  currentBaseAmount: number
+  onDone: () => void
+  onError: (m: string) => void
+}) {
+  const [periodStart, setPeriodStart] = useState(currentPeriodStart)
+  const [periodEnd, setPeriodEnd] = useState(currentPeriodEnd)
+  const [baseAmount, setBaseAmount] = useState(String(Math.round(currentBaseAmount)))
+  const [submitting, setSubmitting] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    try {
+      await billingApi.editLedger(ledgerId, { periodStart, periodEnd, baseAmount: Number(baseAmount) })
+      onDone()
+    } catch (err) {
+      onError(errMsg(err, '일정 수정에 실패했습니다.'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4">
+      <p className="text-sm font-semibold text-amber-800">일정 수정</p>
+      <div className="grid grid-cols-2 gap-3">
+        <Labeled label="청구 시작일">
+          <CalendarField value={periodStart} onChange={setPeriodStart} format={ymdKorean} className={inputCls} />
+        </Labeled>
+        <Labeled label="청구 종료일">
+          <CalendarField value={periodEnd} onChange={setPeriodEnd} format={ymdKorean} className={inputCls} />
+        </Labeled>
+      </div>
+      <Labeled label="청구액(원)">
+        <input
+          type="number"
+          min={0}
+          value={baseAmount}
+          onChange={(e) => setBaseAmount(e.target.value)}
+          required
+          className={inputCls}
+        />
+      </Labeled>
+      <p className="text-xs text-amber-700">다른 회차와 기간이 겹치면 저장할 수 없습니다.</p>
+      <SubmitRow submitting={submitting} label="일정 저장" />
     </form>
   )
 }

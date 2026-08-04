@@ -64,6 +64,25 @@ public interface BillingLedgerRepository extends JpaRepository<BillingLedger, Lo
                                           @Param("from") LocalDate from,
                                           @Param("to") LocalDate to);
 
+    /**
+     * [일정 수정 시 겹침 검증] existsActiveLedgerOverlapping과 동일하지만, 지금 수정 중인
+     * 원장 자기 자신은 겹침 대상에서 제외한다 — 아니면 기간을 그대로 저장만 해도 "자기 자신과
+     * 겹친다"고 항상 막혀버린다.
+     */
+    @Query("""
+            select case when count(l) > 0 then true else false end
+            from BillingLedger l
+            where l.storageOrder.id = :orderId
+              and l.id <> :excludeLedgerId
+              and l.status <> com.example.wms.billing.entity.BillingStatus.CANCELED
+              and l.billingPeriodStart <= :to
+              and l.billingPeriodEnd >= :from
+            """)
+    boolean existsActiveLedgerOverlappingExcluding(@Param("orderId") Long orderId,
+                                                    @Param("from") LocalDate from,
+                                                    @Param("to") LocalDate to,
+                                                    @Param("excludeLedgerId") Long excludeLedgerId);
+
     // [계약 삭제] 특정 계약에 연결된 모든 청구 원장 조회 (cascade 삭제용)
     List<BillingLedger> findByStorageOrderId(Long storageOrderId);
 

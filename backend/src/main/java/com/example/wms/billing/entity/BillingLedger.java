@@ -245,6 +245,28 @@ public class BillingLedger {
         recompute();
     }
 
+    /**
+     * [수동 일정 수정] 관리자가 이 원장의 청구기간·기본 청구액을 직접 고친다.
+     * 중도출고 재산정(reviseForMidRelease)과 달리 원복용 스냅샷을 남기지 않는 단순 정정 — 자동
+     * 배치가 아니라 사람이 화면에서 "이 회차는 이 기간·이 금액이 맞다"고 확정하는 행위이기 때문.
+     */
+    public void reviseSchedule(LocalDate periodStart, LocalDate periodEnd, BigDecimal baseAmount) {
+        requireActive();
+        if (periodStart == null || periodEnd == null) {
+            throw new IllegalArgumentException("청구 기간 시작일·종료일은 필수입니다.");
+        }
+        if (periodEnd.isBefore(periodStart)) {
+            throw new IllegalArgumentException("종료일이 시작일보다 앞설 수 없습니다.");
+        }
+        if (baseAmount == null || baseAmount.signum() < 0) {
+            throw new IllegalArgumentException("청구액은 0 이상이어야 합니다.");
+        }
+        this.billingPeriodStart = periodStart;
+        this.billingPeriodEnd = periodEnd;
+        this.baseAmount = MoneyPolicy.normalize(baseAmount);
+        recompute();
+    }
+
     /** 납기일 변경 (계약 수정에서 청구 조건 재정렬 시) */
     public void changeDueDate(LocalDate dueDate) {
         requireActive();

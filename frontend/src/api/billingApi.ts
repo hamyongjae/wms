@@ -105,6 +105,12 @@ export interface LedgerCreateRequest {
   dueDate?: string
 }
 
+export interface LedgerEditRequest {
+  periodStart: string
+  periodEnd: string
+  baseAmount: number
+}
+
 export const billingApi = {
   // [기간 조회] from·to(yyyy-MM-dd) 지정 시 청구 기간이 겹치는 원장만 서버에서 필터링
   async list(range?: { from?: string; to?: string }): Promise<BillingLedger[]> {
@@ -160,6 +166,11 @@ export const billingApi = {
   },
   async applyAdjustment(id: number, body: AdjustmentRequest): Promise<BillingLedger> {
     const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/${id}/adjustments`, body)
+    return data
+  },
+  // [일정 수정] 이미 만든 회차의 청구기간·기본 청구액을 직접 정정 — 다른 회차와 겹치면 서버가 막는다
+  async editLedger(id: number, body: LedgerEditRequest): Promise<BillingLedger> {
+    const { data } = await api.put<BillingLedger>(`/api/billing/ledgers/${id}`, body)
     return data
   },
   // 미납(연체) 촉구 일괄 발송 → 결과 메시지 문자열
