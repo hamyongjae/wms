@@ -384,17 +384,29 @@ public class BillingService {
         if (ledger.getStatus() == BillingStatus.CARRIED_OVER) {
             throw new IllegalStateException("이미 다음 원장으로 이월된 원장은 삭제할 수 없습니다.");
         }
-        // [정산 스케줄 공백 방지] 앞뒤에 다른 활성 회차가 둘 다 있는(=중간에 낀) 회차를 지우면
-        // 그 사이에 정산 공백이 생긴다 — 맨 처음·맨 마지막 회차만 삭제를 허용한다.
-        List<BillingLedger> others = ledgerRepository.findByStorageOrderId(ledger.getStorageOrder().getId()).stream()
+        // [정산 스케줄 공백 메우기] 앞뒤에 다른 활성 회차가 둘 다 있는(=중간에 낀) 회차를 지우면
+        // 그 사이에 정산 공백이 생긴다 — 막는 대신, 바로 앞 회차의 종료일을 바로 다음 회차의
+        // 시작일 전날까지 늘려 자동으로 이어붙인다(금액은 손대지 않고 기간만 확장).
+        // 맨 처음·맨 마지막 회차를 지울 때는(앞 또는 뒤가 없음) 채울 공백이 없으니 그대로 삭제.
+        Long orderId = ledger.getStorageOrder().getId();
+        List<BillingLedger> others = ledgerRepository.findByStorageOrderId(orderId).stream()
                 .filter(l -> l.getStatus() != BillingStatus.CANCELED)
                 .filter(l -> !l.getId().equals(ledger.getId()))
                 .toList();
-        boolean hasPrev = others.stream().anyMatch(l -> l.getBillingPeriodEnd().isBefore(ledger.getBillingPeriodStart()));
-        boolean hasNext = others.stream().anyMatch(l -> l.getBillingPeriodStart().isAfter(ledger.getBillingPeriodEnd()));
-        if (hasPrev && hasNext) {
-            throw new IllegalStateException(
-                    "이 회차를 삭제하면 앞뒤 회차 사이에 정산 공백이 생깁니다. 맨 처음이나 맨 마지막 회차만 삭제할 수 있습니다.");
+        BillingLedger prev = others.stream()
+                .filter(l -> l.getBillingPeriodEnd().isBefore(ledger.getBillingPeriodStart()))
+                .max(java.util.Comparator.comparing(BillingLedger::getBillingPeriodEnd))
+                .orElse(null);
+        BillingLedger next = others.stream()
+                .filter(l -> l.getBillingPeriodStart().isAfter(ledger.getBillingPeriodEnd()))
+                .min(java.util.Comparator.comparing(BillingLedger::getBillingPeriodStart))
+                .orElse(null);
+        if (prev != null && next != null) {
+            BillingLedger prevLocked = lockLedger(prev.getId());
+            prevLocked.reviseSchedule(
+                    prevLocked.getBillingPeriodStart(),
+                    next.getBillingPeriodStart().minusDays(1),
+                    prevLocked.getBaseAmount());
         }
         paymentHistoryRepository.deleteByBillingLedgerId(ledger.getId());
         adjustmentRepository.deleteByBillingLedgerId(ledger.getId());

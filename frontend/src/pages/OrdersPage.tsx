@@ -825,6 +825,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                   index={i}
                   isAdmin={isAdmin}
                   expanded={expandedLedgerId === l.id}
+                  isMiddle={i > 0 && i < ledgers.length - 1}
                   onToggle={() => setExpandedLedgerId((cur) => (cur === l.id ? null : l.id))}
                   onCollapse={() => setExpandedLedgerId(null)}
                   onChanged={() => load(target.id)}
@@ -848,6 +849,7 @@ function LedgerHistoryRow({
   index,
   isAdmin,
   expanded,
+  isMiddle,
   onToggle,
   onCollapse,
   onChanged,
@@ -856,19 +858,24 @@ function LedgerHistoryRow({
   index: number
   isAdmin: boolean
   expanded: boolean
+  /** 이 회차 앞뒤로 다른 활성 회차가 둘 다 있는지 — 삭제 시 서버가 앞 회차를 자동으로 늘려 이어붙인다 */
+  isMiddle: boolean
   onToggle: () => void
   onCollapse: () => void
   onChanged: () => void
 }) {
   const ds = displayStatus(l)
-  // [삭제 가능 조건] 서버(deleteLedger)와 동일 — 입금·조정 흔적이 없고, 이월되지 않았고,
-  //   양옆에 다른 회차가 둘 다 있어 지우면 공백이 생기는 '중간' 회차가 아니어야 한다(서버가 최종 검증).
   const canDelete = isAdmin && l.paidTotal === 0 && l.adjustmentTotal === 0 && l.status !== 'CARRIED_OVER'
   const canEdit = isAdmin && l.status !== 'CARRIED_OVER' && l.status !== 'CANCELED'
 
   async function handleDelete(e: MouseEvent) {
     e.stopPropagation()
-    if (!window.confirm('이 정산 기록을 삭제하시겠습니까?\n삭제하면 되돌릴 수 없습니다.')) return
+    // [삭제 시 공백 메우기 안내] 앞뒤에 다른 회차가 둘 다 있는 '중간' 회차는, 지우면 서버가
+    // 바로 앞 회차의 종료일을 이 회차 자리까지 자동으로 늘려 빈 날짜 없이 이어붙인다 — 미리 안내.
+    const msg = isMiddle
+      ? '이 정산 기록을 삭제하시겠습니까?\n삭제하면 되돌릴 수 없고, 앞 회차의 종료일이 이 회차 자리까지 자동으로 늘어나 이어붙습니다.'
+      : '이 정산 기록을 삭제하시겠습니까?\n삭제하면 되돌릴 수 없습니다.'
+    if (!window.confirm(msg)) return
     try {
       await billingApi.remove(l.id)
       onChanged()
