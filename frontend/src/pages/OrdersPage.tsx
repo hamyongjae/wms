@@ -883,9 +883,12 @@ function LedgerHistoryRow({
   const canDelete = isAdmin && l.paidTotal === 0 && l.adjustmentTotal === 0 && l.status !== 'CARRIED_OVER'
   const canEdit = isAdmin && l.status !== 'CARRIED_OVER' && l.status !== 'CANCELED'
   const totalDue = l.baseAmount + l.carriedOverIn + l.adjustmentTotal
-  // [과거 이력 묶음] 과거부터 보관 중이던 계약을 등록할 때 생기는 소급분 0원 회차 —
-  //   실제 청구서와 헷갈리지 않도록 옅게 표시하고 안내 문구를 붙인다.
   const isNoCharge = totalDue === 0
+  // [과거 이력 묶음] 처음부터 청구액 0원으로 만들어진 소급분(과거부터 보관 중이던 계약을
+  //   등록할 때 생김)과, 실제 청구했다가 나중에 전액 조정(할인)으로 0원이 된 회차는 다르다
+  //   — 후자는 조정 이력이 남아있어 삭제도 막힌다(실제 돈 관련 이력 보호). 라벨을 구분해서
+  //   "청구가 원래 없었다"고 오해하지 않게 한다.
+  const isOriginallyZero = l.baseAmount === 0 && l.carriedOverIn === 0
   const hasBalance = l.balance > 0
 
   async function handleDelete(e: MouseEvent) {
@@ -928,7 +931,9 @@ function LedgerHistoryRow({
           </span>
           <span className="ml-auto flex items-center gap-1.5 text-sm">
             {isNoCharge ? (
-              <span className="text-xs text-slate-400">실사용 이전 이력 · 청구 없음</span>
+              <span className="text-xs text-slate-400">
+                {isOriginallyZero ? '실사용 이전 이력 · 청구 없음' : '전액 조정 · 청구 없음'}
+              </span>
             ) : (
               <span className={cn('font-semibold', hasBalance ? 'text-[#A65B44]' : 'text-slate-400')}>
                 {won(l.paidTotal)}
