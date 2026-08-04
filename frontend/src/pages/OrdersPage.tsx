@@ -797,7 +797,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                     className={gridInputCls}
                   />
                 </GridField>
-                <GridField label="청구 금액">
+                <GridField label="정산금액">
                   <MoneyInput value={genAmount} onChange={setGenAmount} required className={cn(gridInputCls, 'pr-8')} />
                 </GridField>
                 <GridField label="납기일">
@@ -942,8 +942,11 @@ function LedgerHistoryRow({
               </span>
             ) : (
               <span className={cn('font-semibold', hasBalance ? 'text-[#A65B44]' : 'text-slate-400')}>
+                <span className="mr-1 text-xs font-normal text-slate-400">실제입금액</span>
                 {won(l.paidTotal)}
-                <span className={hasBalance ? 'text-[#C99C8F]' : 'text-slate-300'}> / </span>
+                <span className={cn('mx-1.5 text-xs font-normal', hasBalance ? 'text-[#C99C8F]' : 'text-slate-300')}>
+                  정산금액
+                </span>
                 {won(totalDue)}
               </span>
             )}
@@ -1028,7 +1031,7 @@ function ScheduleEditForm({
         <GridField label="정산 종료일">
           <CalendarField value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} className={gridInputCls} />
         </GridField>
-        <GridField label="청구 금액">
+        <GridField label="정산금액">
           <MoneyInput value={baseAmount} onChange={setBaseAmount} required className={cn(gridInputCls, 'pr-8')} />
         </GridField>
       </FieldGrid>
