@@ -55,7 +55,10 @@ public class OrderPeriodSyncRunner implements ApplicationRunner {
             LocalDate maxEnd = e.getValue();
             if (order.isOutbound()) continue; // 출고 완료 계약은 확정
             LocalDate current = order.getExpectedEndDate();
-            if (current == null || maxEnd.isAfter(current)) {
+            // [출고일 미정 보존] 종료일이 없는(1층처럼 계속 쓰는) 계약은 서버 재기동마다 도는 이
+            // 정합화가 건드리면 안 된다 — BillingLedgerIssuer/BillingService의 동일 규칙과 통일.
+            if (current == null) continue;
+            if (maxEnd.isAfter(current)) {
                 order.setExpectedEndDate(maxEnd);  // dirty checking 으로 반영
                 updated++;
             }
