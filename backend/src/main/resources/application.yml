@@ -71,6 +71,15 @@ jwt:
   # 짧게(예: 3600000=1시간) 주고 리프레시 토큰을 도입하는 것을 권장.
   access-token-validity-ms: ${JWT_ACCESS_TOKEN_VALIDITY_MS:43200000}
 
+# ===== 웹 푸시(VAPID) 설정 =====
+push:
+  vapid:
+    # 운영에서는 VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY 환경변수로 실제 키를 주입한다.
+    # 아래 기본값은 개발용으로 한 번 생성해둔 키 — 운영에 그대로 쓰지 않는다(유출 취급).
+    subject: ${VAPID_SUBJECT:mailto:admin@smartwarehouse.duckdns.org}
+    public-key: ${VAPID_PUBLIC_KEY:BLEcCNMFheU8889PpiYzfS96fEX3NLPHHy-pGz-OrBQb3knRq1z_rNfW7wi791y8y7xGdZigjwd1s6ZxKZEqvU8}
+    private-key: ${VAPID_PRIVATE_KEY:YRsE64dXmqTGw9-3_hJnaV_tfK-Pk6e_CFdIOP-FHNg}
+
 # ===== 데이터 정합화(마이그레이션) =====
 wms:
   migration:

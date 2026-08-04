@@ -47,6 +47,10 @@ dependencies {
     // 메일 발송 (SMTP) — 비밀번호 재설정 링크 실제 전송
     implementation 'org.springframework.boot:spring-boot-starter-mail'
 
+    // 웹 푸시 — VAPID 서명 + payload 암호화(aes128gcm)까지 처리해주는 표준 라이브러리.
+    // 직접 구현하면 암호화 버그 위험이 커서, 검증된 라이브러리를 쓴다.
+    implementation 'nl.martijndwars:web-push:5.1.1'
+
     // API 문서 자동 생성 (Swagger UI) — 버전은 최신으로 확인 권장
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'
 

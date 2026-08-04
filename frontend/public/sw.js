@@ -52,3 +52,38 @@ self.addEventListener('fetch', (event) => {
     }),
   )
 })
+
+/*
+ * [긴급 알림 웹 푸시] 서버(WebPushService)가 보낸 payload는
+ * { title, body, url } 형태의 JSON. 앱이 꺼져있어도 이 리스너가 동작해 알림을 띄운다.
+ */
+self.addEventListener('push', (event) => {
+  let data = {}
+  try {
+    data = event.data ? event.data.json() : {}
+  } catch {
+    data = {}
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || '알림', {
+      body: data.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { url: data.url || '/' },
+    }),
+  )
+})
+
+/* 알림 탭 → 이미 열려있는 탭이 있으면 포커스, 없으면 새 탭으로 해당 경로를 연다 */
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = event.notification.data && event.notification.data.url ? event.notification.data.url : '/'
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ('focus' in client) return client.focus().then(() => client.navigate ? client.navigate(url) : undefined)
+      }
+      return self.clients.openWindow(url)
+    }),
+  )
+})

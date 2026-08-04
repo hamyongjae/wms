@@ -3,6 +3,7 @@ import { Palette, Check, RotateCcw } from 'lucide-react'
 import { THEMES, getTheme, applyTheme, previewTheme, DEFAULT_THEME, type ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/cn'
 import ScheduleColorSettings from '@/components/settings/ScheduleColorSettings'
+import PushNotificationSettings from '@/components/settings/PushNotificationSettings'
 import Modal from '@/components/ui/Modal'
 
 export default function SettingsPage() {
@@ -10,12 +11,14 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h2 className="text-xl font-bold text-slate-800">설정</h2>
-        <p className="mt-1 text-sm text-slate-500">테마 색상·달력 상태 색상을 관리합니다.</p>
+        <p className="mt-1 text-sm text-slate-500">테마 색상·달력 상태 색상·알림을 관리합니다.</p>
       </div>
 
       <ThemeSection />
 
       <ScheduleColorSettings />
+
+      <PushNotificationSettings />
     </div>
   )
 }
