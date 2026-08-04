@@ -914,24 +914,28 @@ function LedgerHistoryRow({
     <li>
       <div
         className={cn(
-          'flex w-full flex-wrap items-center gap-1.5 rounded-xl border-l-4 bg-white p-3.5 ring-1 ring-slate-200/70 transition hover:bg-slate-50',
+          'flex w-full items-center gap-1.5 rounded-xl border-l-4 bg-white p-3.5 ring-1 ring-slate-200/70 transition hover:bg-slate-50',
           ds.accent,
           isNoCharge && 'bg-slate-50/60 opacity-70',
         )}
       >
+        {/* [행 높이 통일] 회차·상태 / 날짜 / 금액을 항상 3줄 고정 구조로 쌓는다 — 아이콘 유무에
+            따라 줄바꿈이 달라지면 카드 높이가 들쭉날쭉해지고 오른쪽 아이콘 위치도 어긋난다. */}
         <button
           type="button"
           onClick={canEdit ? onToggle : undefined}
-          className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-left"
+          className="flex min-w-0 flex-1 flex-col gap-1 text-left"
         >
-          <span className="text-xs font-semibold text-slate-400">{index + 1}회차</span>
+          <span className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-400">{index + 1}회차</span>
+            <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>
+              {ds.label}
+            </span>
+          </span>
           <span className="text-sm font-medium text-slate-700">
             <DateRangeLabel start={l.periodStart} end={l.periodEnd} format={ymdKorean} />
           </span>
-          <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>
-            {ds.label}
-          </span>
-          <span className="ml-auto flex items-center gap-1.5 text-sm">
+          <span className="text-sm">
             {isNoCharge ? (
               <span className="text-xs text-slate-400">
                 {isOriginallyZero ? '실사용 이전 이력 · 청구 없음' : '전액 조정 · 청구 없음'}
@@ -945,19 +949,23 @@ function LedgerHistoryRow({
             )}
           </span>
         </button>
-        {canEdit && (
-          <ChevronRight size={16} className={cn('shrink-0 text-slate-300 transition-transform', expanded && 'rotate-90')} />
-        )}
-        {canDelete && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-            title="삭제"
-          >
-            <Trash2 size={15} />
-          </button>
-        )}
+        {/* [아이콘 정렬] 펼침·삭제 버튼을 한 묶음으로 오른쪽에 고정 — 행 높이가 일정해졌으니
+            항상 같은 위치에 나란히 정렬된다. */}
+        <div className="flex shrink-0 items-center gap-0.5">
+          {canEdit && (
+            <ChevronRight size={16} className={cn('text-slate-300 transition-transform', expanded && 'rotate-90')} />
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+              title="삭제"
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
       </div>
       {l.carriedOverIn > 0 && (
         <p className="mt-1 pl-1 text-[11px] text-slate-400">전 회차 이월 미수 {won(l.carriedOverIn)} 포함</p>
