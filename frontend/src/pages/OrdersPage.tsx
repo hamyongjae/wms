@@ -599,17 +599,18 @@ export default function OrdersPage() {
                   </div>
                 </div>
 
-                {/* 액션 — 주 액션(출고 처리/정산 보기)도 같은 격자·같은 크기로 통일 */}
+                {/* 액션 — 주 액션(출고 처리/출고취소)이 항상 첫 자리·같은 색(amber)이고
+                    정산이 항상 둘째 자리·같은 색(default)이도록 데스크톱 RowAction과 통일 */}
                 <div className={cn('mt-1.5 grid gap-1.5', isAdmin ? 'grid-cols-4' : 'grid-cols-3')}>
                   {o.status === 'INBOUND' ? (
                     <MobileBtn label="출고 처리" tone="amber" onClick={() => setStatusTarget(o)} />
                   ) : (
-                    <MobileBtn label="정산 보기" tone="indigo" onClick={() => setBillingTarget(o)} />
+                    <MobileBtn label="출고취소" tone="amber" onClick={() => handleCancelRelease(o)} />
                   )}
                   {o.status === 'INBOUND' ? (
                     <MobileBtn label="정산" onClick={() => setBillingTarget(o)} />
                   ) : (
-                    <MobileBtn label="출고취소" onClick={() => handleCancelRelease(o)} />
+                    <MobileBtn label="정산 보기" onClick={() => setBillingTarget(o)} />
                   )}
                   <MobileBtn label="수정" onClick={() => setEditTarget(o)} />
                   {isAdmin && <MobileBtn label="삭제" tone="danger" onClick={() => handleDelete(o)} />}
