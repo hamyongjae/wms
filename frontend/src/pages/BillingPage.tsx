@@ -5,8 +5,6 @@ import {
   Loader2,
   Wallet,
   Coins,
-  AlertTriangle,
-  FileText,
   X,
   BadgeCheck,
   HandCoins,
@@ -243,7 +241,7 @@ export default function BillingPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-3 md:space-y-6">
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-xl font-bold text-slate-800">정산 관리</h2>
+        <h2 className="text-xl font-bold text-slate-800">매출 관리</h2>
       </div>
 
       {notice && (
@@ -297,12 +295,10 @@ export default function BillingPage() {
           sub={deltaPct != null ? `${deltaLabel} ${delta >= 0 ? '▲' : '▼'} ${deltaPct >= 0 ? '+' : ''}${deltaPct}%` : undefined}
           subClassName={delta >= 0 ? 'text-emerald-600' : 'text-red-500'}
         />
-        <BillStat label="정산 건수" value={`${kpi.count}건`} tone="slate" />
         <BillStat label="미수금 총액" value={won(kpi.outstanding)} tone="amber" alert={kpi.outstanding > 0} />
-        <BillStat label="연체 건수" value={`${kpi.overdueCount}건`} tone="red" alert={kpi.overdueCount > 0} />
       </div>
       {/* 데스크톱: StatCard */}
-      <div className="hidden gap-4 md:grid md:grid-cols-4">
+      <div className="hidden gap-4 md:grid md:grid-cols-2">
         <StatCard
           label="기간 입금액"
           value={won(kpi.collected)}
@@ -311,7 +307,6 @@ export default function BillingPage() {
           icon={Coins}
           tone="emerald"
         />
-        <StatCard label="정산 건수" value={`${kpi.count}건`} icon={FileText} tone="slate" />
         <StatCard
           label="미수금 총액"
           value={won(kpi.outstanding)}
@@ -319,7 +314,6 @@ export default function BillingPage() {
           icon={Wallet}
           tone="amber"
         />
-        <StatCard label="연체 건수" value={`${kpi.overdueCount}건`} icon={AlertTriangle} tone="indigo" />
       </div>
 
       {/* [구 매출관리 통합] 고객별 입금 비중 랭킹 — 기본 접힘(부가 정보라 목록까지 스크롤이
