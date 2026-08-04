@@ -88,6 +88,12 @@ function monthBounds(year: number, month1: number): { from: string; to: string }
   return { from: `${year}-${pad2(month1)}-01`, to: `${year}-${pad2(month1)}-${pad2(last)}` }
 }
 
+/** [연체 딥링크용 '전체' 대체] 날짜 입력칸이 비어 보이지 않도록, 충분히 넓은 실제 기간을 준다. */
+function wideRange(): { from: string; to: string } {
+  const y = new Date().getFullYear()
+  return { from: `${y - 10}-01-01`, to: `${y + 1}-12-31` }
+}
+
 export default function BillingPage() {
   const isAdmin = authStorage.getUser()?.role === 'ADMIN'
 
@@ -121,12 +127,14 @@ export default function BillingPage() {
   }, [searchParams, setSearchParams])
 
   // [딥링크] 대시보드 연체 알림에서 /billing?filter=OVERDUE 로 들어오면 연체 칩을 바로 켠다.
-  //   기간이 이번 달로 좁혀져 있으면 지난달 이전에 밀린 연체 건이 안 보이므로 기간도 '전체'로 넓힌다.
+  //   기간이 이번 달로 좁혀져 있으면 지난달 이전에 밀린 연체 건이 안 보이므로 기간도 넓힌다.
+  //   빈 문자열('전체')로 두면 날짜 입력칸이 비어 보이고 고객별 입금 비중 계산도 깨지므로
+  //   (조회기간이 없으면 일할 계산 기준점이 없어 0건으로 나옴) 충분히 넓은 실제 날짜로 대신한다.
   useEffect(() => {
     const f = searchParams.get('filter')
     if (f === 'OVERDUE') {
       setStatusFilter('OVERDUE')
-      setRange({ from: '', to: '' })
+      setRange(wideRange())
       setSearchParams({}, { replace: true })
     }
   }, [searchParams, setSearchParams])
