@@ -15,12 +15,15 @@ export default function StatCard({
   label,
   value,
   sub,
+  subClassName,
   icon: Icon,
   tone = 'slate',
 }: {
   label: string
   value: string
   sub?: string
+  /** sub 줄 색상을 기본(text-slate-400) 대신 지정하고 싶을 때(예: 증감 방향 강조) */
+  subClassName?: string
   icon: LucideIcon
   tone?: Tone
 }) {
@@ -33,7 +36,7 @@ export default function StatCard({
         </div>
       </div>
       <p className="mt-3 text-2xl font-bold tracking-tight text-slate-800">{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
+      {sub && <p className={cn('mt-0.5 text-xs', subClassName ?? 'text-slate-400')}>{sub}</p>}
     </div>
   )
 }

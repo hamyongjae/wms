@@ -6,7 +6,6 @@ import DashboardPage from '@/pages/DashboardPage'
 import YardDispatchPage from '@/pages/YardDispatchPage'
 import WarehousesPage from '@/pages/WarehousesPage'
 import BillingPage from '@/pages/BillingPage'
-import RevenuePage from '@/pages/RevenuePage'
 import ScheduleCalendarPage from '@/pages/ScheduleCalendarPage'
 import OrdersPage from '@/pages/OrdersPage'
 import CustomersPage from '@/pages/CustomersPage'
@@ -33,7 +32,6 @@ function App() {
           <Route path="/warehouses" element={<WarehousesPage />} />
           <Route path="/yard" element={<YardDispatchPage />} />
           <Route path="/billing" element={<BillingPage />} />
-          <Route path="/revenue" element={<RevenuePage />} />
           <Route path="/staff" element={<StaffPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/company-info" element={<CompanyInfoPage />} />
