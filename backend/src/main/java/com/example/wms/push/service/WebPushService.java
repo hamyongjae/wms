@@ -10,10 +10,12 @@ import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
 import nl.martijndwars.webpush.Subscription;
 import org.apache.http.HttpResponse;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.security.GeneralSecurityException;
+import java.security.Security;
 import java.util.List;
 import java.util.Map;
 
@@ -45,6 +47,10 @@ public class WebPushService {
 
     @PostConstruct
     void init() throws GeneralSecurityException {
+        // web-push 라이브러리가 EC 키 처리에 BouncyCastle 프로바이더가 등록돼 있길 기대한다.
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+            Security.addProvider(new BouncyCastleProvider());
+        }
         this.pushService = new PushService(vapidPublicKey, vapidPrivateKey, vapidSubject);
     }
 
