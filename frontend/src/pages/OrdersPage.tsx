@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Search, ChevronRight } from 'lucide-react'
+import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Search, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger } from '@/api/billingApi'
@@ -815,38 +815,20 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
             </p>
           )}
 
-          {/* 회차를 탭하면 정산 화면과 같은 공용 상세 팝업이 열린다(발행·수금·조정·이월·환불·삭제 통합) */}
+          {/* 회차를 탭하면 입금·조정·환불 등 세부 처리를 위한 공용 상세 팝업이 열린다.
+              단, 이 화면에서 자주 하는 "일정 수정"·"삭제"는 상세 팝업으로 안 넘어가고 행에서 바로 처리한다. */}
           {!loading && ledgers.length > 0 && (
             <ol className="space-y-2">
-              {ledgers.map((l, i) => {
-                const ds = displayStatus(l)
-                return (
-                  <li key={l.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedLedgerId(l.id)}
-                      className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-white p-3.5 text-left ring-1 ring-slate-200/70 transition hover:bg-slate-50"
-                    >
-                      <span className="text-xs font-semibold text-slate-400">{i + 1}회차</span>
-                      <span className="text-sm font-medium text-slate-700">
-                        {l.periodStart} ~ {l.periodEnd}
-                      </span>
-                      <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>
-                        {ds.label}
-                      </span>
-                      <span className="ml-auto flex items-center gap-1.5 text-sm text-slate-500">
-                        <span className="font-semibold text-slate-800">{won(l.paidTotal)}</span>
-                        <span className="text-slate-300"> / </span>
-                        {won(l.baseAmount + l.carriedOverIn + l.adjustmentTotal)}
-                        <ChevronRight size={16} className="text-slate-300" />
-                      </span>
-                    </button>
-                    {l.carriedOverIn > 0 && (
-                      <p className="mt-1 pl-1 text-[11px] text-slate-400">전 회차 이월 미수 {won(l.carriedOverIn)} 포함</p>
-                    )}
-                  </li>
-                )
-              })}
+              {ledgers.map((l, i) => (
+                <LedgerHistoryRow
+                  key={l.id}
+                  ledger={l}
+                  index={i}
+                  isAdmin={isAdmin}
+                  onOpenDetail={() => setSelectedLedgerId(l.id)}
+                  onChanged={() => load(target.id)}
+                />
+              ))}
             </ol>
           )}
         </div>
@@ -861,6 +843,181 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
         />
       )}
     </>
+  )
+}
+
+/**
+ * [정산 이력 행] 회차 하나. 탭하면 상세 팝업(입금·조정·환불)이 열리지만,
+ * "일정 수정"·"삭제"는 상세 팝업으로 넘어가지 않고 이 행에서 바로 처리한다 —
+ * 사용자가 정산 스케줄을 직접 고칠 때 화면을 오가지 않도록.
+ */
+function LedgerHistoryRow({
+  ledger: l,
+  index,
+  isAdmin,
+  onOpenDetail,
+  onChanged,
+}: {
+  ledger: BillingLedger
+  index: number
+  isAdmin: boolean
+  onOpenDetail: () => void
+  onChanged: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const ds = displayStatus(l)
+  // [삭제 가능 조건] LedgerDetailPanel의 canDelete와 동일 — 실제 돈이 오간 원장은 삭제 불가
+  const canDelete = isAdmin && l.paidTotal === 0 && l.adjustmentTotal === 0 && l.status !== 'CARRIED_OVER'
+  const canEdit = isAdmin && l.status !== 'CARRIED_OVER' && l.status !== 'CANCELED'
+
+  async function handleDelete(e: MouseEvent) {
+    e.stopPropagation()
+    if (!window.confirm('이 정산 기록을 삭제하시겠습니까?\n삭제하면 되돌릴 수 없습니다.')) return
+    try {
+      await billingApi.remove(l.id)
+      onChanged()
+      orderSync.emit()
+    } catch (err) {
+      window.alert(errMsg(err, '삭제에 실패했습니다.'))
+    }
+  }
+
+  return (
+    <li>
+      <div className="flex w-full flex-wrap items-center gap-1.5 rounded-xl bg-white p-3.5 ring-1 ring-slate-200/70 transition hover:bg-slate-50">
+        <button
+          type="button"
+          onClick={onOpenDetail}
+          className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-left"
+        >
+          <span className="text-xs font-semibold text-slate-400">{index + 1}회차</span>
+          <span className="text-sm font-medium text-slate-700">
+            {l.periodStart} ~ {l.periodEnd}
+          </span>
+          <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>
+            {ds.label}
+          </span>
+          <span className="ml-auto flex items-center gap-1.5 text-sm text-slate-500">
+            <span className="font-semibold text-slate-800">{won(l.paidTotal)}</span>
+            <span className="text-slate-300"> / </span>
+            {won(l.baseAmount + l.carriedOverIn + l.adjustmentTotal)}
+          </span>
+        </button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setEditing((v) => !v)
+            }}
+            className={cn(
+              'shrink-0 rounded-lg p-1.5 transition',
+              editing ? 'bg-amber-100 text-amber-700' : 'text-slate-400 hover:bg-slate-100 hover:text-amber-600',
+            )}
+            title="일정 수정"
+          >
+            <Pencil size={15} />
+          </button>
+        )}
+        {canDelete && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+            title="삭제"
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
+        <ChevronRight size={16} className="shrink-0 text-slate-300" onClick={onOpenDetail} />
+      </div>
+      {l.carriedOverIn > 0 && (
+        <p className="mt-1 pl-1 text-[11px] text-slate-400">전 회차 이월 미수 {won(l.carriedOverIn)} 포함</p>
+      )}
+      {editing && (
+        <InlineScheduleEditForm
+          ledger={l}
+          onDone={() => {
+            setEditing(false)
+            onChanged()
+            orderSync.emit()
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
+    </li>
+  )
+}
+
+/* ===== 정산 이력 행 - 일정 수정 인라인 폼 ===== */
+function InlineScheduleEditForm({
+  ledger,
+  onDone,
+  onCancel,
+}: {
+  ledger: BillingLedger
+  onDone: () => void
+  onCancel: () => void
+}) {
+  const [periodStart, setPeriodStart] = useState(ledger.periodStart)
+  const [periodEnd, setPeriodEnd] = useState(ledger.periodEnd)
+  const [baseAmount, setBaseAmount] = useState<number | null>(Math.round(ledger.baseAmount))
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (baseAmount == null || baseAmount < 0) return setError('청구액을 입력하세요.')
+    if (periodEnd < periodStart) return setError('종료일은 시작일보다 빠를 수 없습니다.')
+    setSubmitting(true)
+    try {
+      await billingApi.editLedger(ledger.id, { periodStart, periodEnd, baseAmount })
+      onDone()
+    } catch (err) {
+      setError(errMsg(err, '일정 수정에 실패했습니다.'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      onClick={(e) => e.stopPropagation()}
+      className="mt-1.5 space-y-2.5 rounded-xl bg-amber-50/50 p-3.5 ring-1 ring-amber-200/60"
+    >
+      <FieldGrid>
+        <GridField label="청구 시작일">
+          <CalendarField value={periodStart} onChange={setPeriodStart} max={periodEnd || undefined} className={gridInputCls} />
+        </GridField>
+        <GridField label="청구 종료일">
+          <CalendarField value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} className={gridInputCls} />
+        </GridField>
+        <GridField label="청구 금액">
+          <MoneyInput value={baseAmount} onChange={setBaseAmount} required className={cn(gridInputCls, 'pr-8')} />
+        </GridField>
+      </FieldGrid>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <div className="flex justify-end gap-1.5">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onCancel()
+          }}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 transition hover:bg-white"
+        >
+          취소
+        </button>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-700 disabled:opacity-60"
+        >
+          {submitting ? '저장 중…' : '일정 저장'}
+        </button>
+      </div>
+    </form>
   )
 }
 
