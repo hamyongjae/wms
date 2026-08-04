@@ -1032,7 +1032,6 @@ function ScheduleEditForm({
           <MoneyInput value={baseAmount} onChange={setBaseAmount} required className={cn(gridInputCls, 'pr-8')} />
         </GridField>
       </FieldGrid>
-      <p className="text-xs text-amber-700">다른 회차와 겹치거나 비면 그 회차 경계를 자동으로 맞춰 이어붙입니다.</p>
       {error && <p className="text-xs text-red-600">{error}</p>}
       <div className="flex justify-end gap-1.5">
         <button
