@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Search, ChevronRight, ChevronDown, Trash2, BadgeCheck } from 'lucide-react'
+import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Search, ChevronRight, ChevronDown, Trash2 } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger } from '@/api/billingApi'
@@ -792,11 +792,11 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
             </p>
           )}
 
-          {/* [이번 회차] 처리 대상 — 카드 위에서 원터치로 입금 완료까지 끝난다 */}
+          {/* [이번 회차] 처리 대상을 위에, 완납 이력은 아래 아코디언에 접어둔다 */}
           {!loading && openLedgers.length > 0 && (
-            <ol className="space-y-2.5">
+            <ol className="space-y-2">
               {openLedgers.map((l) => (
-                <CurrentRoundCard
+                <LedgerHistoryRow
                   key={l.id}
                   ledger={l}
                   index={indexById.get(l.id)!}
@@ -829,7 +829,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
               {historyOpen && (
                 <ol className="mt-2 space-y-2">
                   {closedLedgers.map((l) => (
-                    <PastRoundRow
+                    <LedgerHistoryRow
                       key={l.id}
                       ledger={l}
                       index={indexById.get(l.id)!}
@@ -900,127 +900,12 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
 }
 
 /**
- * [이번 회차 카드] 아직 안 끝난(입금예정·부분입금·연체) 회차 하나를 크고 명확하게 보여준다.
- * 상세 수정 창에 들어가지 않아도 카드 위 "입금 완료 처리" 버튼 한 번으로 완납 처리가
- * 끝난다(billingApi.recordPayment로 잔액 전액 즉시 수납). 아직 돈을 안 받은 회차라
- * 삭제 아이콘도 여기서만 보인다 — 실수로 지워도 실제 입금 기록이 사라지는 게 아니다.
+ * [정산 이력 행] 회차 하나. 입금·조정·납기일변경·환불·이력 같은 '정산서' 내용은 여기서
+ * 안 다룬다(그건 전역 '정산 관리' 화면에서) — 이 화면은 날짜·금액을 빠르게 바로잡는 용도라
+ * 행을 탭하면 곧장 날짜·금액 수정 폼이 펼쳐진다. 삭제는 아직 한 푼도 안 들어온(미수) 회차만
+ * — 완납된 회차는 휴지통 아이콘 자체가 안 보여 실수로 지워지는 걸 막는다.
  */
-function CurrentRoundCard({
-  ledger: l,
-  index,
-  isAdmin,
-  expanded,
-  onToggle,
-  onCollapse,
-  onChanged,
-}: {
-  ledger: BillingLedger
-  index: number
-  isAdmin: boolean
-  expanded: boolean
-  onToggle: () => void
-  onCollapse: () => void
-  onChanged: () => void
-}) {
-  const ds = displayStatus(l)
-  const [paying, setPaying] = useState(false)
-  const [payError, setPayError] = useState<string | null>(null)
-
-  async function handleOneTouchPay(e: MouseEvent) {
-    e.stopPropagation()
-    setPaying(true)
-    setPayError(null)
-    try {
-      await billingApi.recordPayment(l.id, { amount: l.balance, method: 'BANK_TRANSFER', paidOn: today() })
-      onChanged()
-      orderSync.emit()
-    } catch (err) {
-      setPayError(errMsg(err, '입금 처리에 실패했습니다.'))
-    } finally {
-      setPaying(false)
-    }
-  }
-
-  async function handleDelete(e: MouseEvent) {
-    e.stopPropagation()
-    if (!window.confirm('정말 이 정산 스케줄을 삭제하시겠습니까?')) return
-    try {
-      await billingApi.remove(l.id)
-      onChanged()
-      orderSync.emit()
-    } catch (err) {
-      window.alert(errMsg(err, '삭제에 실패했습니다.'))
-    }
-  }
-
-  return (
-    <li>
-      <div className={cn('rounded-2xl border-l-4 bg-white p-4 shadow-soft ring-1 ring-slate-200/70', ds.accent)}>
-        <button type="button" onClick={onToggle} className="flex w-full flex-col gap-1.5 text-left">
-          <span className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-400">{index + 1}회차</span>
-            <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1', ds.cls)}>
-              {ds.label}
-            </span>
-            <ChevronRight size={18} className={cn('ml-auto shrink-0 text-slate-300 transition-transform', expanded && 'rotate-90')} />
-          </span>
-          <span className="text-base font-semibold text-slate-800">
-            <DateRangeLabel start={l.periodStart} end={l.periodEnd} format={ymdKorean} />
-          </span>
-          <span className="text-lg font-bold text-[#A65B44]">미수 {won(l.balance)}</span>
-        </button>
-
-        {payError && <p className="mt-2 text-xs text-red-600">{payError}</p>}
-
-        <div className="mt-3 flex items-center gap-2">
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={handleOneTouchPay}
-              disabled={paying}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition active:scale-[0.99] disabled:opacity-60"
-            >
-              {paying ? <Loader2 size={15} className="animate-spin" /> : <BadgeCheck size={15} />}
-              입금 완료 처리
-            </button>
-          )}
-          {/* [삭제 방어] 아직 한 푼도 안 들어온 회차만 — 일부라도 입금됐으면(부분입금) 삭제
-              자체를 숨겨 실제 입금 기록이 딸려 지워지는 실수를 막는다. */}
-          {isAdmin && l.paidTotal === 0 && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="shrink-0 rounded-lg p-2.5 text-slate-400 ring-1 ring-slate-200 transition hover:bg-red-50 hover:text-red-600"
-              title="삭제"
-            >
-              <Trash2 size={16} />
-            </button>
-          )}
-        </div>
-      </div>
-      {l.carriedOverIn > 0 && (
-        <p className="mt-1 pl-1 text-[11px] text-slate-400">전 회차 이월 미수 {won(l.carriedOverIn)} 포함</p>
-      )}
-      {expanded && (
-        <ScheduleEditForm
-          ledger={l}
-          onDone={() => {
-            onCollapse()
-            onChanged()
-          }}
-          onCancel={onCollapse}
-        />
-      )}
-    </li>
-  )
-}
-
-/**
- * [지난 이력 행] 완납·이월 등으로 이미 끝난 회차 — 아코디언 안에서만 보이는 콤팩트 행.
- * 날짜·금액을 바로잡아야 할 때를 대비해 탭하면 수정 폼은 열리지만, 이미 돈을 받은
- * 기록이라 삭제 아이콘은 아예 없다(실수로 지워지는 걸 원천 차단).
- */
-function PastRoundRow({
+function LedgerHistoryRow({
   ledger: l,
   index,
   isAdmin,
@@ -1039,19 +924,32 @@ function PastRoundRow({
 }) {
   const ds = displayStatus(l)
   const canEdit = isAdmin && l.status !== 'CARRIED_OVER' && l.status !== 'CANCELED'
+  // [삭제 방어] 아직 한 푼도 안 들어온 회차만 — 완납된 회차는 휴지통 아이콘이 아예 안 보인다.
+  const canDelete = isAdmin && l.paidTotal === 0 && isOpenLedger(l)
   const totalDue = l.baseAmount + l.carriedOverIn + l.adjustmentTotal
   const isNoCharge = totalDue === 0
   // [과거 이력 묶음] 처음부터 청구액 0원으로 만들어진 소급분과, 실제 청구했다가 나중에
   //   전액 조정(할인)으로 0원이 된 회차는 다르다 — 라벨을 구분해 오해를 없앤다.
   const isOriginallyZero = l.baseAmount === 0 && l.carriedOverIn === 0
+  const hasBalance = l.balance > 0
+
+  async function handleDelete(e: MouseEvent) {
+    e.stopPropagation()
+    if (!window.confirm('정말 이 정산 스케줄을 삭제하시겠습니까?')) return
+    try {
+      await billingApi.remove(l.id)
+      onChanged()
+      orderSync.emit()
+    } catch (err) {
+      window.alert(errMsg(err, '삭제에 실패했습니다.'))
+    }
+  }
 
   return (
     <li>
-      {/* [카드 통일감] 최근 회차 카드(rounded-2xl·ring)와 같은 모양 언어를 쓰되,
-          지난 이력이라는 걸 알 수 있게 여백·글자 크기만 한 단계 낮춘다. */}
       <div
         className={cn(
-          'flex w-full items-center gap-1.5 rounded-2xl border-l-4 bg-white p-3 ring-1 ring-slate-200/70 transition hover:bg-slate-50',
+          'flex w-full items-center gap-1.5 rounded-xl border-l-4 bg-white p-3.5 ring-1 ring-slate-200/70 transition hover:bg-slate-50',
           ds.accent,
           isNoCharge && 'bg-slate-50/60 opacity-70',
         )}
@@ -1076,17 +974,29 @@ function PastRoundRow({
                 {isOriginallyZero ? '실사용 이전 이력 · 청구 없음' : '전액 조정 · 청구 없음'}
               </span>
             ) : (
-              <span className="font-semibold text-slate-400">
+              <span className={cn('font-semibold', hasBalance ? 'text-[#A65B44]' : 'text-slate-400')}>
                 {won(l.paidTotal)}
-                <span className="text-slate-300"> / </span>
+                <span className={hasBalance ? 'text-[#C99C8F]' : 'text-slate-300'}> / </span>
                 {won(totalDue)}
               </span>
             )}
           </span>
         </button>
-        {canEdit && (
-          <ChevronRight size={16} className={cn('shrink-0 text-slate-300 transition-transform', expanded && 'rotate-90')} />
-        )}
+        <div className="flex shrink-0 items-center gap-0.5">
+          {canEdit && (
+            <ChevronRight size={16} className={cn('text-slate-300 transition-transform', expanded && 'rotate-90')} />
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+              title="삭제"
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
       </div>
       {l.carriedOverIn > 0 && (
         <p className="mt-1 pl-1 text-[11px] text-slate-400">전 회차 이월 미수 {won(l.carriedOverIn)} 포함</p>
