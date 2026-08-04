@@ -28,7 +28,9 @@ import java.util.Map;
 public class WebPushService {
 
     private final PushSubscriptionRepository subscriptionRepository;
-    private final ObjectMapper objectMapper;
+    // [빈 주입 대신 직접 생성] payload가 title/body/url 세 문자열뿐인 단순 JSON이라,
+    // 앱 전역 ObjectMapper 빈에 기대지 않고 이 클래스 안에서 자체 완결시킨다.
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${push.vapid.public-key}")
     private String vapidPublicKey;
