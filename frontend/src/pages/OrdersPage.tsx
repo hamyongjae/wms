@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Search, ChevronRight, Trash2 } from 'lucide-react'
+import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Search, ChevronRight, ChevronDown, Trash2, BadgeCheck } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger } from '@/api/billingApi'
@@ -664,6 +664,8 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
   //   '정산서' 내용은 다루지 않는다(전역 '정산 관리' 화면에서). 그래서 행을 탭하면 팝업
   //   대신 곧장 날짜·금액 수정 폼만 그 자리에서 펼쳐진다.
   const [expandedLedgerId, setExpandedLedgerId] = useState<number | null>(null)
+  // [지난 이력 아코디언] 완납된 과거 회차는 기본적으로 접어 스크롤 피로를 없앤다.
+  const [historyOpen, setHistoryOpen] = useState(false)
   // 청구서 생성
   const [creating, setCreating] = useState(false)
   const [genOpen, setGenOpen] = useState(false)
@@ -691,6 +693,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
   useEffect(() => {
     if (target) {
       setExpandedLedgerId(null)
+      setHistoryOpen(false)
       load(target.id)
     }
   }, [target])
@@ -739,6 +742,11 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
 
   const totalBalance = ledgers.reduce((s, l) => s + (isOpenLedger(l) ? l.balance : 0), 0)
   const paidCount = ledgers.filter((l) => l.balance <= 0).length
+  // [원터치 동선] 처리해야 할 회차(입금예정·부분입금·연체)는 위에 크게, 끝난 회차는 아래
+  // 아코디언에 접어둔다 — 60대 관리자가 스크롤 없이 "지금 뭘 해야 하는지"만 보게 한다.
+  const openLedgers = ledgers.filter(isOpenLedger)
+  const closedLedgers = ledgers.filter((l) => !isOpenLedger(l))
+  const indexById = new Map(ledgers.map((l, i) => [l.id, i]))
 
   return (
     <>
@@ -767,14 +775,81 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
             )}
           </div>
 
-          {/* 정산서 생성 (관리자) — 원장이 없으면 여기서 만들어야 정산이 시작된다 */}
-          {isAdmin && !genOpen && (
+          {loading && (
+            <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
+              <Loader2 className="animate-spin" size={16} />
+              <span className="text-sm">정산 이력을 불러오는 중…</span>
+            </div>
+          )}
+
+          {!loading && ledgers.length === 0 && (
+            <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
+              아직 생성된 정산서가 없습니다.
+              {isAdmin ? ' 아래 "다음 회차 정산 생성"으로 이번 회차를 만들면 바로 입금을 기록할 수 있습니다.' : ' 정산서는 매월 1일 자동 생성됩니다.'}
+            </p>
+          )}
+
+          {/* [이번 회차] 처리 대상 — 카드 위에서 원터치로 입금 완료까지 끝난다 */}
+          {!loading && openLedgers.length > 0 && (
+            <ol className="space-y-2.5">
+              {openLedgers.map((l) => (
+                <CurrentRoundCard
+                  key={l.id}
+                  ledger={l}
+                  index={indexById.get(l.id)!}
+                  isAdmin={isAdmin}
+                  expanded={expandedLedgerId === l.id}
+                  onToggle={() => setExpandedLedgerId((cur) => (cur === l.id ? null : l.id))}
+                  onCollapse={() => setExpandedLedgerId(null)}
+                  onChanged={() => load(target.id)}
+                />
+              ))}
+            </ol>
+          )}
+          {!loading && ledgers.length > 0 && openLedgers.length === 0 && (
+            <p className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 px-4 py-6 text-center text-sm font-medium text-emerald-700">
+              미수금이 없습니다 — 모든 회차가 완납 처리됐습니다.
+            </p>
+          )}
+
+          {/* [지난 이력] 완납된 과거 회차 — 기본 접힘, 스크롤 피로 제거 */}
+          {!loading && closedLedgers.length > 0 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setHistoryOpen((v) => !v)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-100 py-2.5 text-xs font-medium text-slate-500 transition hover:bg-slate-200"
+              >
+                <ChevronDown size={14} className={cn('transition-transform', historyOpen && 'rotate-180')} />
+                지난 정산 이력 보기 ({closedLedgers.length}건 완료)
+              </button>
+              {historyOpen && (
+                <ol className="mt-2 space-y-2">
+                  {closedLedgers.map((l) => (
+                    <PastRoundRow
+                      key={l.id}
+                      ledger={l}
+                      index={indexById.get(l.id)!}
+                      isAdmin={isAdmin}
+                      expanded={expandedLedgerId === l.id}
+                      onToggle={() => setExpandedLedgerId((cur) => (cur === l.id ? null : l.id))}
+                      onCollapse={() => setExpandedLedgerId(null)}
+                      onChanged={() => load(target.id)}
+                    />
+                  ))}
+                </ol>
+              )}
+            </div>
+          )}
+
+          {/* [다음 회차 생성] 목록 맨 아래 — 점선 버튼 대신 명확한 대형 버튼 */}
+          {isAdmin && !genOpen && !loading && (
             <button
               type="button"
               onClick={openGenerator}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-indigo-300 bg-indigo-50/50 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99]"
             >
-              <Plus size={15} /> 정산서 생성 (이번 회차)
+              <Plus size={18} /> 다음 회차 정산 생성
             </button>
           )}
           {genOpen && (
@@ -815,39 +890,6 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
               </div>
             </form>
           )}
-
-          {loading && (
-            <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
-              <Loader2 className="animate-spin" size={16} />
-              <span className="text-sm">정산 이력을 불러오는 중…</span>
-            </div>
-          )}
-
-          {!loading && ledgers.length === 0 && (
-            <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
-              아직 생성된 정산서가 없습니다.
-              {isAdmin ? ' 위 "정산서 생성"으로 이번 회차를 만들면 바로 입금을 기록할 수 있습니다.' : ' 정산서는 매월 1일 자동 생성됩니다.'}
-            </p>
-          )}
-
-          {/* 회차를 탭하면 그 자리에서 날짜·금액 수정 폼이 펼쳐진다. 삭제는 휴지통 아이콘으로. */}
-          {!loading && ledgers.length > 0 && (
-            <ol className="space-y-2">
-              {ledgers.map((l, i) => (
-                <LedgerHistoryRow
-                  key={l.id}
-                  ledger={l}
-                  index={i}
-                  isAdmin={isAdmin}
-                  expanded={expandedLedgerId === l.id}
-                  isMiddle={i > 0 && i < ledgers.length - 1}
-                  onToggle={() => setExpandedLedgerId((cur) => (cur === l.id ? null : l.id))}
-                  onCollapse={() => setExpandedLedgerId(null)}
-                  onChanged={() => load(target.id)}
-                />
-              ))}
-            </ol>
-          )}
         </div>
       </Modal>
     </>
@@ -855,16 +897,16 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
 }
 
 /**
- * [정산 이력 행] 회차 하나. 입금·조정·납기일변경·환불·이력 같은 '정산서' 내용은 여기서
- * 안 다룬다(그건 전역 '정산 관리' 화면에서) — 이 화면은 날짜·금액을 빠르게 바로잡는 용도라
- * 행을 탭하면 곧장 날짜·금액 수정 폼이 펼쳐진다. 삭제는 별도 휴지통 아이콘으로.
+ * [이번 회차 카드] 아직 안 끝난(입금예정·부분입금·연체) 회차 하나를 크고 명확하게 보여준다.
+ * 상세 수정 창에 들어가지 않아도 카드 위 "입금 완료 처리" 버튼 한 번으로 완납 처리가
+ * 끝난다(billingApi.recordPayment로 잔액 전액 즉시 수납). 아직 돈을 안 받은 회차라
+ * 삭제 아이콘도 여기서만 보인다 — 실수로 지워도 실제 입금 기록이 사라지는 게 아니다.
  */
-function LedgerHistoryRow({
+function CurrentRoundCard({
   ledger: l,
   index,
   isAdmin,
   expanded,
-  isMiddle,
   onToggle,
   onCollapse,
   onChanged,
@@ -873,34 +915,32 @@ function LedgerHistoryRow({
   index: number
   isAdmin: boolean
   expanded: boolean
-  /** 이 회차 앞뒤로 다른 활성 회차가 둘 다 있는지 — 삭제 시 서버가 앞 회차를 자동으로 늘려 이어붙인다 */
-  isMiddle: boolean
   onToggle: () => void
   onCollapse: () => void
   onChanged: () => void
 }) {
   const ds = displayStatus(l)
-  // 실제 입금이 없으면 삭제 가능 — 조정(할인) 이력은 막지 않는다(청구 후 전액 할인으로
-  // 0원 처리된 과거 회차 정리용). 삭제 시 서버가 앞뒤 회차를 자동으로 이어붙인다.
-  const canDelete = isAdmin && l.paidTotal === 0 && l.status !== 'CARRIED_OVER'
-  const canEdit = isAdmin && l.status !== 'CARRIED_OVER' && l.status !== 'CANCELED'
-  const totalDue = l.baseAmount + l.carriedOverIn + l.adjustmentTotal
-  const isNoCharge = totalDue === 0
-  // [과거 이력 묶음] 처음부터 청구액 0원으로 만들어진 소급분(과거부터 보관 중이던 계약을
-  //   등록할 때 생김)과, 실제 청구했다가 나중에 전액 조정(할인)으로 0원이 된 회차는 다르다
-  //   — 후자는 조정 이력이 남아있어 삭제도 막힌다(실제 돈 관련 이력 보호). 라벨을 구분해서
-  //   "청구가 원래 없었다"고 오해하지 않게 한다.
-  const isOriginallyZero = l.baseAmount === 0 && l.carriedOverIn === 0
-  const hasBalance = l.balance > 0
+  const [paying, setPaying] = useState(false)
+  const [payError, setPayError] = useState<string | null>(null)
+
+  async function handleOneTouchPay(e: MouseEvent) {
+    e.stopPropagation()
+    setPaying(true)
+    setPayError(null)
+    try {
+      await billingApi.recordPayment(l.id, { amount: l.balance, method: 'BANK_TRANSFER', paidOn: today() })
+      onChanged()
+      orderSync.emit()
+    } catch (err) {
+      setPayError(errMsg(err, '입금 처리에 실패했습니다.'))
+    } finally {
+      setPaying(false)
+    }
+  }
 
   async function handleDelete(e: MouseEvent) {
     e.stopPropagation()
-    // [삭제 시 공백 메우기 안내] 앞뒤에 다른 회차가 둘 다 있는 '중간' 회차는, 지우면 서버가
-    // 바로 앞 회차의 종료일을 이 회차 자리까지 자동으로 늘려 빈 날짜 없이 이어붙인다 — 미리 안내.
-    const msg = isMiddle
-      ? '이 정산 기록을 삭제하시겠습니까?\n삭제하면 되돌릴 수 없고, 앞 회차의 종료일이 이 회차 자리까지 자동으로 늘어나 이어붙습니다.'
-      : '이 정산 기록을 삭제하시겠습니까?\n삭제하면 되돌릴 수 없습니다.'
-    if (!window.confirm(msg)) return
+    if (!window.confirm('정말 이 정산 스케줄을 삭제하시겠습니까?')) return
     try {
       await billingApi.remove(l.id)
       onChanged()
@@ -912,6 +952,98 @@ function LedgerHistoryRow({
 
   return (
     <li>
+      <div className={cn('rounded-2xl border-l-4 bg-white p-4 shadow-soft ring-1 ring-slate-200/70', ds.accent)}>
+        <button type="button" onClick={onToggle} className="flex w-full flex-col gap-1.5 text-left">
+          <span className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-400">{index + 1}회차</span>
+            <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1', ds.cls)}>
+              {ds.label}
+            </span>
+            <ChevronRight size={18} className={cn('ml-auto shrink-0 text-slate-300 transition-transform', expanded && 'rotate-90')} />
+          </span>
+          <span className="text-base font-semibold text-slate-800">
+            <DateRangeLabel start={l.periodStart} end={l.periodEnd} format={ymdKorean} />
+          </span>
+          <span className="text-lg font-bold text-[#A65B44]">미수 {won(l.balance)}</span>
+        </button>
+
+        {payError && <p className="mt-2 text-xs text-red-600">{payError}</p>}
+
+        <div className="mt-3 flex items-center gap-2">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={handleOneTouchPay}
+              disabled={paying}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99] disabled:opacity-60"
+            >
+              {paying ? <Loader2 size={18} className="animate-spin" /> : <BadgeCheck size={18} />}
+              입금 완료 처리
+            </button>
+          )}
+          {/* [삭제 방어] 아직 한 푼도 안 들어온 회차만 — 일부라도 입금됐으면(부분입금) 삭제
+              자체를 숨겨 실제 입금 기록이 딸려 지워지는 실수를 막는다. */}
+          {isAdmin && l.paidTotal === 0 && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="shrink-0 rounded-xl p-3.5 text-slate-400 ring-1 ring-slate-200 transition hover:bg-red-50 hover:text-red-600"
+              title="삭제"
+            >
+              <Trash2 size={18} />
+            </button>
+          )}
+        </div>
+      </div>
+      {l.carriedOverIn > 0 && (
+        <p className="mt-1 pl-1 text-[11px] text-slate-400">전 회차 이월 미수 {won(l.carriedOverIn)} 포함</p>
+      )}
+      {expanded && (
+        <ScheduleEditForm
+          ledger={l}
+          onDone={() => {
+            onCollapse()
+            onChanged()
+          }}
+          onCancel={onCollapse}
+        />
+      )}
+    </li>
+  )
+}
+
+/**
+ * [지난 이력 행] 완납·이월 등으로 이미 끝난 회차 — 아코디언 안에서만 보이는 콤팩트 행.
+ * 날짜·금액을 바로잡아야 할 때를 대비해 탭하면 수정 폼은 열리지만, 이미 돈을 받은
+ * 기록이라 삭제 아이콘은 아예 없다(실수로 지워지는 걸 원천 차단).
+ */
+function PastRoundRow({
+  ledger: l,
+  index,
+  isAdmin,
+  expanded,
+  onToggle,
+  onCollapse,
+  onChanged,
+}: {
+  ledger: BillingLedger
+  index: number
+  isAdmin: boolean
+  expanded: boolean
+  onToggle: () => void
+  onCollapse: () => void
+  onChanged: () => void
+}) {
+  const ds = displayStatus(l)
+  const canEdit = isAdmin && l.status !== 'CARRIED_OVER' && l.status !== 'CANCELED'
+  const totalDue = l.baseAmount + l.carriedOverIn + l.adjustmentTotal
+  const isNoCharge = totalDue === 0
+  // [과거 이력 묶음] 처음부터 청구액 0원으로 만들어진 소급분과, 실제 청구했다가 나중에
+  //   전액 조정(할인)으로 0원이 된 회차는 다르다 — 라벨을 구분해 오해를 없앤다.
+  const isOriginallyZero = l.baseAmount === 0 && l.carriedOverIn === 0
+
+  return (
+    <li>
       <div
         className={cn(
           'flex w-full items-center gap-1.5 rounded-xl border-l-4 bg-white p-3.5 ring-1 ring-slate-200/70 transition hover:bg-slate-50',
@@ -919,8 +1051,6 @@ function LedgerHistoryRow({
           isNoCharge && 'bg-slate-50/60 opacity-70',
         )}
       >
-        {/* [행 높이 통일] 회차·상태 / 날짜 / 금액을 항상 3줄 고정 구조로 쌓는다 — 아이콘 유무에
-            따라 줄바꿈이 달라지면 카드 높이가 들쭉날쭉해지고 오른쪽 아이콘 위치도 어긋난다. */}
         <button
           type="button"
           onClick={canEdit ? onToggle : undefined}
@@ -941,31 +1071,17 @@ function LedgerHistoryRow({
                 {isOriginallyZero ? '실사용 이전 이력 · 청구 없음' : '전액 조정 · 청구 없음'}
               </span>
             ) : (
-              <span className={cn('font-semibold', hasBalance ? 'text-[#A65B44]' : 'text-slate-400')}>
+              <span className="font-semibold text-slate-400">
                 {won(l.paidTotal)}
-                <span className={hasBalance ? 'text-[#C99C8F]' : 'text-slate-300'}> / </span>
+                <span className="text-slate-300"> / </span>
                 {won(totalDue)}
               </span>
             )}
           </span>
         </button>
-        {/* [아이콘 정렬] 펼침·삭제 버튼을 한 묶음으로 오른쪽에 고정 — 행 높이가 일정해졌으니
-            항상 같은 위치에 나란히 정렬된다. */}
-        <div className="flex shrink-0 items-center gap-0.5">
-          {canEdit && (
-            <ChevronRight size={16} className={cn('text-slate-300 transition-transform', expanded && 'rotate-90')} />
-          )}
-          {canDelete && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-              title="삭제"
-            >
-              <Trash2 size={15} />
-            </button>
-          )}
-        </div>
+        {canEdit && (
+          <ChevronRight size={16} className={cn('shrink-0 text-slate-300 transition-transform', expanded && 'rotate-90')} />
+        )}
       </div>
       {l.carriedOverIn > 0 && (
         <p className="mt-1 pl-1 text-[11px] text-slate-400">전 회차 이월 미수 {won(l.carriedOverIn)} 포함</p>
