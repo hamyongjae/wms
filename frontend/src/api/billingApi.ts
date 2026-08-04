@@ -168,7 +168,7 @@ export const billingApi = {
     const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/${id}/adjustments`, body)
     return data
   },
-  // [일정 수정] 이미 만든 회차의 청구기간·기본 청구액을 직접 정정 — 다른 회차와 겹치면 서버가 막는다
+  // [일정 수정] 이미 만든 회차의 청구기간·기본 청구액을 직접 정정 — 다른 회차와 겹치거나 비면 서버가 그 회차 경계를 자동으로 맞춰 이어붙인다
   async editLedger(id: number, body: LedgerEditRequest): Promise<BillingLedger> {
     const { data } = await api.put<BillingLedger>(`/api/billing/ledgers/${id}`, body)
     return data

@@ -627,7 +627,7 @@ function ScheduleEditForm({
           className={inputCls}
         />
       </Labeled>
-      <p className="text-xs text-amber-700">다른 회차와 기간이 겹치면 저장할 수 없습니다.</p>
+      <p className="text-xs text-amber-700">다른 회차와 겹치거나 비면 그 회차 경계를 자동으로 맞춰 이어붙입니다.</p>
       <SubmitRow submitting={submitting} label="일정 저장" />
     </form>
   )
