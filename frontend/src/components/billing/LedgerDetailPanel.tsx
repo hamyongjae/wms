@@ -610,10 +610,10 @@ function ScheduleEditForm({
     <form onSubmit={submit} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4">
       <p className="text-sm font-semibold text-amber-800">일정 수정</p>
       <div className="grid grid-cols-2 gap-3">
-        <Labeled label="청구 시작일">
+        <Labeled label="정산 시작일">
           <CalendarField value={periodStart} onChange={setPeriodStart} format={ymdKorean} className={inputCls} />
         </Labeled>
-        <Labeled label="청구 종료일">
+        <Labeled label="정산 종료일">
           <CalendarField value={periodEnd} onChange={setPeriodEnd} format={ymdKorean} className={inputCls} />
         </Labeled>
       </div>
