@@ -752,24 +752,27 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
     <>
       <Modal open onClose={onClose} title={`${target.customerName} · 정산 이력`} widthClass="max-w-2xl">
         <div className="space-y-3">
-          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500">
-                계약 기간{' '}
-                <span className="font-medium text-slate-700">
-                  <DateRangeLabel
-                    start={target.storageStartDate}
-                    end={target.actualEndDate ?? target.expectedEndDate}
-                    format={ymdKorean}
-                  />
-                </span>
-              </span>
-              <span className={cn('font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-[#5C7C6B]')}>
-                {totalBalance > 0 ? `미수 잔액 ${won(totalBalance)}` : '미수 없음'}
-              </span>
+          {/* [좌우 밸런스] 계약기간·미수잔액을 같은 크기의 라벨+값 2단 구성으로 맞춰
+              한쪽 텍스트가 길어져도 서로 안 밀리고 나란히 정렬된다. */}
+          <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
+            <div className="min-w-0">
+              <p className="text-xs text-slate-400">계약 기간</p>
+              <p className="mt-0.5 font-medium text-slate-700">
+                <DateRangeLabel
+                  start={target.storageStartDate}
+                  end={target.actualEndDate ?? target.expectedEndDate}
+                  format={ymdKorean}
+                />
+              </p>
+            </div>
+            <div className="min-w-0 text-right">
+              <p className="text-xs text-slate-400">{totalBalance > 0 ? '미수 잔액' : '정산 현황'}</p>
+              <p className={cn('mt-0.5 font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-[#5C7C6B]')}>
+                {totalBalance > 0 ? won(totalBalance) : '미수 없음'}
+              </p>
             </div>
             {ledgers.length > 0 && (
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="col-span-2 text-xs text-slate-400">
                 {ledgers.length}회차 중 {paidCount}회 완납
               </p>
             )}
@@ -975,9 +978,9 @@ function CurrentRoundCard({
               type="button"
               onClick={handleOneTouchPay}
               disabled={paying}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-base font-bold text-white transition active:scale-[0.99] disabled:opacity-60"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition active:scale-[0.99] disabled:opacity-60"
             >
-              {paying ? <Loader2 size={18} className="animate-spin" /> : <BadgeCheck size={18} />}
+              {paying ? <Loader2 size={15} className="animate-spin" /> : <BadgeCheck size={15} />}
               입금 완료 처리
             </button>
           )}
@@ -987,10 +990,10 @@ function CurrentRoundCard({
             <button
               type="button"
               onClick={handleDelete}
-              className="shrink-0 rounded-xl p-3.5 text-slate-400 ring-1 ring-slate-200 transition hover:bg-red-50 hover:text-red-600"
+              className="shrink-0 rounded-lg p-2.5 text-slate-400 ring-1 ring-slate-200 transition hover:bg-red-50 hover:text-red-600"
               title="삭제"
             >
-              <Trash2 size={18} />
+              <Trash2 size={16} />
             </button>
           )}
         </div>
@@ -1044,9 +1047,11 @@ function PastRoundRow({
 
   return (
     <li>
+      {/* [카드 통일감] 최근 회차 카드(rounded-2xl·ring)와 같은 모양 언어를 쓰되,
+          지난 이력이라는 걸 알 수 있게 여백·글자 크기만 한 단계 낮춘다. */}
       <div
         className={cn(
-          'flex w-full items-center gap-1.5 rounded-xl border-l-4 bg-white p-3.5 ring-1 ring-slate-200/70 transition hover:bg-slate-50',
+          'flex w-full items-center gap-1.5 rounded-2xl border-l-4 bg-white p-3 ring-1 ring-slate-200/70 transition hover:bg-slate-50',
           ds.accent,
           isNoCharge && 'bg-slate-50/60 opacity-70',
         )}
