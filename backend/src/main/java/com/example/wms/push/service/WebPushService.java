@@ -66,6 +66,15 @@ public class WebPushService {
         }
     }
 
+    /** [설정 화면 - 테스트 발송] 현재 사용자 본인의 구독 기기에만 보낸다. 발송 시도한 기기 수를 반환. */
+    public int sendToUser(Long userId, String title, String body, String url) {
+        List<PushSubscription> subs = subscriptionRepository.findAllByUser_Id(userId);
+        for (PushSubscription sub : subs) {
+            send(sub, title, body, url);
+        }
+        return subs.size();
+    }
+
     private void send(PushSubscription sub, String title, String body, String url) {
         try {
             String payload = objectMapper.writeValueAsString(Map.of("title", title, "body", body, "url", url));

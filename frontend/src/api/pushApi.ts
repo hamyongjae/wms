@@ -18,4 +18,9 @@ export const pushApi = {
   async unsubscribe(endpoint: string): Promise<void> {
     await api.delete('/api/push/subscriptions', { params: { endpoint } })
   },
+  // 설정 화면 "테스트 알림 보내기" — 본인 구독 기기 수를 반환
+  async sendTest(): Promise<number> {
+    const { data } = await api.post<{ sent: number }>('/api/push/test')
+    return data.sent
+  },
 }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Bell, BellOff, Loader2 } from 'lucide-react'
+import { Bell, BellOff, Loader2, Send } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { getPushStatus, enablePush, disablePush, isPushSupported, type PushStatus } from '@/lib/push'
+import { pushApi } from '@/api/pushApi'
 
 /**
  * ===== [긴급 알림 웹 푸시 설정] =====
@@ -12,10 +13,25 @@ export default function PushNotificationSettings() {
   const [status, setStatus] = useState<PushStatus | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [testBusy, setTestBusy] = useState(false)
+  const [testResult, setTestResult] = useState<string | null>(null)
 
   useEffect(() => {
     getPushStatus().then(setStatus)
   }, [])
+
+  async function handleTest() {
+    setTestBusy(true)
+    setTestResult(null)
+    try {
+      const sent = await pushApi.sendTest()
+      setTestResult(sent > 0 ? '전송했습니다. 잠시 후 알림을 확인하세요.' : '등록된 구독이 없습니다. 먼저 알림을 켜주세요.')
+    } catch {
+      setTestResult('테스트 발송에 실패했습니다.')
+    } finally {
+      setTestBusy(false)
+    }
+  }
 
   async function handleToggle() {
     if (!status) return
@@ -89,6 +105,21 @@ export default function PushNotificationSettings() {
         )}
 
         {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+
+        {subscribed && (
+          <>
+            <button
+              type="button"
+              onClick={handleTest}
+              disabled={testBusy}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+            >
+              {testBusy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+              테스트 알림 보내기
+            </button>
+            {testResult && <p className="mt-1.5 text-center text-xs text-slate-500">{testResult}</p>}
+          </>
+        )}
 
         <p className="mt-3 text-[11px] text-slate-400">
           아이폰(Safari)은 이 페이지를 홈 화면에 추가한 뒤, 그 아이콘으로 연 상태에서만 알림을 받을 수 있어요.
