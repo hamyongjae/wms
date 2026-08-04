@@ -12,6 +12,8 @@ import {
   HandCoins,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   PieChart,
 } from 'lucide-react'
 import { billingApi, type BillingLedger, type BillingStatus } from '@/api/billingApi'
@@ -95,6 +97,8 @@ export default function BillingPage() {
   // [구 매출관리 통합] 목록·KPI용 ledgers는 기간 스코프 조회를 유지하고, 고객별 입금 비중과
   // 전월 대비 비교는 직전 기간까지 걸치므로 별도로 전체를 조회해 클라이언트에서 계산한다.
   const [revenueLedgers, setRevenueLedgers] = useState<BillingLedger[]>([])
+  // [스크롤 절약] 고객별 입금 비중은 부가 정보라 기본 접힘 — 헤더 탭으로 펼친다
+  const [revenueOpen, setRevenueOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<FilterKey>('ALL')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -318,41 +322,51 @@ export default function BillingPage() {
         <StatCard label="연체 건수" value={`${kpi.overdueCount}건`} icon={AlertTriangle} tone="indigo" />
       </div>
 
-      {/* [구 매출관리 통합] 고객별 입금 비중 랭킹 */}
-      <section className="rounded-2xl bg-white p-4 shadow-soft ring-1 ring-slate-200/60 md:p-6">
-        <div className="flex items-center justify-between">
+      {/* [구 매출관리 통합] 고객별 입금 비중 랭킹 — 기본 접힘(부가 정보라 목록까지 스크롤이
+          길어지지 않도록), 헤더를 탭하면 펼쳐진다 */}
+      <section className="rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60">
+        <button
+          type="button"
+          onClick={() => setRevenueOpen((v) => !v)}
+          className="flex w-full items-center justify-between gap-2 p-4 text-left md:p-6"
+        >
           <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
             <PieChart size={15} className="text-slate-400" /> 고객별 입금 비중
           </h3>
-          <span className="text-xs text-slate-400">
+          <span className="flex items-center gap-2 text-xs text-slate-400">
             {revenueSummary.customerCount}개 고객사 · {revenueSummary.contractCount}건 계약
+            {revenueOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </span>
-        </div>
+        </button>
 
-        {revenueSummary.customers.length === 0 ? (
-          <p className="py-14 text-center text-sm text-slate-400">이 기간에 발생한 입금이 없습니다.</p>
-        ) : (
-          <ul className="mt-4 space-y-3">
-            {revenueSummary.customers.map((c, i) => (
-              <li key={c.customerId}>
-                <div className="flex items-center justify-between gap-2 text-base">
-                  <span className="flex min-w-0 items-center gap-2 font-semibold text-slate-700">
-                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }} />
-                    <span className="truncate">{c.customerName}</span>
-                  </span>
-                  <span className="shrink-0 tabular-nums font-bold text-slate-800">
-                    {won(c.amount)} <span className="ml-1 text-xs font-medium text-slate-400">{pct(c.share)}</span>
-                  </span>
-                </div>
-                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full transition-[width] duration-500"
-                    style={{ width: `${Math.max(c.share * 100, 2)}%`, backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
+        {revenueOpen && (
+          <div className="px-4 pb-4 md:px-6 md:pb-6">
+            {revenueSummary.customers.length === 0 ? (
+              <p className="py-14 text-center text-sm text-slate-400">이 기간에 발생한 입금이 없습니다.</p>
+            ) : (
+              <ul className="space-y-3">
+                {revenueSummary.customers.map((c, i) => (
+                  <li key={c.customerId}>
+                    <div className="flex items-center justify-between gap-2 text-base">
+                      <span className="flex min-w-0 items-center gap-2 font-semibold text-slate-700">
+                        <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }} />
+                        <span className="truncate">{c.customerName}</span>
+                      </span>
+                      <span className="shrink-0 tabular-nums font-bold text-slate-800">
+                        {won(c.amount)} <span className="ml-1 text-xs font-medium text-slate-400">{pct(c.share)}</span>
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full transition-[width] duration-500"
+                        style={{ width: `${Math.max(c.share * 100, 2)}%`, backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </section>
 
