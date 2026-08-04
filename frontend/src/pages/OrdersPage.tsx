@@ -738,18 +738,33 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
   }
 
   const totalBalance = ledgers.reduce((s, l) => s + (isOpenLedger(l) ? l.balance : 0), 0)
+  const paidCount = ledgers.filter((l) => l.balance <= 0).length
 
   return (
     <>
       <Modal open onClose={onClose} title={`${target.customerName} · 정산 이력`} widthClass="max-w-2xl">
         <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-            <span className="text-slate-500">
-              계약 기간 <span className="font-medium text-slate-700">{target.storageStartDate} ~ {target.actualEndDate ?? target.expectedEndDate ?? '미정'}</span>
-            </span>
-            <span className={cn('font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-[#5C7C6B]')}>
-              {totalBalance > 0 ? `미수 잔액 ${won(totalBalance)}` : '미수 없음'}
-            </span>
+          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">
+                계약 기간{' '}
+                <span className="font-medium text-slate-700">
+                  <DateRangeLabel
+                    start={target.storageStartDate}
+                    end={target.actualEndDate ?? target.expectedEndDate}
+                    format={ymdKorean}
+                  />
+                </span>
+              </span>
+              <span className={cn('font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-[#5C7C6B]')}>
+                {totalBalance > 0 ? `미수 잔액 ${won(totalBalance)}` : '미수 없음'}
+              </span>
+            </div>
+            {ledgers.length > 0 && (
+              <p className="mt-1 text-xs text-slate-400">
+                {ledgers.length}회차 중 {paidCount}회 완납
+              </p>
+            )}
           </div>
 
           {/* 정산서 생성 (관리자) — 원장이 없으면 여기서 만들어야 정산이 시작된다 */}
@@ -867,6 +882,11 @@ function LedgerHistoryRow({
   const ds = displayStatus(l)
   const canDelete = isAdmin && l.paidTotal === 0 && l.adjustmentTotal === 0 && l.status !== 'CARRIED_OVER'
   const canEdit = isAdmin && l.status !== 'CARRIED_OVER' && l.status !== 'CANCELED'
+  const totalDue = l.baseAmount + l.carriedOverIn + l.adjustmentTotal
+  // [과거 이력 묶음] 과거부터 보관 중이던 계약을 등록할 때 생기는 소급분 0원 회차 —
+  //   실제 청구서와 헷갈리지 않도록 옅게 표시하고 안내 문구를 붙인다.
+  const isNoCharge = totalDue === 0
+  const hasBalance = l.balance > 0
 
   async function handleDelete(e: MouseEvent) {
     e.stopPropagation()
@@ -887,7 +907,13 @@ function LedgerHistoryRow({
 
   return (
     <li>
-      <div className="flex w-full flex-wrap items-center gap-1.5 rounded-xl bg-white p-3.5 ring-1 ring-slate-200/70 transition hover:bg-slate-50">
+      <div
+        className={cn(
+          'flex w-full flex-wrap items-center gap-1.5 rounded-xl border-l-4 bg-white p-3.5 ring-1 ring-slate-200/70 transition hover:bg-slate-50',
+          ds.accent,
+          isNoCharge && 'bg-slate-50/60 opacity-70',
+        )}
+      >
         <button
           type="button"
           onClick={canEdit ? onToggle : undefined}
@@ -895,15 +921,21 @@ function LedgerHistoryRow({
         >
           <span className="text-xs font-semibold text-slate-400">{index + 1}회차</span>
           <span className="text-sm font-medium text-slate-700">
-            {l.periodStart} ~ {l.periodEnd}
+            <DateRangeLabel start={l.periodStart} end={l.periodEnd} format={ymdKorean} />
           </span>
           <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>
             {ds.label}
           </span>
-          <span className="ml-auto flex items-center gap-1.5 text-sm text-slate-500">
-            <span className="font-semibold text-slate-800">{won(l.paidTotal)}</span>
-            <span className="text-slate-300"> / </span>
-            {won(l.baseAmount + l.carriedOverIn + l.adjustmentTotal)}
+          <span className="ml-auto flex items-center gap-1.5 text-sm">
+            {isNoCharge ? (
+              <span className="text-xs text-slate-400">실사용 이전 이력 · 청구 없음</span>
+            ) : (
+              <span className={cn('font-semibold', hasBalance ? 'text-[#A65B44]' : 'text-slate-400')}>
+                {won(l.paidTotal)}
+                <span className={hasBalance ? 'text-[#C99C8F]' : 'text-slate-300'}> / </span>
+                {won(totalDue)}
+              </span>
+            )}
           </span>
         </button>
         {canEdit && (

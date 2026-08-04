@@ -31,14 +31,14 @@ export function daysFromDue(dueDate: string): number {
   return Math.round((now - due) / 86_400_000)
 }
 
-/** 저장 상태 라벨 (파생 미적용 원형) */
-const RAW_META: Record<BillingLedger['status'], { label: string; cls: string }> = {
-  DRAFT: { label: '작성중', cls: 'bg-slate-100 text-slate-500 ring-slate-200' },
-  ISSUED: { label: '발행', cls: 'bg-[#E9EEF3] text-[#5A748F] ring-[#D4DDE7]' },
-  PARTIALLY_PAID: { label: '부분수금', cls: 'bg-[#EFEBE4] text-[#8A8172] ring-[#E2DCD1]' },
-  PAID: { label: '완납', cls: 'bg-[#E9EFEA] text-[#5C7C6B] ring-[#D3DFD6]' },
-  CARRIED_OVER: { label: '이월마감', cls: 'bg-violet-50 text-violet-700 ring-violet-200' },
-  CANCELED: { label: '취소', cls: 'bg-slate-100 text-slate-400 ring-slate-200' },
+/** 저장 상태 라벨 (파생 미적용 원형). accent는 목록 카드 좌측 컬러 바용 — 배지 색과 짝을 맞춘다. */
+const RAW_META: Record<BillingLedger['status'], { label: string; cls: string; accent: string }> = {
+  DRAFT: { label: '작성중', cls: 'bg-slate-100 text-slate-500 ring-slate-200', accent: 'border-l-slate-300' },
+  ISSUED: { label: '발행', cls: 'bg-[#E9EEF3] text-[#5A748F] ring-[#D4DDE7]', accent: 'border-l-[#5A748F]' },
+  PARTIALLY_PAID: { label: '부분수금', cls: 'bg-[#EFEBE4] text-[#8A8172] ring-[#E2DCD1]', accent: 'border-l-[#8A8172]' },
+  PAID: { label: '완납', cls: 'bg-[#E9EFEA] text-[#5C7C6B] ring-[#D3DFD6]', accent: 'border-l-[#5C7C6B]' },
+  CARRIED_OVER: { label: '이월마감', cls: 'bg-violet-50 text-violet-700 ring-violet-200', accent: 'border-l-violet-400' },
+  CANCELED: { label: '취소', cls: 'bg-slate-100 text-slate-400 ring-slate-200', accent: 'border-l-slate-200' },
 }
 
 /**
@@ -46,14 +46,19 @@ const RAW_META: Record<BillingLedger['status'], { label: string; cls: string }> 
  *  - 발행/부분수금 + 납기 전 → '입금예정' (더스티블루)
  *  - 발행/부분수금 + 납기 경과·잔액>0 → '연체 N일' (클레이)
  */
-export function displayStatus(l: BillingLedger): { label: string; cls: string } {
+export function displayStatus(l: BillingLedger): { label: string; cls: string; accent: string } {
   if (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID') {
     if (isOverdue(l)) {
-      return { label: `연체 ${daysFromDue(l.dueDate!)}일`, cls: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]' }
+      return {
+        label: `연체 ${daysFromDue(l.dueDate!)}일`,
+        cls: 'bg-[#F2E8E3] text-[#A65B44] ring-[#E4D2C9]',
+        accent: 'border-l-[#A65B44]',
+      }
     }
     return {
       label: l.status === 'PARTIALLY_PAID' ? '부분입금 · 입금예정' : '입금예정',
       cls: 'bg-[#E9EEF3] text-[#5A748F] ring-[#D4DDE7]',
+      accent: 'border-l-[#5A748F]',
     }
   }
   return RAW_META[l.status]
