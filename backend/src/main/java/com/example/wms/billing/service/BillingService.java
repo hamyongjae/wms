@@ -103,7 +103,10 @@ public class BillingService {
         // 이미 출고 완료된 계약은 실제 출고일이 확정이므로 건드리지 않는다.
         if (order.isOutbound()) return;
         LocalDate current = order.getExpectedEndDate();
-        if (current == null || periodEnd.isAfter(current)) {
+        // [출고일 미정 보존] 종료일이 없는(1층처럼 계속 쓰는) 계약은 정산서를 새로 만들어도
+        // 그대로 미정으로 둔다 — BillingLedgerIssuer.extendOrderPeriod와 동일 규칙.
+        if (current == null) return;
+        if (periodEnd.isAfter(current)) {
             order.setExpectedEndDate(periodEnd);
             // [일정 동기화] 배정된 컨테이너의 출고예정일도 계약 기준으로 즉시 맞춘다.
             //   (tenant는 SecurityUtils가 아닌 계약 엔티티에서 얻어 배치/요청 문맥 모두에서 동작)
