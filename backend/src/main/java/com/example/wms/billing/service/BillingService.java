@@ -74,7 +74,7 @@ public class BillingService {
         if (ledgerRepository.existsActiveLedgerOverlapping(order.getId(), req.getPeriodStart(), req.getPeriodEnd())) {
             throw new IllegalArgumentException("이미 같은 기간에 정산서가 있습니다. 기간이 겹치지 않게 입력하세요.");
         }
-        requireNoScheduleGap(order.getId(), req.getPeriodStart(), req.getPeriodEnd(), null);
+        requireValidSchedulePlacement(order, req.getPeriodStart(), req.getPeriodEnd(), null);
 
         BigDecimal baseAmount = resolveBaseAmount(req, order);
         BigDecimal carriedOverIn = MoneyPolicy.nvl(req.getCarriedOverIn());
@@ -357,7 +357,7 @@ public class BillingService {
                 orderId, req.getPeriodStart(), req.getPeriodEnd(), ledgerId)) {
             throw new IllegalArgumentException("이미 같은 기간에 정산서가 있습니다. 기간이 겹치지 않게 입력하세요.");
         }
-        requireNoScheduleGap(orderId, req.getPeriodStart(), req.getPeriodEnd(), ledgerId);
+        requireValidSchedulePlacement(ledger.getStorageOrder(), req.getPeriodStart(), req.getPeriodEnd(), ledgerId);
 
         ledger.reviseSchedule(req.getPeriodStart(), req.getPeriodEnd(), req.getBaseAmount());
         extendOrderPeriod(ledger.getStorageOrder(), ledger.getBillingPeriodEnd());
@@ -651,14 +651,20 @@ public class BillingService {
     }
 
     /**
-     * [정산 스케줄 공백 방지] 겹침 검사만으론 못 막는 문제 — 회차 사이에 날짜가
-     * 비어버리는 것(예: 1회차 ~06-18, 2회차 06-20~이면 06-19가 붕 뜬다). 관리자가 수동으로
-     * 만들거나(createLedger) 고칠 때(editLedger) 바로 앞·뒤 활성 회차와 정확히 하루 단위로
-     * 이어지는지 검증한다. 앞/뒤에 회차가 없으면(맨 처음·맨 마지막 회차) 검사하지 않는다 —
-     * 계약 시작일과의 정합성은 이 검증의 범위 밖이다.
+     * [정산 스케줄 정합성] 겹침 검사만으론 못 막는 두 가지를 검증한다.
+     *  1) 공백 방지 — 회차 사이에 날짜가 비어버리는 것(예: 1회차 ~06-18, 2회차 06-20~이면
+     *     06-19가 붕 뜬다). 바로 앞·뒤 활성 회차와 정확히 하루 단위로 이어지는지 검증.
+     *  2) 계약 경계 일치 — 스케줄의 첫 회차 시작일은 계약의 보관 시작일과 같아야 하고
+     *     (앞에 다른 회차가 없을 때), 계약이 이미 종료(출고 완료, 실제 출고일 확정)됐다면
+     *     마지막 회차 종료일도 그 실제 출고일과 같아야 한다(뒤에 다른 회차가 없을 때).
+     *     아직 진행 중인 계약(실제 출고일 미확정)은 예정 출고일이 청구가 늘어날 때마다
+     *     같이 밀려나므로(extendOrderPeriod) 마지막 회차 종료일을 강제로 맞추지 않는다 —
+     *     강제하면 "정산서 생성(이번 회차)"으로 다음 달 청구서를 만드는 정상 흐름이 막힌다.
+     * 관리자가 수동으로 만들거나(createLedger) 고칠 때(editLedger) 호출한다.
      */
-    private void requireNoScheduleGap(Long orderId, LocalDate periodStart, LocalDate periodEnd, Long excludeLedgerId) {
-        List<BillingLedger> active = ledgerRepository.findByStorageOrderId(orderId).stream()
+    private void requireValidSchedulePlacement(StorageOrder order, LocalDate periodStart, LocalDate periodEnd,
+                                                Long excludeLedgerId) {
+        List<BillingLedger> active = ledgerRepository.findByStorageOrderId(order.getId()).stream()
                 .filter(l -> l.getStatus() != BillingStatus.CANCELED)
                 .filter(l -> excludeLedgerId == null || !l.getId().equals(excludeLedgerId))
                 .toList();
@@ -667,20 +673,30 @@ public class BillingService {
                 .filter(l -> l.getBillingPeriodEnd().isBefore(periodStart))
                 .max(java.util.Comparator.comparing(BillingLedger::getBillingPeriodEnd))
                 .orElse(null);
-        if (prev != null && !prev.getBillingPeriodEnd().plusDays(1).equals(periodStart)) {
+        if (prev != null) {
+            if (!prev.getBillingPeriodEnd().plusDays(1).equals(periodStart)) {
+                throw new IllegalArgumentException(
+                        "이전 회차(" + prev.getBillingPeriodEnd() + " 종료)와 이어지지 않습니다. 시작일을 "
+                                + prev.getBillingPeriodEnd().plusDays(1) + "로 입력하세요.");
+            }
+        } else if (!periodStart.equals(order.getStorageStartDate())) {
             throw new IllegalArgumentException(
-                    "이전 회차(" + prev.getBillingPeriodEnd() + " 종료)와 이어지지 않습니다. 시작일을 "
-                            + prev.getBillingPeriodEnd().plusDays(1) + "로 입력하세요.");
+                    "첫 회차 시작일은 계약의 보관 시작일(" + order.getStorageStartDate() + ")과 같아야 합니다.");
         }
 
         BillingLedger next = active.stream()
                 .filter(l -> l.getBillingPeriodStart().isAfter(periodEnd))
                 .min(java.util.Comparator.comparing(BillingLedger::getBillingPeriodStart))
                 .orElse(null);
-        if (next != null && !periodEnd.plusDays(1).equals(next.getBillingPeriodStart())) {
+        if (next != null) {
+            if (!periodEnd.plusDays(1).equals(next.getBillingPeriodStart())) {
+                throw new IllegalArgumentException(
+                        "다음 회차(" + next.getBillingPeriodStart() + " 시작)와 이어지지 않습니다. 종료일을 "
+                                + next.getBillingPeriodStart().minusDays(1) + "로 입력하세요.");
+            }
+        } else if (order.getActualEndDate() != null && !periodEnd.equals(order.getActualEndDate())) {
             throw new IllegalArgumentException(
-                    "다음 회차(" + next.getBillingPeriodStart() + " 시작)와 이어지지 않습니다. 종료일을 "
-                            + next.getBillingPeriodStart().minusDays(1) + "로 입력하세요.");
+                    "마지막 회차 종료일은 계약의 실제 출고일(" + order.getActualEndDate() + ")과 같아야 합니다.");
         }
     }
 
