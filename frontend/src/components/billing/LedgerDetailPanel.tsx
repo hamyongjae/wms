@@ -172,14 +172,14 @@ export function LedgerDetailContent({
             </div>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               {/* 청구기간은 날짜 범위라 폭이 넓어 옆 칸(납기)과 붙으면 줄바꿈된 숫자가 헷갈린다 — 단독 한 줄 */}
-              <Info label="정산기간" className="col-span-2">
+              <Info label="청구기간" className="col-span-2">
                 {ymdKorean(l.periodStart)} ~ {ymdKorean(l.periodEnd)}
               </Info>
               <Info label="납기">{l.dueDate ? ymdKorean(l.dueDate) : '—'}</Info>
-              <Info label="정산금액">{won(l.baseAmount)}</Info>
+              <Info label="기본 청구액">{won(l.baseAmount)}</Info>
               <Info label="이월 유입">{won(l.carriedOverIn)}</Info>
               <Info label="조정 합계">{won(l.adjustmentTotal)}</Info>
-              <Info label="실제입금액" className="col-span-2">
+              <Info label="입금 합계" className="col-span-2">
                 {won(l.paidTotal)}
               </Info>
             </dl>
@@ -432,7 +432,7 @@ function PaymentForm({
     <form onSubmit={submit} className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
       <p className="text-sm font-semibold text-emerald-800">입금</p>
       <div className="grid grid-cols-2 gap-3">
-        <Labeled label="실제입금액(원)">
+        <Labeled label="입금액(원)">
           <input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} required className={inputCls} />
         </Labeled>
         <Labeled label="수단">
@@ -610,14 +610,14 @@ function ScheduleEditForm({
     <form onSubmit={submit} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4">
       <p className="text-sm font-semibold text-amber-800">일정 수정</p>
       <div className="grid grid-cols-2 gap-3">
-        <Labeled label="정산 시작일">
+        <Labeled label="청구 시작일">
           <CalendarField value={periodStart} onChange={setPeriodStart} format={ymdKorean} className={inputCls} />
         </Labeled>
-        <Labeled label="정산 종료일">
+        <Labeled label="청구 종료일">
           <CalendarField value={periodEnd} onChange={setPeriodEnd} format={ymdKorean} className={inputCls} />
         </Labeled>
       </div>
-      <Labeled label="정산금액(원)">
+      <Labeled label="청구액(원)">
         <input
           type="number"
           min={0}
