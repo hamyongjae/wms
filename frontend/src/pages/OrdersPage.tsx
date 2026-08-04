@@ -753,21 +753,21 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
     <>
       <Modal open onClose={onClose} title={`${target.customerName} · 정산 이력`} widthClass="max-w-2xl">
         <div className="space-y-3">
-          {/* [좌우 밸런스] 계약기간·미수잔액을 같은 크기의 라벨+값 2단 구성으로 맞춰
-              한쪽 텍스트가 길어져도 서로 안 밀리고 나란히 정렬된다. */}
-          <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
+          {/* [좌우 밸런스] 계약기간에 더 넓은 칸을 주고 짧은 날짜 포맷을 써서 한 줄로 다
+              들어가게 하고, 보관료는 좁은 칸에 오른쪽 정렬로 맞춘다. */}
+          <div className="grid grid-cols-[3fr_2fr] gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
             <div className="min-w-0">
               <p className="text-xs text-slate-400">계약 기간</p>
-              <p className="mt-0.5 font-medium text-slate-700">
+              <p className="mt-0.5 whitespace-nowrap font-medium text-slate-700">
                 <DateRangeLabel
                   start={target.storageStartDate}
                   end={target.actualEndDate ?? target.expectedEndDate}
-                  format={ymdKorean}
+                  format={md}
                 />
               </p>
             </div>
             <div className="min-w-0 text-right">
-              <p className="text-xs text-slate-400">{totalBalance > 0 ? '미수 잔액' : '정산 현황'}</p>
+              <p className="text-xs text-slate-400">보관료</p>
               <p className={cn('mt-0.5 font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-[#5C7C6B]')}>
                 {totalBalance > 0 ? won(totalBalance) : '미수 없음'}
               </p>
