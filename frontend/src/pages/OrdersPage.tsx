@@ -1022,13 +1022,16 @@ function ScheduleEditForm({
       className="mt-1.5 space-y-2.5 rounded-xl bg-amber-50/50 p-3.5 ring-1 ring-amber-200/60"
     >
       <FieldGrid>
-        <GridField label="청구 시작일">
+        <GridField label="정산 시작일">
           <CalendarField value={periodStart} onChange={setPeriodStart} max={periodEnd || undefined} className={gridInputCls} />
         </GridField>
-        <GridField label="청구 종료일">
+        <GridField label="정산 종료일">
           <CalendarField value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} className={gridInputCls} />
         </GridField>
-        <GridField label="청구 금액">
+        <GridField label="입금액">
+          <div className={gridReadonlyCls}>{won(ledger.paidTotal)}</div>
+        </GridField>
+        <GridField label="정산금액">
           <MoneyInput value={baseAmount} onChange={setBaseAmount} required className={cn(gridInputCls, 'pr-8')} />
         </GridField>
       </FieldGrid>
