@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Search, ChevronDown, Trash2, Pencil } from 'lucide-react'
+import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Search, ChevronDown } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger } from '@/api/billingApi'
-import { displayStatus, isOpenLedger } from '@/lib/billing'
-import ScheduleEditForm from '@/components/billing/ScheduleEditForm'
+import { isOpenLedger } from '@/lib/billing'
+import LedgerRow from '@/components/billing/LedgerRow'
 import { customerApi, type Customer, type CustomerType } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { containerApi } from '@/api/containerApi'
@@ -17,7 +17,7 @@ import { validateContractPeriod } from '@/lib/dateValidation'
 import { calcDailyFee, calcMonthlyFeeFromDaily, storageDays } from '@/lib/fee'
 import { extractOwner } from '@/lib/owner'
 import { orderSync } from '@/lib/orderEvents'
-import { today, addDays, addMonths, getDurationDays } from '@/lib/dates'
+import { today, addDays, addMonths, getDurationDays, md } from '@/lib/dates'
 import Modal from '@/components/ui/Modal'
 import Fab from '@/components/ui/Fab'
 import MoneyInput from '@/components/ui/MoneyInput'
@@ -72,8 +72,6 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 ]
 
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
-// 모바일 카드용 짧은 날짜(MM.DD) — 큰 글씨에서도 줄바꿈 없이 들어가도록
-const md = (s?: string | null) => (s ? s.replace(/-/g, '.') : '미정')
 // 조회 기간 검색창 표기용 — "2026년 01월 01일"
 const ymdKorean = (iso: string) => {
   const [y, m, d] = iso.split('-')
@@ -816,10 +814,10 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
           {!loading && recentLedgers.length > 0 && (
             <ol className="space-y-2">
               {recentLedgers.map((l) => (
-                <LedgerHistoryRow
+                <LedgerRow
                   key={l.id}
                   ledger={l}
-                  index={indexById.get(l.id)!}
+                  label={`${indexById.get(l.id)! + 1}회차`}
                   isAdmin={isAdmin}
                   expanded={expandedLedgerId === l.id}
                   isOnlyLedger={ledgers.length === 1}
@@ -850,10 +848,10 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                 <>
                   <ol className="space-y-2">
                     {olderLedgers.map((l) => (
-                      <LedgerHistoryRow
+                      <LedgerRow
                         key={l.id}
                         ledger={l}
-                        index={indexById.get(l.id)!}
+                        label={`${indexById.get(l.id)! + 1}회차`}
                         isAdmin={isAdmin}
                         expanded={expandedLedgerId === l.id}
                         isOnlyLedger={false}
@@ -924,151 +922,6 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
         </div>
       </Modal>
     </>
-  )
-}
-
-/**
- * [정산 이력 행] 회차 하나. 입금·조정·납기일변경·환불·이력 같은 '정산서' 내용은 여기서
- * 안 다룬다(그건 전역 '정산 관리' 화면에서) — 이 화면은 날짜·금액을 빠르게 바로잡는 용도라
- * 행을 탭하면 곧장 날짜·금액 수정 폼이 펼쳐진다. 삭제는 아직 한 푼도 안 들어온(미수) 회차만
- * — 완납된 회차는 휴지통 아이콘 자체가 안 보여 실수로 지워지는 걸 막는다.
- */
-function LedgerHistoryRow({
-  ledger: l,
-  index,
-  isAdmin,
-  expanded,
-  isOnlyLedger,
-  onToggle,
-  onCollapse,
-  onChanged,
-}: {
-  ledger: BillingLedger
-  index: number
-  isAdmin: boolean
-  expanded: boolean
-  /** 이 계약에 회차가 이거 하나뿐인지 — 지우면 정산 이력이 통째로 사라지니 안내를 다르게 한다 */
-  isOnlyLedger: boolean
-  onToggle: () => void
-  onCollapse: () => void
-  onChanged: () => void
-}) {
-  const ds = displayStatus(l)
-  const canEdit = isAdmin && l.status !== 'CARRIED_OVER' && l.status !== 'CANCELED'
-  // [삭제 방어] 아직 한 푼도 안 들어온 회차만 — 완납된 회차는 휴지통 아이콘이 아예 안 보인다.
-  const canDelete = isAdmin && l.paidTotal === 0 && isOpenLedger(l)
-  const totalDue = l.baseAmount + l.carriedOverIn + l.adjustmentTotal
-  // [버그 수정] 청구액이 0이어도 실제 입금액(paidTotal)이 있으면 "청구 없음" 고정 문구로
-  //   가리면 안 된다 — 그러면 이런 회차에서 입금액을 정정해도 화면에 반영이 안 된 것처럼
-  //   보인다(실제로는 저장됨). 청구·입금 둘 다 0일 때만 "청구 없음"으로 취급한다.
-  const isNoCharge = totalDue === 0 && l.paidTotal === 0
-  // [과거 이력 묶음] 처음부터 청구액 0원으로 만들어진 소급분과, 실제 청구했다가 나중에
-  //   전액 조정(할인)으로 0원이 된 회차는 다르다 — 라벨을 구분해 오해를 없앤다.
-  const isOriginallyZero = l.baseAmount === 0 && l.carriedOverIn === 0
-  const hasBalance = l.balance > 0
-
-  async function handleDelete(e: MouseEvent) {
-    e.stopPropagation()
-    // [단일 회차 경고] 이게 이 계약의 유일한 회차라면 지우는 순간 정산 이력이 통째로
-    // 사라진다 — 계약 자체를 잘못 등록한 거라면 여기서 지우지 말고 계약 삭제로 유도한다.
-    const msg = isOnlyLedger
-      ? '이 계약의 유일한 정산 회차입니다. 삭제하면 정산 이력이 전부 사라집니다.\n계약 자체를 잘못 등록하신 거라면 여기서 지우지 말고 "계약 관리"에서 계약을 삭제해주세요.\n\n그래도 이 회차만 삭제하시겠습니까?'
-      : '정말 이 정산 스케줄을 삭제하시겠습니까?'
-    if (!window.confirm(msg)) return
-    try {
-      await billingApi.remove(l.id)
-      onChanged()
-      orderSync.emit()
-    } catch (err) {
-      window.alert(errMsg(err, '삭제에 실패했습니다.'))
-    }
-  }
-
-  return (
-    <li>
-      <div
-        className={cn(
-          'flex w-full items-center gap-1.5 rounded-xl border-l-4 bg-white p-3.5 ring-1 ring-slate-200/70 transition hover:bg-slate-50',
-          ds.accent,
-          isNoCharge && 'bg-slate-50/60 opacity-70',
-        )}
-      >
-        <button
-          type="button"
-          onClick={canEdit ? onToggle : undefined}
-          className="flex min-w-0 flex-1 flex-col gap-1 text-left"
-        >
-          <span className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-400">{index + 1}회차</span>
-            <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>
-              {ds.label}
-            </span>
-          </span>
-          {/* [한 줄 고정] 우측 수정·삭제 버튼에 밀려 두 줄로 깨지지 않도록 짧은 날짜
-              포맷(점 표기)을 쓰고 줄바꿈 자체를 막는다 — 요약바 계약기간과 동일 처리. */}
-          <span className="whitespace-nowrap text-sm font-medium text-slate-700">
-            <DateRangeLabel start={l.periodStart} end={l.periodEnd} format={md} />
-          </span>
-          <span className="text-sm">
-            {isNoCharge ? (
-              <span className="text-xs text-slate-400">
-                {isOriginallyZero ? '실사용 이전 이력 · 청구 없음' : '전액 조정 · 청구 없음'}
-              </span>
-            ) : (
-              <span className={cn('font-semibold', hasBalance ? 'text-[#A65B44]' : 'text-slate-400')}>
-                {won(l.paidTotal)}
-                <span className={hasBalance ? 'text-[#C99C8F]' : 'text-slate-300'}> / </span>
-                {won(totalDue)}
-              </span>
-            )}
-          </span>
-        </button>
-        {/* [잘 보이는 버튼] 옅은 화살표 대신 테두리·배경이 있는 명확한 버튼으로 — 60대
-            사용자도 "여기 누르면 된다"를 바로 알 수 있게. */}
-        <div className="flex shrink-0 items-center gap-1.5">
-          {canEdit && (
-            <button
-              type="button"
-              onClick={onToggle}
-              className={cn(
-                'flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium ring-1 transition',
-                expanded
-                  ? 'bg-amber-100 text-amber-700 ring-amber-300'
-                  : 'bg-white text-slate-600 ring-slate-300 hover:bg-slate-50',
-              )}
-              title="일정 수정"
-            >
-              <Pencil size={14} />
-              수정
-            </button>
-          )}
-          {canDelete && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="flex items-center gap-1 rounded-lg bg-white px-2 py-1.5 text-xs font-medium text-red-600 ring-1 ring-red-200 transition hover:bg-red-50"
-              title="삭제"
-            >
-              <Trash2 size={14} />
-              삭제
-            </button>
-          )}
-        </div>
-      </div>
-      {l.carriedOverIn > 0 && (
-        <p className="mt-1 pl-1 text-[11px] text-slate-400">전 회차 이월 미수 {won(l.carriedOverIn)} 포함</p>
-      )}
-      {expanded && canEdit && (
-        <ScheduleEditForm
-          ledger={l}
-          onDone={() => {
-            onCollapse()
-            onChanged()
-          }}
-          onCancel={onCollapse}
-        />
-      )}
-    </li>
   )
 }
 

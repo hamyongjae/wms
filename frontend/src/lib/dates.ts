@@ -54,3 +54,6 @@ export function ymdKorean(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   return `${y}년 ${m}월 ${d}일`
 }
+
+/** yyyy-MM-dd → 'yyyy.MM.dd' — 좁은 카드·행에서 줄바꿈 없이 한 줄에 넣기 위한 짧은 표기 */
+export const md = (s?: string | null) => (s ? s.replace(/-/g, '.') : '미정')
