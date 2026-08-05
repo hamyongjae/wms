@@ -20,4 +20,7 @@ public class LedgerEditRequest {
 
     @NotNull(message = "청구액은 필수입니다")
     private BigDecimal baseAmount;
+
+    /** [선택] 보내면 현재 입금 누계와의 차액만큼 실제 입금으로 처리한다. 안 보내면 입금액은 그대로 둔다. */
+    private BigDecimal paidAmount;
 }

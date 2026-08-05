@@ -1040,16 +1040,18 @@ function ScheduleEditForm({
   const [periodStart, setPeriodStart] = useState(ledger.periodStart)
   const [periodEnd, setPeriodEnd] = useState(ledger.periodEnd)
   const [baseAmount, setBaseAmount] = useState<number | null>(Math.round(ledger.baseAmount))
+  const [paidAmount, setPaidAmount] = useState<number | null>(Math.round(ledger.paidTotal))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (baseAmount == null || baseAmount < 0) return setError('청구액을 입력하세요.')
+    if (paidAmount == null || paidAmount < 0) return setError('입금액을 입력하세요.')
     if (periodEnd < periodStart) return setError('종료일은 시작일보다 빠를 수 없습니다.')
     setSubmitting(true)
     try {
-      await billingApi.editLedger(ledger.id, { periodStart, periodEnd, baseAmount })
+      await billingApi.editLedger(ledger.id, { periodStart, periodEnd, baseAmount, paidAmount })
       onDone()
       orderSync.emit()
     } catch (err) {
@@ -1071,8 +1073,8 @@ function ScheduleEditForm({
         <GridField label="정산 종료일">
           <CalendarField value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} className={gridInputCls} />
         </GridField>
-        <GridField label="입금액">
-          <div className={gridReadonlyCls}>{won(ledger.paidTotal)}</div>
+        <GridField label="입금액" hint="실제 입금 처리됩니다">
+          <MoneyInput value={paidAmount} onChange={setPaidAmount} required className={cn(gridInputCls, 'pr-8')} />
         </GridField>
         <GridField label="정산금액">
           <MoneyInput value={baseAmount} onChange={setBaseAmount} required className={cn(gridInputCls, 'pr-8')} />

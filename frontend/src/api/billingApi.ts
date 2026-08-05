@@ -109,6 +109,8 @@ export interface LedgerEditRequest {
   periodStart: string
   periodEnd: string
   baseAmount: number
+  // [선택] 보내면 현재 입금 누계와의 차액만큼 서버가 실제 입금으로 처리한다
+  paidAmount?: number
 }
 
 export const billingApi = {
