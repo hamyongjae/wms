@@ -981,8 +981,10 @@ function LedgerHistoryRow({
               {ds.label}
             </span>
           </span>
-          <span className="text-sm font-medium text-slate-700">
-            <DateRangeLabel start={l.periodStart} end={l.periodEnd} format={ymdKorean} />
+          {/* [한 줄 고정] 우측 수정·삭제 버튼에 밀려 두 줄로 깨지지 않도록 짧은 날짜
+              포맷(점 표기)을 쓰고 줄바꿈 자체를 막는다 — 요약바 계약기간과 동일 처리. */}
+          <span className="whitespace-nowrap text-sm font-medium text-slate-700">
+            <DateRangeLabel start={l.periodStart} end={l.periodEnd} format={md} />
           </span>
           <span className="text-sm">
             {isNoCharge ? (
