@@ -743,10 +743,10 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
 
   const totalBalance = ledgers.reduce((s, l) => s + (isOpenLedger(l) ? l.balance : 0), 0)
   const paidCount = ledgers.filter((l) => l.balance <= 0).length
-  // [원터치 동선] 처리해야 할 회차(입금예정·부분입금·연체)는 위에 크게, 끝난 회차는 아래
-  // 아코디언에 접어둔다 — 60대 관리자가 스크롤 없이 "지금 뭘 해야 하는지"만 보게 한다.
-  const openLedgers = ledgers.filter(isOpenLedger)
-  const closedLedgers = ledgers.filter((l) => !isOpenLedger(l))
+  // [스크롤 압축] 최근 3회차는 상태와 무관하게 항상 펼쳐 보여주고, 그보다 이전 회차만
+  // 아코디언에 접어둔다 — 완납 여부로 가르지 않고 순수하게 "최근 것"만 늘 보이게 한다.
+  const recentLedgers = ledgers.slice(-3)
+  const olderLedgers = ledgers.slice(0, -3)
   const indexById = new Map(ledgers.map((l, i) => [l.id, i]))
 
   return (
@@ -793,10 +793,10 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
             </p>
           )}
 
-          {/* [이번 회차] 처리 대상을 위에, 완납 이력은 아래 아코디언에 접어둔다 */}
-          {!loading && openLedgers.length > 0 && (
+          {/* [최근 3회차] 상태와 무관하게 항상 펼쳐서 보여준다 */}
+          {!loading && recentLedgers.length > 0 && (
             <ol className="space-y-2">
-              {openLedgers.map((l) => (
+              {recentLedgers.map((l) => (
                 <LedgerHistoryRow
                   key={l.id}
                   ledger={l}
@@ -810,14 +810,9 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
               ))}
             </ol>
           )}
-          {!loading && ledgers.length > 0 && openLedgers.length === 0 && (
-            <p className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 px-4 py-6 text-center text-sm font-medium text-emerald-700">
-              미수금이 없습니다 — 모든 회차가 완납 처리됐습니다.
-            </p>
-          )}
 
-          {/* [지난 이력] 완납된 과거 회차 — 기본 접힘, 스크롤 피로 제거 */}
-          {!loading && closedLedgers.length > 0 && (
+          {/* [이전 이력] 최근 3회차보다 앞선 회차 — 기본 접힘, 스크롤 피로 제거 */}
+          {!loading && olderLedgers.length > 0 && (
             <div>
               <button
                 type="button"
@@ -825,11 +820,11 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                 className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-100 py-2.5 text-xs font-medium text-slate-500 transition hover:bg-slate-200"
               >
                 <ChevronDown size={14} className={cn('transition-transform', historyOpen && 'rotate-180')} />
-                지난 정산 이력 보기 ({closedLedgers.length}건 완료)
+                이전 정산 이력 보기 ({olderLedgers.length}건)
               </button>
               {historyOpen && (
                 <ol className="mt-2 space-y-2">
-                  {closedLedgers.map((l) => (
+                  {olderLedgers.map((l) => (
                     <LedgerHistoryRow
                       key={l.id}
                       ledger={l}
