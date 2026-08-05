@@ -817,32 +817,46 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
             </ol>
           )}
 
-          {/* [이전 이력] 최근 3회차보다 앞선 회차 — 기본 접힘, 스크롤 피로 제거 */}
+          {/* [이전 이력] 최근 3회차보다 앞선 회차 — 기본 접힘, 스크롤 피로 제거.
+              펼친 상태에선 위쪽 토글 버튼을 숨기고 목록 맨 아래에 "접기" 버튼만 둔다 —
+              펼친 목록 중간에 버튼이 끼어 있으면 헷갈린다. */}
           {!loading && olderLedgers.length > 0 && (
             <div>
-              <button
-                type="button"
-                onClick={() => setHistoryOpen((v) => !v)}
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-100 py-2.5 text-xs font-medium text-slate-500 transition hover:bg-slate-200"
-              >
-                <ChevronDown size={14} className={cn('transition-transform', historyOpen && 'rotate-180')} />
-                이전 정산 이력 보기 ({olderLedgers.length}건)
-              </button>
+              {!historyOpen && (
+                <button
+                  type="button"
+                  onClick={() => setHistoryOpen(true)}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-100 py-2.5 text-xs font-medium text-slate-500 transition hover:bg-slate-200"
+                >
+                  <ChevronDown size={14} />
+                  이전 정산 이력 보기 ({olderLedgers.length}건)
+                </button>
+              )}
               {historyOpen && (
-                <ol className="mt-2 space-y-2">
-                  {olderLedgers.map((l) => (
-                    <LedgerHistoryRow
-                      key={l.id}
-                      ledger={l}
-                      index={indexById.get(l.id)!}
-                      isAdmin={isAdmin}
-                      expanded={expandedLedgerId === l.id}
-                      onToggle={() => setExpandedLedgerId((cur) => (cur === l.id ? null : l.id))}
-                      onCollapse={() => setExpandedLedgerId(null)}
-                      onChanged={() => load(target.id)}
-                    />
-                  ))}
-                </ol>
+                <>
+                  <ol className="space-y-2">
+                    {olderLedgers.map((l) => (
+                      <LedgerHistoryRow
+                        key={l.id}
+                        ledger={l}
+                        index={indexById.get(l.id)!}
+                        isAdmin={isAdmin}
+                        expanded={expandedLedgerId === l.id}
+                        onToggle={() => setExpandedLedgerId((cur) => (cur === l.id ? null : l.id))}
+                        onCollapse={() => setExpandedLedgerId(null)}
+                        onChanged={() => load(target.id)}
+                      />
+                    ))}
+                  </ol>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryOpen(false)}
+                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-100 py-2.5 text-xs font-medium text-slate-500 transition hover:bg-slate-200"
+                  >
+                    <ChevronDown size={14} className="rotate-180" />
+                    접기
+                  </button>
+                </>
               )}
             </div>
           )}
