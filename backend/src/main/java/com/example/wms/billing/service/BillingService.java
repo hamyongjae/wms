@@ -354,11 +354,14 @@ public class BillingService {
      * 이어붙인다(reconcileSchedulePlacement). 기간이 늘어나면 계약 종료일도 함께 확장한다
      * (createLedger와 동일 규칙 — 출고일 미정 계약은 그대로 미정 유지).
      *
-     * [입금액 함께 처리] req.paidAmount가 오면 현재 입금 누계와의 차액만큼 실제 입금
-     * 이력(PaymentHistory)을 남긴다 — recordPayment와 같은 원리를 한 트랜잭션 안에서
-     * 처리해, 잔액이 남으면 자동으로 부분입금, 다 채우면 완납으로 상태가 바뀐다
-     * (BillingLedger.recompute() 재사용, 별도 상태 전환 로직 불필요). 차액이 음수면
-     * (=지금보다 입금액을 줄이려는 시도) 어떤 입금 건을 취소할지 특정할 수 없어 막는다.
+     * [입금액 함께 처리] req.paidAmount가 오면 현재 입금 누계와의 차액만큼 이력
+     * (PaymentHistory)을 남긴다 — recordPayment와 같은 원리를 한 트랜잭션 안에서 처리해,
+     * 잔액이 남으면 자동으로 부분입금, 다 채우면 완납으로 상태가 바뀐다
+     * (BillingLedger.recompute() 재사용, 별도 상태 전환 로직 불필요).
+     * 차액이 음수(=지금보다 입금액을 줄임)면 "어느 건을 취소했는지" 특정하는 대신
+     * 감액분만큼 음수 금액의 정정 이력을 새로 남기고 원장 잔액을 그만큼 되돌린다 —
+     * 특정 입금 건 하나를 골라 취소하는 것과 결과(누적 입금액)는 같고, 방금 잘못 입력한
+     * 금액을 바로 고치고 싶을 때 정산 관리 화면을 오갈 필요가 없다.
      */
     @Transactional
     public BillingLedgerResponse editLedger(Long ledgerId, LedgerEditRequest req) {
@@ -374,16 +377,18 @@ public class BillingService {
                 throw new IllegalArgumentException("입금액은 0 이상이어야 합니다.");
             }
             BigDecimal delta = req.getPaidAmount().subtract(ledger.getPaidTotal());
-            if (delta.signum() > 0) {
+            if (delta.signum() != 0) {
                 Long userId = SecurityUtils.getCurrentUser().getUserId();
+                String memo = delta.signum() > 0 ? "일정 수정에서 입금 처리" : "일정 수정에서 감액 정정";
                 PaymentHistory payment = new PaymentHistory(
                         ledger.getTenant(), ledger, delta, PaymentMethod.BANK_TRANSFER,
-                        LocalDate.now(), "일정 수정에서 입금 처리", userId);
+                        LocalDate.now(), memo, userId);
                 paymentHistoryRepository.save(payment);
-                ledger.applyPayment(delta);
-            } else if (delta.signum() < 0) {
-                throw new IllegalArgumentException(
-                        "입금액을 지금보다 줄일 수 없습니다. 정산 관리 화면에서 해당 입금 건을 취소한 뒤 다시 시도하세요.");
+                if (delta.signum() > 0) {
+                    ledger.applyPayment(delta);
+                } else {
+                    ledger.reversePayment(delta.negate());
+                }
             }
         }
         return new BillingLedgerResponse(ledger);
