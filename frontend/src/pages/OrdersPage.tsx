@@ -810,10 +810,11 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
             </p>
           )}
 
-          {/* [최근 3회차] 상태와 무관하게 항상 펼쳐서 보여준다 */}
+          {/* [최근 3회차] 상태와 무관하게 항상 펼쳐서 보여준다 — 가장 최근 회차가 위로 오도록
+              날짜 오름차순 배열(ledgers)을 뒤집어서 렌더한다. */}
           {!loading && recentLedgers.length > 0 && (
             <ol className="space-y-2">
-              {recentLedgers.map((l) => (
+              {[...recentLedgers].reverse().map((l) => (
                 <LedgerRow
                   key={l.id}
                   ledger={l}
@@ -847,7 +848,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
               {historyOpen && (
                 <>
                   <ol className="space-y-2">
-                    {olderLedgers.map((l) => (
+                    {[...olderLedgers].reverse().map((l) => (
                       <LedgerRow
                         key={l.id}
                         ledger={l}

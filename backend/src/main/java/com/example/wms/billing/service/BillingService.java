@@ -26,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -88,7 +87,7 @@ public class BillingService {
         Customer customer = order.getCustomer();
 
         BillingLedger ledger = new BillingLedger(
-                tenant, order, customer, generateLedgerNo(),
+                tenant, order, customer, tempLedgerNo(),
                 req.getBillingType(), req.getSettlementType(),
                 req.getPeriodStart(), req.getPeriodEnd(),
                 baseAmount, carriedOverIn, req.getDueDate());
@@ -98,7 +97,7 @@ public class BillingService {
                 : (req.getSettlementType() == SettlementType.PREPAID ? req.getPeriodStart() : req.getPeriodEnd());
         ledger.issue(due);
 
-        BillingLedger saved = ledgerRepository.save(ledger);
+        BillingLedger saved = persistWithLedgerNo(ledger);
         // [보관기간 동기화] 회차 청구가 계약 종료일을 넘기면 계약을 그 종료일까지 자동 연장
         extendOrderPeriod(order, saved.getBillingPeriodEnd());
         return new BillingLedgerResponse(saved);
@@ -144,12 +143,12 @@ public class BillingService {
         PaymentMethod payMethod = method != null ? method : PaymentMethod.BANK_TRANSFER;
 
         BillingLedger ledger = new BillingLedger(
-                order.getTenant(), order, order.getCustomer(), generateLedgerNo(),
+                order.getTenant(), order, order.getCustomer(), tempLedgerNo(),
                 BillingType.MONTHLY, SettlementType.PREPAID,
                 periodStart, periodEnd, base, BigDecimal.ZERO, due);
 
         ledger.issue(due);                      // DRAFT → ISSUED (납기 = 납기일)
-        ledgerRepository.save(ledger);
+        persistWithLedgerNo(ledger);
 
         Long userId = SecurityUtils.getCurrentUser().getUserId();
         paymentHistoryRepository.save(new PaymentHistory(
@@ -174,12 +173,12 @@ public class BillingService {
                 : (periodEnd != null ? periodEnd : periodStart);
 
         BillingLedger ledger = new BillingLedger(
-                order.getTenant(), order, order.getCustomer(), generateLedgerNo(),
+                order.getTenant(), order, order.getCustomer(), tempLedgerNo(),
                 BillingType.MONTHLY, SettlementType.POSTPAID,
                 periodStart, periodEnd, base, BigDecimal.ZERO, due);
 
         ledger.issue(due);                      // DRAFT → ISSUED (미납 = 전액 = 입금예정)
-        ledgerRepository.save(ledger);
+        persistWithLedgerNo(ledger);
     }
 
     /**
@@ -193,11 +192,11 @@ public class BillingService {
     @Transactional
     public void settleHistoricalBundle(StorageOrder order, LocalDate periodStart, LocalDate periodEnd) {
         BillingLedger ledger = new BillingLedger(
-                order.getTenant(), order, order.getCustomer(), generateLedgerNo(),
+                order.getTenant(), order, order.getCustomer(), tempLedgerNo(),
                 BillingType.MONTHLY, SettlementType.POSTPAID,
                 periodStart, periodEnd, BigDecimal.ZERO, BigDecimal.ZERO, periodEnd);
         ledger.issue(periodEnd);
-        ledgerRepository.save(ledger);
+        persistWithLedgerNo(ledger);
     }
 
     /**
@@ -783,13 +782,26 @@ public class BillingService {
         eventPublisher.publishEvent(new BillingNotificationEvent(notification));
     }
 
-    private String generateLedgerNo() {
-        String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String ledgerNo;
-        do {
-            int random = (int) (Math.random() * 10000);
-            ledgerNo = String.format("LDG-%s-%04d", datePart, random);
-        } while (ledgerRepository.existsByLedgerNo(ledgerNo));
-        return ledgerNo;
+    /**
+     * [임시 번호] id 발급 전까지만 NOT NULL/UNIQUE 제약을 만족시키는 자리표시자. UUID라 그 자체로
+     * 충돌 가능성이 사실상 0이고, {@link #persistWithLedgerNo}가 저장 직후 곧바로 실제 번호로
+     * 덮어쓰므로 화면에 노출되지 않는다.
+     */
+    private String tempLedgerNo() {
+        return "TMP-" + java.util.UUID.randomUUID();
+    }
+
+    /**
+     * [번호 확정 저장] 원장을 저장해 auto-increment id를 발급받은 뒤, 그 id로 최종 청구번호를
+     * 확정한다. 예전엔 4자리 난수를 생성해 existsByLedgerNo로 미리 확인하는 방식이었는데, 확인과
+     * 저장 사이에 경쟁 상태가 있어(생일 문제 — 같은 날짜에 원장이 많이 쌓이면 확률이 무시할 수
+     * 없는 수준까지 올라간다) 유니크 제약 위반이 실제로 재현됐다. id는 DB가 발급하는 순간부터
+     * 이미 유일하므로 이 방식은 재시도 자체가 필요 없다(같은 이유로 BillingLedgerIssuer에도
+     * 동일하게 적용돼 있다).
+     */
+    private BillingLedger persistWithLedgerNo(BillingLedger ledger) {
+        BillingLedger saved = ledgerRepository.save(ledger);
+        saved.finalizeLedgerNo(BillingLedger.buildLedgerNo(LocalDate.now(), saved.getId()));
+        return saved;
     }
 }

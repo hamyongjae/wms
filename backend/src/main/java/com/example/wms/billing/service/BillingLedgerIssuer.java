@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 
 /**
  * ===== [배치 전용 — 계약 하나·회차 하나를 독립 트랜잭션으로 발행] =====
@@ -69,11 +68,12 @@ public class BillingLedgerIssuer {
                 BigDecimal.valueOf(order.getMonthlyFee()), periodStart, periodEnd);
 
         BillingLedger ledger = new BillingLedger(
-                order.getTenant(), order, order.getCustomer(), generateLedgerNo(),
+                order.getTenant(), order, order.getCustomer(), tempLedgerNo(),
                 BillingType.MONTHLY, SettlementType.POSTPAID,
                 periodStart, periodEnd, base, MoneyPolicy.ZERO, dueDate);
         ledger.issue(dueDate);
-        ledgerRepository.save(ledger);
+        BillingLedger saved = ledgerRepository.save(ledger);
+        saved.finalizeLedgerNo(BillingLedger.buildLedgerNo(LocalDate.now(), saved.getId()));
         extendOrderPeriod(order.getId(), periodEnd);
         return true;
     }
@@ -106,13 +106,14 @@ public class BillingLedgerIssuer {
         }
     }
 
-    private String generateLedgerNo() {
-        String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String ledgerNo;
-        do {
-            int random = (int) (Math.random() * 10000);
-            ledgerNo = String.format("LDG-%s-%04d", datePart, random);
-        } while (ledgerRepository.existsByLedgerNo(ledgerNo));
-        return ledgerNo;
+    /**
+     * [임시 번호] id 발급 전까지만 NOT NULL/UNIQUE 제약을 만족시키는 자리표시자. 저장 직후
+     * {@link BillingLedger#buildLedgerNo}로 만든 실제 번호로 곧바로 덮어써 화면엔 노출되지 않는다.
+     * (BillingService.persistWithLedgerNo와 동일한 이유 — 예전 4자리 난수+존재확인 방식은
+     * 확인과 저장 사이 경쟁 상태에서 유니크 제약 위반이 재현됐다. 특히 이 메서드는 배치가 계약을
+     * 순회하며 각각 독립 트랜잭션으로 호출하므로 그 경쟁 상태가 가장 발생하기 쉬운 자리였다.)
+     */
+    private String tempLedgerNo() {
+        return "TMP-" + java.util.UUID.randomUUID();
     }
 }

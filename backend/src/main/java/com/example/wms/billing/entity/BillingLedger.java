@@ -267,6 +267,25 @@ public class BillingLedger {
         recompute();
     }
 
+    /**
+     * [번호 확정] id 발급(=최초 INSERT) 직후, 임시로 넣어둔 번호를 사람이 읽는 최종 청구번호로
+     * 교체한다. {@link #buildLedgerNo}가 auto-increment id 기반으로 만들어 충돌이 있을 수 없다.
+     */
+    public void finalizeLedgerNo(String ledgerNo) {
+        this.ledgerNo = ledgerNo;
+    }
+
+    /**
+     * [정산서 번호 규칙] "LDG-yyyyMMdd-{id 6자리}" 형태의 사람이 읽는 청구번호를 만든다.
+     * 예전엔 4자리 난수를 뽑아 existsByLedgerNo로 중복을 확인하는 방식이었는데, 같은 날짜에
+     * 원장이 많이 쌓이면(생일 문제) 확인-저장 사이 경쟁 상태에서 유니크 제약 위반이 실제로
+     * 발생할 수 있었다. id는 DB가 발급하는 순간부터 이미 유일하므로, 그 값을 그대로 써서
+     * 재시도 자체가 필요 없게 만든다.
+     */
+    public static String buildLedgerNo(LocalDate today, Long id) {
+        return String.format("LDG-%s-%06d", today.format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE), id);
+    }
+
     /** 납기일 변경 (계약 수정에서 청구 조건 재정렬 시) */
     public void changeDueDate(LocalDate dueDate) {
         requireActive();

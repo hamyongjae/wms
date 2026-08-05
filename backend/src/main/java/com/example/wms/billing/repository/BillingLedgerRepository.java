@@ -42,8 +42,6 @@ public interface BillingLedgerRepository extends JpaRepository<BillingLedger, Lo
     // [캘린더] 해당 테넌트의 전체 원장 (청구 이벤트 파생용)
     List<BillingLedger> findAllByTenantId(Long tenantId);
 
-    boolean existsByLedgerNo(String ledgerNo);
-
     // [배치] 같은 계약·같은 청구기간 원장이 이미 있는지 (월 청구 중복 생성 방지)
     boolean existsByStorageOrderIdAndBillingPeriodStart(Long storageOrderId, LocalDate billingPeriodStart);
 
