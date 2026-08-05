@@ -826,9 +826,9 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                 <button
                   type="button"
                   onClick={() => setHistoryOpen(true)}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-100 py-2.5 text-xs font-medium text-slate-500 transition hover:bg-slate-200"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-100 py-3.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
                 >
-                  <ChevronDown size={14} />
+                  <ChevronDown size={18} />
                   이전 정산 이력 보기 ({olderLedgers.length}건)
                 </button>
               )}
@@ -851,9 +851,9 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                   <button
                     type="button"
                     onClick={() => setHistoryOpen(false)}
-                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-100 py-2.5 text-xs font-medium text-slate-500 transition hover:bg-slate-200"
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-slate-100 py-3.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
                   >
-                    <ChevronDown size={14} className="rotate-180" />
+                    <ChevronDown size={18} className="rotate-180" />
                     접기
                   </button>
                 </>
