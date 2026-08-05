@@ -29,7 +29,6 @@ import PaymentAccountPicker from '@/components/order/PaymentAccountPicker'
 import { placeContainerAtSlot } from '@/lib/containerPlacement'
 import {
   AutoBillingToggle,
-  HistoricalContractToggle,
   CalendarField,
   Field,
   FieldGrid,
@@ -256,6 +255,15 @@ export default function OrdersPage() {
     [orders, locationsByOrder],
   )
   const overdueCount = useMemo(() => orders.filter(isOutboundOverdue).length, [orders])
+
+  // [주의 필터 자동 해제] 배너를 켠 뒤 그 문제(미배치/지연)가 다른 화면에서 해결되면 배너 자체는
+  //   카운트가 0이 되어 사라지지만(그 안에 있던 "필터 해제" 버튼도 함께 사라진다), attention 상태는
+  //   그대로 남아 목록만 계속 걸러진 채였다 — 상단 칩(전체/입고/출고)은 attention과 무관하게 세므로
+  //   숫자는 정상인데 목록만 텅 비어 보이는 버그로 실제 보고됨. 카운트가 0이 되는 순간 자동으로 끈다.
+  useEffect(() => {
+    if (attention === 'UNPLACED' && unplacedCount === 0) setAttention('NONE')
+    if (attention === 'OVERDUE' && overdueCount === 0) setAttention('NONE')
+  }, [attention, unplacedCount, overdueCount])
 
   // 배너를 눌러 주의 필요 목록만 볼 때는 다른 조회 조건(상태 탭·조회어·날짜)을 비워
   // "지금 이 화면에 보이는 게 전부"라는 걸 명확히 한다.
@@ -968,8 +976,6 @@ export function CreateOrderModal({
   const [staffList, setStaffList] = useState<Staff[]>([])
   // [정산서 생성 방식] 기본값은 수동 생성 — 담당자가 명시적으로 켜야만 매월 자동 청구가 시작된다.
   const [autoBillingEnabled, setAutoBillingEnabled] = useState(false)
-  // [과거 계약 등록] 보관 시작일이 과거인 계약을 지금 처음 등록할 때만 의미 있는 1회성 옵션
-  const [historicalContract, setHistoricalContract] = useState(false)
   const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -1005,16 +1011,6 @@ export function CreateOrderModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days])
 
-  // [과거 계약 등록 기본값] 보관 시작일이 두 달(60일) 이상 과거면 체크박스를 자동으로 켠다 —
-  //   직원이 깜빡하고 안 켠 채 등록해 소급 연체가 무더기로 생기는 사고가 두 번 있었다.
-  //   사용자가 수동으로 끈 뒤에도 시작일을 다시 고르면 이 효과가 재평가되어 다시 켜질 수 있는데,
-  //   "날짜를 새로 고른 시점의 합리적 기본값"이라는 취지에 맞으므로 의도된 동작이다.
-  useEffect(() => {
-    if (!storageStartDate) return
-    const daysAgo = storageDays(storageStartDate, today())
-    if (daysAgo != null && daysAgo > 60) setHistoricalContract(true)
-  }, [storageStartDate])
-
   const isBlacklisted = selectedCustomer?.status === 'BLACKLISTED'
   const isDormant = selectedCustomer?.status === 'DORMANT'
 
@@ -1042,7 +1038,6 @@ export function CreateOrderModal({
       setSettlementUserId(null)
       setDueDate('')
       setAutoBillingEnabled(false)
-      setHistoricalContract(false)
       setMemo('')
       setFormError(null)
       setDormantConfirm(false)
@@ -1141,7 +1136,6 @@ export function CreateOrderModal({
         capacityTons: capacityTons ?? undefined,
         memo: memo || undefined,
         autoBillingEnabled,
-        historicalContract,
       })
       // 위치를 지정했으면 컨테이너 생성·배정·적재까지 이어서 처리(미지정이면 생략)
       if (slotId != null) {
@@ -1431,11 +1425,6 @@ export function CreateOrderModal({
             )}
 
             <AutoBillingToggle checked={autoBillingEnabled} onChange={setAutoBillingEnabled} dueDate={dueDate} />
-
-            {/* [과거 계약 등록] 보관 시작일이 과거일 때만 노출 — 오늘/미래 시작일이면 켜도 의미 없음 */}
-            {storageStartDate !== '' && storageStartDate < today() && (
-              <HistoricalContractToggle checked={historicalContract} onChange={setHistoricalContract} />
-            )}
 
             <div>
               <label className={labelCls}>메모</label>

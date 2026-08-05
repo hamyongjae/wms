@@ -438,42 +438,6 @@ export function AutoBillingToggle({
   )
 }
 
-/**
- * [과거 계약 등록] 실제로는 예전부터 보관 중이었던 계약을 지금 처음 입력할 때 켠다.
- * 켜면 '입고일~어제'까지를 0원·완료 처리된 정산서 1건으로 묶어 남기고, '오늘부터'의
- * 진짜 청구만 새로 시작한다 — 매일 배치가 그 사이 공백을 소급 청구하며 연체를 쌓는 걸 방지한다.
- * 등록(생성) 시점 1회성 처리라 EditOrderModal에는 넣지 않는다.
- */
-export function HistoricalContractToggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean
-  onChange: (v: boolean) => void
-}) {
-  return (
-    <label
-      className={cn(
-        'flex cursor-pointer select-none items-start gap-2.5 rounded-lg border px-3 py-2.5 transition',
-        checked ? 'border-indigo-400 bg-indigo-50/60' : 'border-slate-200 hover:bg-slate-50',
-      )}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-      />
-      <span>
-        <span className="block text-sm font-semibold text-slate-700">과거부터 보관 중이던 계약</span>
-        <span className="mt-0.5 block text-[11px] text-slate-400">
-          체크하면 입고일~어제까지는 0원·완료 처리하고, 오늘부터만 정산서를 새로 발행합니다.
-        </span>
-      </span>
-    </label>
-  )
-}
-
 /** '출고일 미정'이 켜졌을 때 날짜 입력창 자리를 대신하는 톤다운 표시 */
 export function UndecidedPlaceholder() {
   return (

@@ -45,8 +45,6 @@ export interface OrderCreate {
   memo?: string
   // 정산서 생성 방식 — true: 매월 자동 생성, false(기본값): 수동 생성. 최초 청구서는 이 값과 무관하게 항상 자동 발행됨.
   autoBillingEnabled?: boolean
-  // [과거 계약 등록] true면 입고일~어제를 0원·완료 원장 1건으로 묶고 오늘부터 진짜 정산서를 새로 시작한다.
-  historicalContract?: boolean
 }
 
 export interface OrderUpdate {
