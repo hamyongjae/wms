@@ -464,6 +464,41 @@ class BillingServiceIntegrationTest extends IntegrationTestBase {
             assertThat(adjustmentRepository.findByBillingLedgerIdAndTenantIdOrderByCreatedAtAsc(l.getId(), tenant.getId()))
                     .isEmpty();
         }
+
+        @Test
+        @DisplayName("마지막 회차를 삭제하면 계약의 출고예정일도 그 이전 회차 종료일로 되돌아간다(extendOrderPeriod의 역방향)")
+        void revertsOrderExpectedEndDateWhenDeletingLastLedger() {
+            StorageOrder o = order(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), 100_000);
+            billingService.createLedger(
+                    createReq(o.getId(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), new BigDecimal("100000")));
+            BillingLedgerResponse l2 = billingService.createLedger(
+                    createReq(o.getId(), LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28), new BigDecimal("100000")));
+
+            // 2회차 생성으로 출고예정일이 2/28까지 자동 연장된 상태에서 시작
+            assertThat(storageOrderRepository.findById(o.getId()).orElseThrow().getExpectedEndDate())
+                    .isEqualTo(LocalDate.of(2026, 2, 28));
+
+            billingService.deleteLedger(l2.getId());
+
+            assertThat(storageOrderRepository.findById(o.getId()).orElseThrow().getExpectedEndDate())
+                    .isEqualTo(LocalDate.of(2026, 1, 31));
+        }
+
+        @Test
+        @DisplayName("출고예정일을 관리자가 회차 종료일보다 더 먼 날짜로 별도 지정해뒀다면, 마지막 회차를 지워도 건드리지 않는다")
+        void doesNotRevertExpectedEndDateWhenItDoesNotMatchDeletedLedger() {
+            StorageOrder o = order(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), 100_000);
+            billingService.createLedger(
+                    createReq(o.getId(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), new BigDecimal("100000")));
+            BillingLedgerResponse l2 = billingService.createLedger(
+                    createReq(o.getId(), LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28), new BigDecimal("100000")));
+
+            billingService.deleteLedger(l2.getId());
+
+            // 출고예정일(3/31)이 지운 회차의 종료일(2/28)과 다르므로 그대로 유지된다.
+            assertThat(storageOrderRepository.findById(o.getId()).orElseThrow().getExpectedEndDate())
+                    .isEqualTo(LocalDate.of(2026, 3, 31));
+        }
     }
 
     // ===================== 수금 =====================

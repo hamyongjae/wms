@@ -418,6 +418,20 @@ public class BillingService {
                     prevLocked.getBillingPeriodStart(),
                     next.getBillingPeriodStart().minusDays(1),
                     prevLocked.getBaseAmount());
+        } else if (next == null && prev != null) {
+            // [보관기간 동기화 - 역방향] extendOrderPeriod가 회차 생성 시 계약의 예정 출고일을
+            // 그 회차 종료일까지 자동으로 늘려둔 것과 대칭 — 그 마지막 회차를 지우면(아직 실제
+            // 출고 전이고, 예정 출고일이 지금 지우는 회차의 종료일과 정확히 같을 때만) 예정
+            // 출고일도 이제 마지막이 된 이전 회차 종료일로 되돌린다. 예정 출고일이 그 회차 종료일과
+            // 다르면(관리자가 별도로 더 먼 날짜를 지정해둔 경우) 그 값을 임의로 건드리지 않는다.
+            StorageOrder order = ledger.getStorageOrder();
+            if (order.getActualEndDate() == null
+                    && ledger.getBillingPeriodEnd().equals(order.getExpectedEndDate())) {
+                order.setExpectedEndDate(prev.getBillingPeriodEnd());
+                for (var c : containerRepository.findByTenantIdAndCurrentOrderId(order.getTenant().getId(), order.getId())) {
+                    c.setStorageDates(order.getStorageStartDate(), prev.getBillingPeriodEnd());
+                }
+            }
         }
         paymentHistoryRepository.deleteByBillingLedgerId(ledger.getId());
         adjustmentRepository.deleteByBillingLedgerId(ledger.getId());
