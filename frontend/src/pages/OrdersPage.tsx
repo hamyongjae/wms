@@ -742,6 +742,12 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
   }
 
   const totalBalance = ledgers.reduce((s, l) => s + (isOpenLedger(l) ? l.balance : 0), 0)
+  // [보관료] 남은 미수 잔액이 아니라 진행 중인 회차의 정산금액(청구 총액)을 보여준다 —
+  // 부분입금 후에도 "얼마 남았나"가 아니라 "원래 보관료가 얼마였나"가 보이게.
+  const totalDue = ledgers.reduce(
+    (s, l) => s + (isOpenLedger(l) ? l.baseAmount + l.carriedOverIn + l.adjustmentTotal : 0),
+    0,
+  )
   const paidCount = ledgers.filter((l) => l.balance <= 0).length
   // [스크롤 압축] 최근 3회차는 상태와 무관하게 항상 펼쳐 보여주고, 그보다 이전 회차만
   // 아코디언에 접어둔다 — 완납 여부로 가르지 않고 순수하게 "최근 것"만 늘 보이게 한다.
@@ -769,7 +775,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
             <div className="min-w-0 text-right">
               <p className="text-xs text-slate-400">보관료</p>
               <p className={cn('mt-0.5 font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-[#5C7C6B]')}>
-                {totalBalance > 0 ? won(totalBalance) : '미수 없음'}
+                {totalDue > 0 ? won(totalDue) : '미수 없음'}
               </p>
             </div>
             {ledgers.length > 0 && (
