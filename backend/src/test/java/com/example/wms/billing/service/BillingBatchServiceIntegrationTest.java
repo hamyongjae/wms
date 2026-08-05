@@ -208,6 +208,53 @@ class BillingBatchServiceIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("[신규] 예정 출고일이 다음 회차 중간에 있으면 한 달을 다 채우지 않고 그 날짜까지만 마지막 회차를 생성한다")
+    void clampsFinalRoundToExpectedEndDate() {
+        Tenant tenant = createTenant("임박출고업체");
+        Warehouse warehouse = createWarehouse(tenant);
+        Customer customer = createCustomer(tenant);
+        // 두 번째 회차(9/15~) 중간인 9/20에 출고 예정 — 한 달(10/14)을 다 채우면 안 된다
+        StorageOrder order = createOrder(tenant, customer, warehouse,
+                LocalDate.of(2026, 8, 15), LocalDate.of(2026, 9, 20), 100_000);
+        createLedger(tenant, order, customer,
+                LocalDate.of(2026, 8, 15), LocalDate.of(2026, 9, 14), new BigDecimal("100000.00"));
+
+        billingBatchService.generateDueLedgers(LocalDate.of(2026, 9, 15));
+
+        List<BillingLedger> ledgers = ledgersSortedByPeriodStart(order);
+        assertThat(ledgers).hasSize(2);
+        BillingLedger last = ledgers.get(1);
+        assertThat(last.getBillingPeriodStart()).isEqualTo(LocalDate.of(2026, 9, 15));
+        assertThat(last.getBillingPeriodEnd()).isEqualTo(LocalDate.of(2026, 9, 20));
+        // 짧은 마지막 회차는 "매달 N일" 납기 패턴 대신 회차 종료일을 그대로 납기일로 쓴다
+        assertThat(last.getDueDate()).isEqualTo(LocalDate.of(2026, 9, 20));
+        // 종료일이 예정일과 정확히 같으므로 연장 로직(extendOrderPeriod)이 개입하지 않는다
+        StorageOrder refreshed = storageOrderRepository.findById(order.getId()).orElseThrow();
+        assertThat(refreshed.getExpectedEndDate()).isEqualTo(LocalDate.of(2026, 9, 20));
+    }
+
+    @Test
+    @DisplayName("[신규] 예정 출고일이 이미 지났는데(출고 지연) 아직 미출고면 축소하지 않고 꽉 찬 한 달을 계속 생성한다")
+    void doesNotClampWhenExpectedEndDateAlreadyPassed() {
+        Tenant tenant = createTenant("출고지연업체");
+        Warehouse warehouse = createWarehouse(tenant);
+        Customer customer = createCustomer(tenant);
+        // 예정 출고일(8/20)이 이미 다음 회차 시작일(9/15)보다 훨씬 과거 — 출고가 늦어지는 상황 재현
+        StorageOrder order = createOrder(tenant, customer, warehouse,
+                LocalDate.of(2026, 8, 15), LocalDate.of(2026, 8, 20), 100_000);
+        createLedger(tenant, order, customer,
+                LocalDate.of(2026, 8, 15), LocalDate.of(2026, 9, 14), new BigDecimal("100000.00"));
+
+        billingBatchService.generateDueLedgers(LocalDate.of(2026, 9, 15));
+
+        List<BillingLedger> ledgers = ledgersSortedByPeriodStart(order);
+        assertThat(ledgers).hasSize(2);
+        assertThat(ledgers.get(1).getBillingPeriodEnd()).isEqualTo(LocalDate.of(2026, 10, 14));
+        StorageOrder refreshed = storageOrderRepository.findById(order.getId()).orElseThrow();
+        assertThat(refreshed.getExpectedEndDate()).isEqualTo(LocalDate.of(2026, 10, 14));
+    }
+
+    @Test
     @DisplayName("[회귀] 출고일 미정(null) 장기 계약은 회차 청구가 계속돼도 출고예정일이 임의로 채워지지 않는다")
     void preservesNullExpectedEndDateForIndefiniteContracts() {
         StorageOrder order = seedOrderWithInitialLedger(); // expectedEndDate=null(미정)로 생성됨

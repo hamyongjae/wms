@@ -58,6 +58,13 @@ public class BillingBatchService {
      * 서버가 며칠 멈췄다 복구된 경우 계약당 최대 {@link #MAX_PERIODS_PER_RUN}회차까지 한 번에
      * 캐치업 생성한다 — 실제로 보관은 계속 진행 중이었으므로 매출 인식을 인위적으로 지연시키지 않는다.
      *
+     * [예정 출고일 임박 - 마지막 회차 축소] 새로 만들 회차 안에 계약의 예정 출고일이 들어오면(=한
+     * 달을 다 채우기 전에 나갈 예정이면) 꽉 찬 한 달 대신 그 예정일까지만 청구하고 이 계약의 롤링을
+     * 멈춘다 — 나중에 관리자가 중도출고 정산으로 수동으로 줄일 필요가 없다. 예정일이 이미 지났는데도
+     * 아직 미출고(=출고가 늦어짐)면 대상이 아니다 — 그런 계약은 지금처럼 꽉 찬 한 달을 계속 굴리고
+     * 예정일 자체를 뒤로 밀어준다(아래 extendOrderPeriod 참고). 실제로 그 예정일에 맞춰 출고 처리
+     * (OUTBOUND 전환)되면 계약이 activeOrders 대상에서 아예 빠지므로 그 뒤로는 신경 쓸 필요가 없다.
+     *
      * [트랜잭션 경계 주의] 이 메서드는 절대 {@code @Transactional}을 붙이면 안 된다 — 여러 테넌트를
      * 순회하며 {@link BillingLedgerIssuer#issueIfNotOverlapping}(REQUIRES_NEW)을 반복 호출하는데,
      * 이 메서드 자체가 이미 트랜잭션 안이면 그 REQUIRES_NEW가 "이미 활성인 트랜잭션을 suspend"하게
@@ -102,8 +109,21 @@ public class BillingBatchService {
                 }
 
                 LocalDate periodStart = nextStart;
-                LocalDate periodEnd = periodStart.plusMonths(1).minusDays(1);
-                LocalDate dueDate = recurringDueDate(order, periodStart);
+                LocalDate fullPeriodEnd = periodStart.plusMonths(1).minusDays(1);
+                // [예정 출고일 임박 - 마지막 회차 축소] 예정 출고일이 이번 회차 안에 들어오면
+                // (=한 달을 다 채우기 전에 나갈 예정이면) 굳이 꽉 찬 한 달을 청구한 뒤 나중에
+                // 관리자가 중도출고 정산으로 수동으로 줄이게 하지 않고, 처음부터 예정 출고일까지만
+                // 청구한다. 예정일이 이미 지났는데 아직 미출고(=출고가 늦어짐)면 대상이 아니다 —
+                // 그런 경우는 지금처럼 꽉 찬 한 달을 계속 굴리고 예정일 자체를 뒤로 밀어준다
+                // (extendOrderPeriod). 예정일 미정(장기 계약)도 당연히 대상 아님.
+                LocalDate expectedEnd = order.getExpectedEndDate();
+                boolean isFinalRound = expectedEnd != null
+                        && !expectedEnd.isBefore(periodStart) && expectedEnd.isBefore(fullPeriodEnd);
+                LocalDate periodEnd = isFinalRound ? expectedEnd : fullPeriodEnd;
+                // 짧게 자른 마지막 회차는 "매달 N일" 패턴을 그대로 적용하면 납기일이 회차 종료일보다
+                // 뒤로 밀릴 수 있다(예: 매달 25일 납부인데 회차가 10일에 끝남) — 후불 소급분과 동일하게
+                // 납기일 = 회차 종료일로 둔다.
+                LocalDate dueDate = isFinalRound ? periodEnd : recurringDueDate(order, periodStart);
 
                 // [테넌트 격리] runAs override는 반드시 issuer 호출을 "감싸는" 형태여야 한다 — issuer의
                 //   @Transactional(REQUIRES_NEW) 프록시가 새 세션을 여는 시점에 override가 이미
