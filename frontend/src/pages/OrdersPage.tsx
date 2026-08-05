@@ -978,12 +978,30 @@ export function CreateOrderModal({
   //   입력 필드를 건드리지 않고 화면 표기용으로만 쓰므로, 사용자가 입력한 값이 덮어써질 일이 없다.
   const days = useMemo(() => storageDays(storageStartDate, expectedEndDate), [storageStartDate, expectedEndDate])
 
+  // [보관일수 미확정 시 임시 보관] 출고예정일 '미정' 등으로 보관일수를 계산할 수 없으면
+  //   monthlyFee를 역산할 수 없어 입력값을 어디에도 반영 못 하고 그대로 잃어버렸다(커서만
+  //   깜빡이고 입력이 안 되는 버그). 그 사이엔 타이핑한 값을 여기 임시로 들고 있다가,
+  //   날짜가 확정되는 순간 아래 effect가 자동으로 반영한다.
+  const [dailyFeeDraft, setDailyFeeDraft] = useState<number | null>(null)
+
   // [읽기 전용 파생값] 하루 보관료 = 보관료 ÷ 보관일수(당일 포함).
-  //   세 값이 모두 유효할 때만 숫자, 그 외(출고예정일 미입력·날짜 역전 등)엔 null → 빈 값으로 표기.
+  //   보관일수가 확정됐을 때만 monthlyFee 에서 파생해 보여주고, 미확정이면 임시 입력값을 그대로 보여준다.
   const dailyFee = useMemo(
-    () => calcDailyFee(monthlyFee, storageStartDate, expectedEndDate),
-    [monthlyFee, storageStartDate, expectedEndDate],
+    () => (days == null ? dailyFeeDraft : calcDailyFee(monthlyFee, storageStartDate, expectedEndDate)),
+    [days, dailyFeeDraft, monthlyFee, storageStartDate, expectedEndDate],
   )
+
+  // [지연 반영] 보관일수가 미확정 → 확정으로 바뀌는 순간, 대기 중이던 하루 보관료 임시값이 있으면
+  //   그걸로 보관료를 채운다. 한 번 반영하면 draft를 비워 이후엔 정상적인 파생 표시로 넘어간다.
+  useEffect(() => {
+    if (days == null || dailyFeeDraft == null || dailyFeeDraft <= 0) return
+    const computed = calcMonthlyFeeFromDaily(dailyFeeDraft, storageStartDate, expectedEndDate)
+    if (computed != null) {
+      setMonthlyFee(computed)
+      setDailyFeeDraft(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days])
 
   // [과거 계약 등록 기본값] 보관 시작일이 두 달(60일) 이상 과거면 체크박스를 자동으로 켠다 —
   //   직원이 깜빡하고 안 켠 채 등록해 소급 연체가 무더기로 생기는 사고가 두 번 있었다.
@@ -1015,6 +1033,7 @@ export function CreateOrderModal({
       setEndDate('')
       setEndDateUnknown(false)
       setMonthlyFee(null)
+      setDailyFeeDraft(null)
       setCapacityTons(null)
       setPaymentType('PREPAID')
       setPaymentMethod('BANK_TRANSFER')
@@ -1048,6 +1067,10 @@ export function CreateOrderModal({
   //   다만 "하루 보관료"는 예외로 입력 가능하게 열어뒀다 — 그 값을 입력하는 순간에만
   //   보관료 = 하루 보관료 × 보관일수로 채워주고, 그 뒤로는 보관료 필드를 그대로 직접 수정해도 된다.
   function handleDailyFeeChange(v: number | null) {
+    // [임시값 갱신] 보관일수가 아직 미확정이면 이 값을 그대로만 들고 있는다(위 dailyFeeDraft 참고) —
+    //   그래야 날짜 미정 상태에서도 타이핑한 값이 화면에 그대로 보인다.
+    setDailyFeeDraft(v)
+    if (days == null) return
     // [빈 값 전파] 이 칸은 자체 상태 없이 monthlyFee 에서 파생된 값을 보여준다.
     //   비웠을 때 아무것도 안 하면 monthlyFee 가 그대로 남아 파생값이 즉시 되살아나고,
     //   결과적으로 마지막 한 자리가 지워지지 않는다. 두 값은 같은 금액의 두 표현이므로

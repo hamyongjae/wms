@@ -82,6 +82,9 @@ export default function EditOrderModal({
   // [출고일 미정] 종료일이 확정되지 않은 장기 보관 건을 표현하는 스위치
   const [endDateUnknown, setEndDateUnknown] = useState(false)
   const [monthlyFee, setMonthlyFee] = useState<number | null>(null)
+  // [보관일수 미확정 시 임시 보관] 출고예정일 '미정'이면 보관일수를 못 구해 monthlyFee를
+  // 역산할 수 없다 — 그 사이 타이핑한 하루 보관료 값을 여기 들고 있다가 날짜 확정 시 자동 반영한다.
+  const [dailyFeeDraft, setDailyFeeDraft] = useState<number | null>(null)
   const [capacityTons, setCapacityTons] = useState<number | null>(null)
   const [memo, setMemo] = useState('')
   const [paymentType, setPaymentType] = useState<PaymentType>('POSTPAID')
@@ -106,6 +109,7 @@ export default function EditOrderModal({
     // [방어 로직] 종료일이 비어 있으면 어떤 경로로 들어오든 '출고일 미정'이 자동으로 켜진다.
     setEndDateUnknown(target.expectedEndDate == null || target.expectedEndDate === '')
     setMonthlyFee(target.monthlyFee)
+    setDailyFeeDraft(null)
     setCapacityTons(target.capacityTons)
     setMemo(target.memo ?? '')
     setPaymentType(target.paymentType ?? 'POSTPAID')
@@ -169,15 +173,33 @@ export default function EditOrderModal({
     }
   }, [storageStartDate, currentSlotId])
 
+  // [지연 반영] 보관일수가 미확정 → 확정으로 바뀌는 순간, 대기 중이던 하루 보관료 임시값이
+  //   있으면 그걸로 보관료를 채운다. 반영 후엔 draft를 비워 정상적인 파생 표시로 넘어간다.
+  useEffect(() => {
+    const days = storageDays(storageStartDate, expectedEndDate)
+    if (days == null || dailyFeeDraft == null || dailyFeeDraft <= 0) return
+    const computed = calcMonthlyFeeFromDaily(dailyFeeDraft, storageStartDate, expectedEndDate)
+    if (computed != null) {
+      setMonthlyFee(computed)
+      setDailyFeeDraft(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageStartDate, expectedEndDate])
+
   if (!target) return null
 
   // [정합성] 보관 시작일이 계약 종료일보다 미래가 될 수 없다 (당일 허용)
   const periodError = validateContractPeriod(storageStartDate, expectedEndDate)
   const days = storageDays(storageStartDate, expectedEndDate)
-  const dailyFee = calcDailyFee(monthlyFee, storageStartDate, expectedEndDate)
+  // 보관일수가 확정됐을 때만 monthlyFee 에서 파생해 보여주고, 미확정이면 임시 입력값을 그대로 보여준다.
+  const dailyFee = days == null ? dailyFeeDraft : calcDailyFee(monthlyFee, storageStartDate, expectedEndDate)
   // 하루 보관료 칸에 직접 입력하면 그 순간 보관료 = 입력값 × 보관일수로 채운다(반대 방향은
   // 위 dailyFee 파생값이 이미 실시간으로 보여준다 — 등록 폼과 동일 패턴).
   function handleDailyFeeChange(v: number | null) {
+    // [임시값 갱신] 보관일수가 아직 미확정이면 이 값을 그대로만 들고 있는다(위 dailyFeeDraft 참고) —
+    //   그래야 날짜 미정 상태에서도 타이핑한 값이 화면에 그대로 보인다.
+    setDailyFeeDraft(v)
+    if (days == null) return
     // [빈 값 전파] 이 칸은 자체 상태 없이 monthlyFee 에서 파생된 값을 보여준다.
     //   비웠을 때 아무것도 안 하면 monthlyFee 가 그대로 남아 파생값이 즉시 되살아나고,
     //   결과적으로 마지막 한 자리가 지워지지 않는다. 두 값은 같은 금액의 두 표현이므로
