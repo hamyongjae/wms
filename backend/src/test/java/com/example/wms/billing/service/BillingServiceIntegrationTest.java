@@ -382,16 +382,18 @@ class BillingServiceIntegrationTest extends IntegrationTestBase {
     class DeleteLedger {
 
         @Test
-        @DisplayName("입금 내역이 있는 원장은 삭제할 수 없다")
-        void cannotDeleteLedgerWithPayments() {
+        @DisplayName("입금 내역이 있어도 원장을 삭제할 수 있고, 그 입금 이력도 함께 지워진다")
+        void deletingLedgerWithPaymentsCascadesPaymentHistory() {
             StorageOrder o = order(LocalDate.of(2026, 1, 1), null, 100_000);
             BillingLedger l = issuedLedger(o, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), "100000.00");
             billingService.recordPayment(l.getId(), paymentReq(new BigDecimal("10000")));
 
             Long id = l.getId();
-            assertThatThrownBy(() -> billingService.deleteLedger(id))
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("수금 내역");
+            billingService.deleteLedger(id);
+
+            assertThat(billingLedgerRepository.findById(id)).isEmpty();
+            assertThat(paymentHistoryRepository.findByBillingLedgerIdAndTenantIdOrderByPaidOnAsc(id, tenant.getId()))
+                    .isEmpty();
         }
 
         @Test

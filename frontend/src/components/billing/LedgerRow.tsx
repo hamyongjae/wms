@@ -4,11 +4,10 @@ import { Pencil, Trash2 } from 'lucide-react'
 import { billingApi, type BillingLedger } from '@/api/billingApi'
 import { cn } from '@/lib/cn'
 import { orderSync } from '@/lib/orderEvents'
-import { displayStatus, isOpenLedger } from '@/lib/billing'
+import { displayStatus } from '@/lib/billing'
 import { md } from '@/lib/dates'
 import DateRangeLabel from '@/components/ui/DateRangeLabel'
 import ScheduleEditForm from '@/components/billing/ScheduleEditForm'
-import PaymentHistoryList from '@/components/billing/PaymentHistoryList'
 
 /**
  * [정산 회차 행 — 단일 공용 템플릿] 회차 하나(상태·기간·금액)를 보여주고, 탭하면
@@ -49,8 +48,9 @@ export default function LedgerRow({
 }) {
   const ds = displayStatus(l)
   const canEdit = isAdmin && l.status !== 'CARRIED_OVER' && l.status !== 'CANCELED'
-  // [삭제 방어] 아직 한 푼도 안 들어온 회차만 — 완납된 회차는 휴지통 아이콘이 아예 안 보인다.
-  const canDelete = isAdmin && l.paidTotal === 0 && isOpenLedger(l)
+  // [삭제] 입금 기록이 있어도 삭제 가능 — 서버가 원장과 함께 그 입금 이력도 지운다.
+  //   이월된 원장만 막는다(그 다음 원장의 이월액과 정합이 깨지므로) — canEdit과 동일 조건.
+  const canDelete = canEdit
   const totalDue = l.baseAmount + l.carriedOverIn + l.adjustmentTotal
   // [버그 수정] 청구액이 0이어도 실제 입금액(paidTotal)이 있으면 "청구 없음" 고정 문구로
   //   가리면 안 된다 — 그러면 이런 회차에서 입금액을 정정해도 화면에 반영이 안 된 것처럼
@@ -65,9 +65,13 @@ export default function LedgerRow({
     e.stopPropagation()
     // [단일 회차 경고] 이게 이 계약의 유일한 회차라면 지우는 순간 정산 이력이 통째로
     // 사라진다 — 계약 자체를 잘못 등록한 거라면 여기서 지우지 말고 계약 삭제로 유도한다.
-    const msg = isOnlyLedger
-      ? '이 계약의 유일한 정산 회차입니다. 삭제하면 정산 이력이 전부 사라집니다.\n계약 자체를 잘못 등록하신 거라면 여기서 지우지 말고 "계약 관리"에서 계약을 삭제해주세요.\n\n그래도 이 회차만 삭제하시겠습니까?'
-      : '정말 이 정산 스케줄을 삭제하시겠습니까?'
+    const onlyLedgerNotice = isOnlyLedger
+      ? '이 계약의 유일한 정산 회차입니다. 삭제하면 정산 이력이 전부 사라집니다.\n계약 자체를 잘못 등록하신 거라면 여기서 지우지 말고 "계약 관리"에서 계약을 삭제해주세요.\n\n'
+      : ''
+    // [입금 경고] 입금 기록이 있는 회차를 지우면 그 입금 이력도 함께 사라진다 — 삭제 전에 분명히 알린다.
+    const paidNotice =
+      l.paidTotal > 0 ? `이 회차에는 ${won(l.paidTotal)} 입금 기록이 있습니다. 삭제하면 그 입금 기록도 함께 사라집니다.\n\n` : ''
+    const msg = `${onlyLedgerNotice}${paidNotice}${onlyLedgerNotice ? '그래도 이 회차만' : '정말 이 정산 스케줄을'} 삭제하시겠습니까?`
     if (!window.confirm(msg)) return
     try {
       await billingApi.remove(l.id)
@@ -153,18 +157,15 @@ export default function LedgerRow({
         <p className="mt-1 pl-1 text-[11px] text-slate-400">전 회차 이월 미수 {won(l.carriedOverIn)} 포함</p>
       )}
       {expanded && canEdit && (
-        <div className="mt-1.5 space-y-1.5">
-          <PaymentHistoryList ledgerId={l.id} isAdmin={isAdmin} onChanged={onChanged} />
-          <ScheduleEditForm
-            ledger={l}
-            lockStartDate={lockStartDate}
-            onDone={() => {
-              onCollapse()
-              onChanged()
-            }}
-            onCancel={onCollapse}
-          />
-        </div>
+        <ScheduleEditForm
+          ledger={l}
+          lockStartDate={lockStartDate}
+          onDone={() => {
+            onCollapse()
+            onChanged()
+          }}
+          onCancel={onCollapse}
+        />
       )}
     </li>
   )

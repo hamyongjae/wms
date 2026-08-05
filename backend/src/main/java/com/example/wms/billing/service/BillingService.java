@@ -377,21 +377,16 @@ public class BillingService {
 
     /**
      * [정산 기록 삭제] 실수로 생성됐거나 잘못된 원장을 화면에서 완전히 지운다.
+     * 입금·조정 이력이 있어도 막지 않고 원장과 함께 전부 지운다 — 정산 이력 화면의
+     * "삭제" 한 번으로 끝나야 하고, 입금 이력만 따로 취소한 뒤 지우나 곧바로 지우나
+     * 최종 결과(원장·이력이 모두 사라짐)는 어차피 같기 때문이다.
      *
-     * [하드가드] 실제 입금(수금) 흔적이 있거나 다음 원장으로 이월된 원장은 삭제를 막는다 —
-     *   그 흔적을 지우면 실제로 주고받은 돈의 기록이 사라져 회계가 어긋난다. 그런 원장을
-     *   정리하려면 먼저 수금 취소(reversePayment)로 흔적을 없앤 뒤 삭제해야 한다.
-     *   조정(할인/가산) 이력은 막지 않는다 — 과거 데이터에 "청구 후 전액 할인으로 0원 처리"된
-     *   회차가 많이 남아있는데(실제 돈은 안 오갔음), 이런 회차까지 막으면 정리를 못 한다.
-     *   조정 이력은 원장과 함께 지워진다(하단 삭제 처리 참고).
-     * 가드를 통과하면(실제 입금이 없는 원장) 하위 이력(수금·조정)까지 함께 지운다.
+     * [하드가드] 다음 원장으로 이월된 원장만 삭제를 막는다 — 이월 연결이 끊기면 그
+     *   다음 원장의 carriedOverIn과 정합이 깨진다.
      */
     @Transactional
     public void deleteLedger(Long ledgerId) {
         BillingLedger ledger = lockLedger(ledgerId);
-        if (ledger.getPaidTotal().signum() > 0) {
-            throw new IllegalStateException("수금 내역이 있는 원장은 삭제할 수 없습니다. 먼저 수금을 취소한 뒤 다시 시도하세요.");
-        }
         if (ledger.getStatus() == BillingStatus.CARRIED_OVER) {
             throw new IllegalStateException("이미 다음 원장으로 이월된 원장은 삭제할 수 없습니다.");
         }
