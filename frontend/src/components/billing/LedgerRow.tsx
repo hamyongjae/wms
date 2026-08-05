@@ -8,6 +8,7 @@ import { displayStatus, isOpenLedger } from '@/lib/billing'
 import { md } from '@/lib/dates'
 import DateRangeLabel from '@/components/ui/DateRangeLabel'
 import ScheduleEditForm from '@/components/billing/ScheduleEditForm'
+import PaymentHistoryList from '@/components/billing/PaymentHistoryList'
 
 /**
  * [정산 회차 행 — 단일 공용 템플릿] 회차 하나(상태·기간·금액)를 보여주고, 탭하면
@@ -152,15 +153,18 @@ export default function LedgerRow({
         <p className="mt-1 pl-1 text-[11px] text-slate-400">전 회차 이월 미수 {won(l.carriedOverIn)} 포함</p>
       )}
       {expanded && canEdit && (
-        <ScheduleEditForm
-          ledger={l}
-          lockStartDate={lockStartDate}
-          onDone={() => {
-            onCollapse()
-            onChanged()
-          }}
-          onCancel={onCollapse}
-        />
+        <div className="mt-1.5 space-y-1.5">
+          <PaymentHistoryList ledgerId={l.id} isAdmin={isAdmin} onChanged={onChanged} />
+          <ScheduleEditForm
+            ledger={l}
+            lockStartDate={lockStartDate}
+            onDone={() => {
+              onCollapse()
+              onChanged()
+            }}
+            onCancel={onCollapse}
+          />
+        </div>
       )}
     </li>
   )
