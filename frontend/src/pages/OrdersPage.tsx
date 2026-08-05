@@ -6,6 +6,7 @@ import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type P
 import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger } from '@/api/billingApi'
 import { displayStatus, isOpenLedger } from '@/lib/billing'
+import ScheduleEditForm from '@/components/billing/ScheduleEditForm'
 import { customerApi, type Customer, type CustomerType } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
 import { containerApi } from '@/api/containerApi'
@@ -1068,85 +1069,6 @@ function LedgerHistoryRow({
         />
       )}
     </li>
-  )
-}
-
-/* ===== 정산 이력 행 - 날짜·금액 수정 폼 ===== */
-function ScheduleEditForm({
-  ledger,
-  onDone,
-  onCancel,
-}: {
-  ledger: BillingLedger
-  onDone: () => void
-  onCancel: () => void
-}) {
-  const [periodStart, setPeriodStart] = useState(ledger.periodStart)
-  const [periodEnd, setPeriodEnd] = useState(ledger.periodEnd)
-  const [baseAmount, setBaseAmount] = useState<number | null>(Math.round(ledger.baseAmount))
-  const [paidAmount, setPaidAmount] = useState<number | null>(Math.round(ledger.paidTotal))
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    if (baseAmount == null || baseAmount < 0) return setError('청구액을 입력하세요.')
-    if (paidAmount == null || paidAmount < 0) return setError('입금액을 입력하세요.')
-    if (periodEnd < periodStart) return setError('종료일은 시작일보다 빠를 수 없습니다.')
-    // [오터치 방지] 입금액이 실제로 바뀌는 경우만 변경 전후 금액을 보여주고 한 번 더 확인한다.
-    const currentPaid = Math.round(ledger.paidTotal)
-    if (paidAmount !== currentPaid) {
-      if (!window.confirm(`입금액을 ${won(currentPaid)}에서 ${won(paidAmount)}(으)로 정정하시겠습니까?`)) return
-    }
-    setSubmitting(true)
-    try {
-      await billingApi.editLedger(ledger.id, { periodStart, periodEnd, baseAmount, paidAmount })
-      onDone()
-      orderSync.emit()
-    } catch (err) {
-      setError(errMsg(err, '일정 수정에 실패했습니다.'))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <form
-      onSubmit={submit}
-      className="mt-1.5 space-y-2.5 rounded-xl bg-amber-50/50 p-3.5 ring-1 ring-amber-200/60"
-    >
-      <FieldGrid>
-        <GridField label="정산 시작일">
-          <CalendarField value={periodStart} onChange={setPeriodStart} max={periodEnd || undefined} className={gridInputCls} />
-        </GridField>
-        <GridField label="정산 종료일">
-          <CalendarField value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} className={gridInputCls} />
-        </GridField>
-        <GridField label="입금액" hint="실제 입금 처리됩니다">
-          <MoneyInput value={paidAmount} onChange={setPaidAmount} required className={cn(gridInputCls, 'pr-8')} />
-        </GridField>
-        <GridField label="정산금액">
-          <MoneyInput value={baseAmount} onChange={setBaseAmount} required className={cn(gridInputCls, 'pr-8')} />
-        </GridField>
-      </FieldGrid>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <div className="flex justify-end gap-1.5">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 transition hover:bg-white"
-        >
-          취소
-        </button>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-700 disabled:opacity-60"
-        >
-          {submitting ? '저장 중…' : '일정 저장'}
-        </button>
-      </div>
-    </form>
   )
 }
 

@@ -14,6 +14,7 @@ import { today, ymdKorean } from '@/lib/dates'
 import { displayStatus } from '@/lib/billing'
 import Modal from '@/components/ui/Modal'
 import { CalendarField } from '@/components/order/orderFormUi'
+import ScheduleEditForm from '@/components/billing/ScheduleEditForm'
 
 /**
  * ===== [정산 상세 — 단일 공용 템플릿] =====
@@ -262,14 +263,7 @@ export function LedgerDetailContent({
             <DueDateForm ledgerId={ledgerId} currentDueDate={l.dueDate} onDone={afterAction} onError={setActionError} />
           )}
           {mode === 'schedule' && (
-            <ScheduleEditForm
-              ledgerId={ledgerId}
-              currentPeriodStart={l.periodStart}
-              currentPeriodEnd={l.periodEnd}
-              currentBaseAmount={l.baseAmount}
-              onDone={afterAction}
-              onError={setActionError}
-            />
+            <ScheduleEditForm ledger={l} onDone={afterAction} onCancel={() => setMode(null)} />
           )}
 
           {/* 입금 이력 */}
@@ -568,66 +562,6 @@ function DueDateForm({
         <CalendarField value={dueDate} onChange={setDueDate} format={ymdKorean} className={inputCls} />
       </Labeled>
       <SubmitRow submitting={submitting} label="납기일 저장" />
-    </form>
-  )
-}
-
-/* ===== 일정 수정 폼 ===== */
-function ScheduleEditForm({
-  ledgerId,
-  currentPeriodStart,
-  currentPeriodEnd,
-  currentBaseAmount,
-  onDone,
-  onError,
-}: {
-  ledgerId: number
-  currentPeriodStart: string
-  currentPeriodEnd: string
-  currentBaseAmount: number
-  onDone: () => void
-  onError: (m: string) => void
-}) {
-  const [periodStart, setPeriodStart] = useState(currentPeriodStart)
-  const [periodEnd, setPeriodEnd] = useState(currentPeriodEnd)
-  const [baseAmount, setBaseAmount] = useState(String(Math.round(currentBaseAmount)))
-  const [submitting, setSubmitting] = useState(false)
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    setSubmitting(true)
-    try {
-      await billingApi.editLedger(ledgerId, { periodStart, periodEnd, baseAmount: Number(baseAmount) })
-      onDone()
-    } catch (err) {
-      onError(errMsg(err, '일정 수정에 실패했습니다.'))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4">
-      <p className="text-sm font-semibold text-amber-800">일정 수정</p>
-      <div className="grid grid-cols-2 gap-3">
-        <Labeled label="청구 시작일">
-          <CalendarField value={periodStart} onChange={setPeriodStart} format={ymdKorean} className={inputCls} />
-        </Labeled>
-        <Labeled label="청구 종료일">
-          <CalendarField value={periodEnd} onChange={setPeriodEnd} format={ymdKorean} className={inputCls} />
-        </Labeled>
-      </div>
-      <Labeled label="청구액(원)">
-        <input
-          type="number"
-          min={0}
-          value={baseAmount}
-          onChange={(e) => setBaseAmount(e.target.value)}
-          required
-          className={inputCls}
-        />
-      </Labeled>
-      <SubmitRow submitting={submitting} label="일정 저장" />
     </form>
   )
 }
