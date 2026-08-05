@@ -957,7 +957,10 @@ function LedgerHistoryRow({
   // [삭제 방어] 아직 한 푼도 안 들어온 회차만 — 완납된 회차는 휴지통 아이콘이 아예 안 보인다.
   const canDelete = isAdmin && l.paidTotal === 0 && isOpenLedger(l)
   const totalDue = l.baseAmount + l.carriedOverIn + l.adjustmentTotal
-  const isNoCharge = totalDue === 0
+  // [버그 수정] 청구액이 0이어도 실제 입금액(paidTotal)이 있으면 "청구 없음" 고정 문구로
+  //   가리면 안 된다 — 그러면 이런 회차에서 입금액을 정정해도 화면에 반영이 안 된 것처럼
+  //   보인다(실제로는 저장됨). 청구·입금 둘 다 0일 때만 "청구 없음"으로 취급한다.
+  const isNoCharge = totalDue === 0 && l.paidTotal === 0
   // [과거 이력 묶음] 처음부터 청구액 0원으로 만들어진 소급분과, 실제 청구했다가 나중에
   //   전액 조정(할인)으로 0원이 된 회차는 다르다 — 라벨을 구분해 오해를 없앤다.
   const isOriginallyZero = l.baseAmount === 0 && l.carriedOverIn === 0
