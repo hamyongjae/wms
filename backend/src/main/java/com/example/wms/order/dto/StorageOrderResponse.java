@@ -39,6 +39,8 @@ public class StorageOrderResponse {
 
     // 정산서 생성 방식 — true: 매월 자동 생성, false: 수동 생성
     private final Boolean autoBillingEnabled;
+    // 정산서 자동 생성 주기(개월) — autoBillingEnabled가 true일 때만 의미 있음
+    private final Integer billingCycleMonths;
 
     public StorageOrderResponse(StorageOrder order) {
         this.id = order.getId();
@@ -70,5 +72,6 @@ public class StorageOrderResponse {
         this.accountHolder = su != null ? su.getAccountHolder() : null;
 
         this.autoBillingEnabled = order.getAutoBillingEnabled();
+        this.billingCycleMonths = order.getBillingCycleMonths();
     }
 }

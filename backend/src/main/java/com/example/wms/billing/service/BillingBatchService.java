@@ -109,12 +109,13 @@ public class BillingBatchService {
                 }
 
                 LocalDate periodStart = nextStart;
-                LocalDate fullPeriodEnd = periodStart.plusMonths(1).minusDays(1);
+                int cycleMonths = order.getBillingCycleMonths() != null ? order.getBillingCycleMonths() : 1;
+                LocalDate fullPeriodEnd = periodStart.plusMonths(cycleMonths).minusDays(1);
                 // [예정 출고일 임박 - 마지막 회차 축소] 예정 출고일이 이번 회차 안에 들어오면
-                // (=한 달을 다 채우기 전에 나갈 예정이면) 굳이 꽉 찬 한 달을 청구한 뒤 나중에
+                // (=생성 주기를 다 채우기 전에 나갈 예정이면) 굳이 꽉 찬 주기를 청구한 뒤 나중에
                 // 관리자가 중도출고 정산으로 수동으로 줄이게 하지 않고, 처음부터 예정 출고일까지만
                 // 청구한다. 예정일이 이미 지났는데 아직 미출고(=출고가 늦어짐)면 대상이 아니다 —
-                // 그런 경우는 지금처럼 꽉 찬 한 달을 계속 굴리고 예정일 자체를 뒤로 밀어준다
+                // 그런 경우는 지금처럼 꽉 찬 주기를 계속 굴리고 예정일 자체를 뒤로 밀어준다
                 // (extendOrderPeriod). 예정일 미정(장기 계약)도 당연히 대상 아님.
                 LocalDate expectedEnd = order.getExpectedEndDate();
                 boolean isFinalRound = expectedEnd != null
@@ -182,9 +183,10 @@ public class BillingBatchService {
         for (StorageOrder order : missing) {
             if (order.getMonthlyFee() == null || order.getMonthlyFee() <= 0) continue;
             LocalDate periodStart = order.getStorageStartDate();
-            // [출고일 미정 임시 기간] 월 단위 청구이므로 한 달로 잡는다 (등록·수정과 동일 규칙)
+            int cycleMonths = order.getBillingCycleMonths() != null ? order.getBillingCycleMonths() : 1;
+            // [출고일 미정 임시 기간] 계약의 생성 주기와 같은 길이로 잡는다 (등록·수정과 동일 규칙)
             LocalDate periodEnd = order.getExpectedEndDate() != null
-                    ? order.getExpectedEndDate() : periodStart.plusMonths(1).minusDays(1);
+                    ? order.getExpectedEndDate() : periodStart.plusMonths(cycleMonths).minusDays(1);
             LocalDate dueDate = periodEnd;   // 후불 소급분 납기 = 보관 종료일
 
             boolean issued = TenantContext.runAs(order.getTenantId(), () ->

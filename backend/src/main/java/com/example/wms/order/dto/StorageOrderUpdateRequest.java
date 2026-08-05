@@ -25,4 +25,7 @@ public class StorageOrderUpdateRequest {
 
     // 정산서 생성 방식(자동/수동) — 미지정(null) 시 기존 값 유지
     private Boolean autoBillingEnabled;
+
+    // [정산서 생성 주기] 미지정(null) 시 기존 값 유지. autoBillingEnabled가 true일 때만 의미 있음.
+    private Integer billingCycleMonths;
 }

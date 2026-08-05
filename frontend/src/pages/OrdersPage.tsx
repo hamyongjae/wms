@@ -717,7 +717,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
     const last = [...ledgers].sort((a, b) => (a.periodEnd < b.periodEnd ? -1 : 1)).at(-1)
     const start = last ? addDays(last.periodEnd, 1) : (target!.storageStartDate ?? today())
     setGenStart(start)
-    setGenEnd(addMonths(start, 1))
+    setGenEnd(addMonths(start, target!.billingCycleMonths ?? 1))
     setGenAmount(target!.monthlyFee ?? null)
     setGenDue(start) // 선납 기준 납기 = 기간 시작일 (필요 시 조정)
     setGenError(null)
@@ -980,6 +980,8 @@ export function CreateOrderModal({
   const [staffList, setStaffList] = useState<Staff[]>([])
   // [정산서 생성 방식] 기본값은 수동 생성 — 담당자가 명시적으로 켜야만 매월 자동 청구가 시작된다.
   const [autoBillingEnabled, setAutoBillingEnabled] = useState(false)
+  // [정산서 생성 주기] 자동 생성일 때만 의미 있음 — 기본값 1개월
+  const [billingCycleMonths, setBillingCycleMonths] = useState(1)
   const [memo, setMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -1042,6 +1044,7 @@ export function CreateOrderModal({
       setSettlementUserId(null)
       setDueDate('')
       setAutoBillingEnabled(false)
+      setBillingCycleMonths(1)
       setMemo('')
       setFormError(null)
       setDormantConfirm(false)
@@ -1140,6 +1143,7 @@ export function CreateOrderModal({
         capacityTons: capacityTons ?? undefined,
         memo: memo || undefined,
         autoBillingEnabled,
+        billingCycleMonths,
       })
       // 위치를 지정했으면 컨테이너 생성·배정·적재까지 이어서 처리(미지정이면 생략)
       if (slotId != null) {
@@ -1428,7 +1432,13 @@ export function CreateOrderModal({
               />
             )}
 
-            <AutoBillingToggle checked={autoBillingEnabled} onChange={setAutoBillingEnabled} dueDate={dueDate} />
+            <AutoBillingToggle
+              checked={autoBillingEnabled}
+              onChange={setAutoBillingEnabled}
+              dueDate={dueDate}
+              cycleMonths={billingCycleMonths}
+              onCycleMonthsChange={setBillingCycleMonths}
+            />
 
             <div>
               <label className={labelCls}>메모</label>

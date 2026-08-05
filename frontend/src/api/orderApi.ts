@@ -29,6 +29,8 @@ export interface StorageOrder {
   accountNumber: string | null
   accountHolder: string | null
   autoBillingEnabled: boolean | null
+  // 정산서 자동 생성 주기(개월) — autoBillingEnabled가 true일 때만 의미 있음
+  billingCycleMonths: number | null
 }
 
 export interface OrderCreate {
@@ -45,6 +47,8 @@ export interface OrderCreate {
   memo?: string
   // 정산서 생성 방식 — true: 매월 자동 생성, false(기본값): 수동 생성. 최초 청구서는 이 값과 무관하게 항상 자동 발행됨.
   autoBillingEnabled?: boolean
+  // 정산서 생성 주기(개월) — autoBillingEnabled가 true일 때만 의미 있음. 미지정 시 1.
+  billingCycleMonths?: number
 }
 
 export interface OrderUpdate {
@@ -58,6 +62,7 @@ export interface OrderUpdate {
   dueDate?: string // 납기일 — 선불=보관 시작일, 후불=보관 종료일 기본값(수동 변경 가능)
   memo?: string
   autoBillingEnabled?: boolean // 정산서 생성 방식(자동/수동)
+  billingCycleMonths?: number // 정산서 생성 주기(개월) — autoBillingEnabled가 true일 때만 의미 있음
 }
 
 export interface OrderStatusChange {

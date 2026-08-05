@@ -93,6 +93,7 @@ export default function EditOrderModal({
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [dueDate, setDueDate] = useState('')
   const [autoBillingEnabled, setAutoBillingEnabled] = useState(false)
+  const [billingCycleMonths, setBillingCycleMonths] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -117,6 +118,7 @@ export default function EditOrderModal({
     setSettlementUserId(target.settlementUserId ?? null)
     setDueDate(target.dueDate ?? '')
     setAutoBillingEnabled(target.autoBillingEnabled ?? false)
+    setBillingCycleMonths(target.billingCycleMonths ?? 1)
     setFormError(null)
   }, [target])
 
@@ -242,6 +244,7 @@ export default function EditOrderModal({
         dueDate: dueDate || undefined,
         memo: memo || undefined,
         autoBillingEnabled,
+        billingCycleMonths,
       })
 
       // ===== 2) 위치 변경 반영 (이동 / 신규 배정 / 미지정 해제) =====
@@ -467,7 +470,13 @@ export default function EditOrderModal({
           <PaymentAccountPicker staffList={staffList} value={settlementUserId} onChange={setSettlementUserId} />
         )}
 
-        <AutoBillingToggle checked={autoBillingEnabled} onChange={setAutoBillingEnabled} dueDate={dueDate} />
+        <AutoBillingToggle
+          checked={autoBillingEnabled}
+          onChange={setAutoBillingEnabled}
+          dueDate={dueDate}
+          cycleMonths={billingCycleMonths}
+          onCycleMonthsChange={setBillingCycleMonths}
+        />
 
         <Field label="메모">
           <textarea

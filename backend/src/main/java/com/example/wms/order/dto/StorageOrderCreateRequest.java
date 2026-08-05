@@ -45,4 +45,7 @@ public class StorageOrderCreateRequest {
     // 정산서 생성 방식 — true(자동, 기본값): 매월 배치가 이 계약도 자동 청구. false(수동): 배치 대상에서 제외, 관리자가 직접 생성.
     // 미지정 시 true(자동)로 서버가 안전 기본값 적용(매출 구멍 방지). 폼 초기 선택값은 프론트에서 '수동'을 기본으로 노출하되 값은 항상 명시 전송한다.
     private Boolean autoBillingEnabled;
+
+    // [정산서 생성 주기] autoBillingEnabled가 true일 때만 의미 있음. 미지정 시 1(개월).
+    private Integer billingCycleMonths;
 }

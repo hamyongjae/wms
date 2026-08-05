@@ -98,12 +98,20 @@ public class StorageOrderService {
             order.setSettlementUser(staff);
         }
 
+        // [정산서 생성 주기] 미지정 시 1개월. autoBillingEnabled가 true일 때만 실제로 쓰이지만
+        //   (BillingBatchService가 그 값만 대상으로 배치를 돈다), 저장 자체는 방식과 무관하게 한다.
+        if (request.getBillingCycleMonths() != null && request.getBillingCycleMonths() < 1) {
+            throw new IllegalArgumentException("정산서 생성 주기는 1개월 이상이어야 합니다.");
+        }
+        int cycleMonths = request.getBillingCycleMonths() != null ? request.getBillingCycleMonths() : 1;
+        order.setBillingCycleMonths(cycleMonths);
+
         // [청구 조건] 결제 방식(미지정 시 후불)과 납기일을 계약에 영속화 — 수정 시 재정산의 기준이 된다.
         LocalDate periodStart = order.getStorageStartDate();
-        // [출고일 미정 임시 기간] 월 단위(MONTHLY) 청구이므로 임시 기간도 한 달로 잡는다.
+        // [출고일 미정 임시 기간] 월 단위(MONTHLY) 청구이므로 임시 기간도 생성 주기와 같은 길이로 잡는다.
         //   예전엔 +7일(어정쩡한 일주일)이라 정산서 화면에 "8/2~8/9"처럼 표시돼 혼동을 줬다.
         LocalDate periodEnd = order.getExpectedEndDate() != null
-                ? order.getExpectedEndDate() : periodStart.plusMonths(1).minusDays(1);
+                ? order.getExpectedEndDate() : periodStart.plusMonths(cycleMonths).minusDays(1);
 
         com.example.wms.billing.entity.SettlementType payType =
                 request.getPaymentType() != null ? request.getPaymentType() : SettlementType.POSTPAID;
@@ -187,23 +195,29 @@ public class StorageOrderService {
             order.setSettlementUser(null);
         }
 
-        // 3) 결제 방식(선불/후불)·납기일 — 계약에 반영하고, 활성 원장을 같은 논리로 재정산
+        // 3) 정산서 생성 방식(자동/수동)·생성 주기 — 미지정 시 기존 값 유지
+        if (request.getAutoBillingEnabled() != null) {
+            order.setAutoBillingEnabled(request.getAutoBillingEnabled());
+        }
+        if (request.getBillingCycleMonths() != null) {
+            if (request.getBillingCycleMonths() < 1) {
+                throw new IllegalArgumentException("정산서 생성 주기는 1개월 이상이어야 합니다.");
+            }
+            order.setBillingCycleMonths(request.getBillingCycleMonths());
+        }
+
+        // 4) 결제 방식(선불/후불)·납기일 — 계약에 반영하고, 활성 원장을 같은 논리로 재정산
         SettlementType newType = request.getPaymentType() != null
                 ? request.getPaymentType() : order.getPaymentType();
         // 납기일: 명시값 우선, 없으면 결제 방식별 기본(선불=시작일/후불=종료일)
-        // [출고일 미정 방어] 종료일이 없으면 등록 때(createOrder)와 같은 규칙으로 시작일+1개월을 임시 기준으로 삼는다.
+        // [출고일 미정 방어] 종료일이 없으면 등록 때(createOrder)와 같은 규칙으로 시작일+생성주기를 임시 기준으로 삼는다.
         //   시작일 그대로 쓰면 후불 계약의 납기일이 등록 당일이 되어 장기 계약이 즉시 연체로 보이는 문제가 있었다.
         LocalDate periodEnd = order.getExpectedEndDate() != null
-                ? order.getExpectedEndDate() : order.getStorageStartDate().plusMonths(1).minusDays(1);
+                ? order.getExpectedEndDate() : order.getStorageStartDate().plusMonths(order.getBillingCycleMonths()).minusDays(1);
         LocalDate newDue = request.getDueDate() != null ? request.getDueDate()
                 : (newType == SettlementType.PREPAID ? order.getStorageStartDate() : periodEnd);
         order.setPaymentType(newType);
         order.setDueDate(newDue);
-
-        // 4) 정산서 생성 방식(자동/수동) — 미지정 시 기존 값 유지
-        if (request.getAutoBillingEnabled() != null) {
-            order.setAutoBillingEnabled(request.getAutoBillingEnabled());
-        }
 
         // 원장 자동 재정산 (후불→선불 완납 / 선불→후불 수납취소 / 납기 갱신)
         billingService.resettleForOrder(order.getId(), newType, newDue, order.getPaymentMethod());

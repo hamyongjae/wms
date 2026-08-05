@@ -391,13 +391,19 @@ export function AutoBillingToggle({
   checked,
   onChange,
   dueDate,
+  cycleMonths,
+  onCycleMonthsChange,
 }: {
   checked: boolean
   onChange: (v: boolean) => void
   /** 폼에 입력된 납기일(yyyy-MM-dd). 매월 반복 납기일 계산의 기준(일자)으로 그대로 쓰인다. */
   dueDate?: string
+  /** 정산서 생성 주기(개월) — 자동 생성일 때만 편집 가능. 기본값 1. */
+  cycleMonths: number
+  onCycleMonthsChange: (v: number) => void
 }) {
   const anchorDay = parseIso(dueDate ?? '')?.d
+  const cycleLabel = cycleMonths === 1 ? '매 회차' : `${cycleMonths}개월마다`
   return (
     <div>
       <label className={labelCls}>정산서 생성 방식</label>
@@ -424,14 +430,31 @@ export function AutoBillingToggle({
               : 'border-slate-300 text-slate-500 active:bg-slate-50',
           )}
         >
-          매월 자동 생성
+          자동 생성
         </button>
       </div>
+      {checked && (
+        <div className="mt-2 flex items-center gap-2">
+          <span className="text-sm text-slate-600">생성 주기</span>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={cycleMonths}
+            onChange={(e) => {
+              const v = Math.trunc(Number(e.target.value))
+              onCycleMonthsChange(v >= 1 ? v : 1)
+            }}
+            className="h-9 w-20 min-w-0 rounded-lg border border-slate-300 px-2 text-center text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+          <span className="text-sm text-slate-600">개월마다</span>
+        </div>
+      )}
       <p className="mt-1.5 text-[11px] text-slate-400">
         {checked
           ? anchorDay != null
-            ? `매월 1일 새벽에 이번 달 정산서가 자동 발행됩니다 (납기일: 매월 ${anchorDay}일 · 없는 달은 말일).`
-            : '매월 1일 새벽에 이번 달 정산서가 자동 발행됩니다. 납기일은 아래 "납기일" 필드의 일자를 매달 기준으로 사용합니다.'
+            ? `직전 회차가 끝나면 ${cycleLabel} 다음 정산서가 자동 발행됩니다 (납기일: 매 회차 ${anchorDay}일 · 없는 달은 말일).`
+            : `직전 회차가 끝나면 ${cycleLabel} 다음 정산서가 자동 발행됩니다. 납기일은 아래 "납기일" 필드의 일자를 매 회차 기준으로 사용합니다.`
           : '정산 화면에서 담당자가 직접 정산서를 생성해야 합니다.'}
       </p>
     </div>

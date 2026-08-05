@@ -255,6 +255,22 @@ class BillingBatchServiceIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("[신규] 정산서 생성 주기를 2개월로 설정하면 회차도 2개월 단위로 생성된다")
+    void generatesLedgersUsingConfiguredCycleMonths() {
+        StorageOrder order = seedOrderWithInitialLedger(); // 최초 원장 [8/15~9/14](1개월) — 이후부터 주기 변경 적용
+        order.setBillingCycleMonths(2);
+        storageOrderRepository.save(order);
+
+        billingBatchService.generateDueLedgers(LocalDate.of(2026, 9, 15));
+
+        List<BillingLedger> ledgers = ledgersSortedByPeriodStart(order);
+        assertThat(ledgers).hasSize(2);
+        BillingLedger next = ledgers.get(1);
+        assertThat(next.getBillingPeriodStart()).isEqualTo(LocalDate.of(2026, 9, 15));
+        assertThat(next.getBillingPeriodEnd()).isEqualTo(LocalDate.of(2026, 11, 14));
+    }
+
+    @Test
     @DisplayName("[회귀] 출고일 미정(null) 장기 계약은 회차 청구가 계속돼도 출고예정일이 임의로 채워지지 않는다")
     void preservesNullExpectedEndDateForIndefiniteContracts() {
         StorageOrder order = seedOrderWithInitialLedger(); // expectedEndDate=null(미정)로 생성됨

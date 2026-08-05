@@ -77,6 +77,12 @@ public class StorageOrder {
     @Column(name = "auto_billing_enabled", nullable = false, columnDefinition = "boolean default true")
     private Boolean autoBillingEnabled = true;
 
+    // 정산서 자동 생성 주기(개월) — autoBillingEnabled가 true일 때만 의미가 있다(수동이면 배치 대상이
+    // 아니라 아예 안 쓰임). BillingBatchService가 매 회차마다 이 개월 수만큼 기간을 잡아 생성한다.
+    // [스키마] 기존 행 호환을 위해 DB 기본값 1(기존 전원 1개월 주기 동작 보존).
+    @Column(name = "billing_cycle_months", nullable = false, columnDefinition = "integer default 1")
+    private Integer billingCycleMonths = 1;
+
     // ===== 결제 수단 & 수납 담당(계좌 연동) =====
     // [스키마] 기존 행 호환을 위해 nullable — 신규 계약은 아래 기본값(계좌이체)으로 저장된다.
     @Enumerated(EnumType.STRING)
