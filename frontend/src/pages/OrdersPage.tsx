@@ -822,6 +822,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                   isAdmin={isAdmin}
                   expanded={expandedLedgerId === l.id}
                   isOnlyLedger={ledgers.length === 1}
+                  lockStartDate={indexById.get(l.id) === 0 ? (target.storageStartDate ?? undefined) : undefined}
                   onToggle={() => setExpandedLedgerId((cur) => (cur === l.id ? null : l.id))}
                   onCollapse={() => setExpandedLedgerId(null)}
                   onChanged={() => load(target.id)}
@@ -856,6 +857,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                         isAdmin={isAdmin}
                         expanded={expandedLedgerId === l.id}
                         isOnlyLedger={false}
+                        lockStartDate={indexById.get(l.id) === 0 ? (target.storageStartDate ?? undefined) : undefined}
                         onToggle={() => setExpandedLedgerId((cur) => (cur === l.id ? null : l.id))}
                         onCollapse={() => setExpandedLedgerId(null)}
                         onChanged={() => load(target.id)}

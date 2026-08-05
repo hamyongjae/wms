@@ -3,8 +3,9 @@ import { isAxiosError } from 'axios'
 import { billingApi, type BillingLedger } from '@/api/billingApi'
 import { cn } from '@/lib/cn'
 import { orderSync } from '@/lib/orderEvents'
-import { CalendarField, FieldGrid, GridField, gridInputCls } from '@/components/order/orderFormUi'
+import { CalendarField, FieldGrid, GridField, gridInputCls, gridReadonlyCls } from '@/components/order/orderFormUi'
 import MoneyInput from '@/components/ui/MoneyInput'
+import { md } from '@/lib/dates'
 
 /**
  * [정산 일정 수정 — 단일 공용 템플릿] 회차의 정산 시작일·종료일·입금액·정산금액을 한
@@ -21,14 +22,19 @@ function errMsg(err: unknown, fallback: string): string {
 
 export default function ScheduleEditForm({
   ledger,
+  lockStartDate,
   onDone,
   onCancel,
 }: {
   ledger: BillingLedger
+  /** [1회차 잠금] 값이 있으면 이 회차는 계약의 보관 시작일과 항상 같아야 하는 1회차라는
+   *  뜻 — 서버(reconcileSchedulePlacement)도 동일하게 강제하므로, 자유 입력을 열어뒀다가
+   *  저장 시점에 에러를 띄우는 대신 아예 이 값으로 고정해 화면에서부터 어긋날 수 없게 한다. */
+  lockStartDate?: string
   onDone: () => void
   onCancel: () => void
 }) {
-  const [periodStart, setPeriodStart] = useState(ledger.periodStart)
+  const [periodStart, setPeriodStart] = useState(lockStartDate ?? ledger.periodStart)
   const [periodEnd, setPeriodEnd] = useState(ledger.periodEnd)
   const [baseAmount, setBaseAmount] = useState<number | null>(Math.round(ledger.baseAmount))
   const [paidAmount, setPaidAmount] = useState<number | null>(Math.round(ledger.paidTotal))
@@ -63,8 +69,12 @@ export default function ScheduleEditForm({
       className="mt-1.5 space-y-2.5 rounded-xl bg-amber-50/50 p-3.5 ring-1 ring-amber-200/60"
     >
       <FieldGrid>
-        <GridField label="정산 시작일">
-          <CalendarField value={periodStart} onChange={setPeriodStart} max={periodEnd || undefined} className={gridInputCls} />
+        <GridField label="정산 시작일" hint={lockStartDate ? '1회차 · 보관 시작일 고정' : undefined}>
+          {lockStartDate ? (
+            <div className={gridReadonlyCls}>{md(periodStart)}</div>
+          ) : (
+            <CalendarField value={periodStart} onChange={setPeriodStart} max={periodEnd || undefined} className={gridInputCls} />
+          )}
         </GridField>
         <GridField label="정산 종료일">
           <CalendarField value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} className={gridInputCls} />

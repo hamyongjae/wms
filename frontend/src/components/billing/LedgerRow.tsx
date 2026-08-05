@@ -28,6 +28,7 @@ export default function LedgerRow({
   isAdmin,
   expanded,
   isOnlyLedger,
+  lockStartDate,
   onToggle,
   onCollapse,
   onChanged,
@@ -39,6 +40,8 @@ export default function LedgerRow({
   expanded: boolean
   /** 이 계약에 회차가 이거 하나뿐인지 — 지우면 정산 이력이 통째로 사라지니 안내를 다르게 한다 */
   isOnlyLedger?: boolean
+  /** [1회차 잠금] 값이 있으면 이 회차가 1회차라는 뜻 — 정산 시작일을 이 값으로 고정한다 */
+  lockStartDate?: string
   onToggle: () => void
   onCollapse: () => void
   onChanged: () => void
@@ -151,6 +154,7 @@ export default function LedgerRow({
       {expanded && canEdit && (
         <ScheduleEditForm
           ledger={l}
+          lockStartDate={lockStartDate}
           onDone={() => {
             onCollapse()
             onChanged()
