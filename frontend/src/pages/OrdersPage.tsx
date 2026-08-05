@@ -165,6 +165,10 @@ export default function OrdersPage() {
         setCustomers(c)
         setWarehouses(w)
         void loadPlacements(o)
+        // [정산 이력 팝업 새로고침] 열어둔 채로 "다음 회차 생성"을 연달아 누르면 서버가 계약의
+        //   예정 출고일을 자동 연장해도(extendOrderPeriod) 팝업은 처음 열 때의 계약 스냅샷을 그대로
+        //   들고 있어 "계약 기간"·초과 경고가 옛 날짜에 머물렀다 — 목록 갱신 때마다 최신 값으로 맞춘다.
+        setBillingTarget((prev) => (prev ? (o.find((x) => x.id === prev.id) ?? prev) : prev))
       })
       .catch(() => setError('계약 목록을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
