@@ -704,13 +704,11 @@ public class BillingService {
                 .max(java.util.Comparator.comparing(BillingLedger::getBillingPeriodStart))
                 .orElse(null);
         if (prev != null) {
+            // [항상 안전] prev는 "시작일이 periodStart보다 이른" 회차 중에서만 고르므로
+            // newPrevEnd(=periodStart-1)는 prev.start보다 항상 뒤이거나 같다 — prev를 통째로
+            // 삼켜버리는 경우는 이 분기로는 수학적으로 나타날 수 없다(다음 회차 쪽과 비대칭).
             LocalDate newPrevEnd = periodStart.minusDays(1);
             if (!prev.getBillingPeriodEnd().equals(newPrevEnd)) {
-                if (newPrevEnd.isBefore(prev.getBillingPeriodStart())) {
-                    throw new IllegalArgumentException(
-                            "이전 회차(" + prev.getBillingPeriodStart() + "~" + prev.getBillingPeriodEnd()
-                                    + ")를 완전히 덮어써서 처리할 수 없습니다. 이전 회차를 먼저 정리하세요.");
-                }
                 BillingLedger prevLocked = lockLedger(prev.getId());
                 prevLocked.reviseSchedule(prevLocked.getBillingPeriodStart(), newPrevEnd, prevLocked.getBaseAmount());
             }
