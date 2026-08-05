@@ -71,6 +71,13 @@ public class BillingService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "존재하지 않는 계약입니다. id=" + req.getStorageOrderId()));
 
+        // [중복 생성 방지] 모바일에서 생성 버튼을 연달아 눌러도(더블클릭) 시작일이 완전히
+        // 같은 회차가 두 번 만들어지지 않게 막는다 — reconcileSchedulePlacement의 이웃 보정
+        // 로직은 "정확히 같은 시작일"인 경우 앞/뒤 어느 쪽으로도 안 잡혀 못 걸러낸다.
+        if (ledgerRepository.existsByStorageOrderIdAndBillingPeriodStart(order.getId(), req.getPeriodStart())) {
+            throw new IllegalArgumentException("이미 같은 시작일의 정산서가 있습니다. 중복 생성이 아닌지 확인하세요.");
+        }
+
         // [자동 보정] 겹치거나 비어도 막지 않고 이웃 회차 경계를 자동으로 맞춰 이어붙인다.
         reconcileSchedulePlacement(order, req.getPeriodStart(), req.getPeriodEnd(), null);
 
@@ -363,6 +370,9 @@ public class BillingService {
         extendOrderPeriod(ledger.getStorageOrder(), ledger.getBillingPeriodEnd());
 
         if (req.getPaidAmount() != null) {
+            if (req.getPaidAmount().signum() < 0) {
+                throw new IllegalArgumentException("입금액은 0 이상이어야 합니다.");
+            }
             BigDecimal delta = req.getPaidAmount().subtract(ledger.getPaidTotal());
             if (delta.signum() > 0) {
                 Long userId = SecurityUtils.getCurrentUser().getUserId();

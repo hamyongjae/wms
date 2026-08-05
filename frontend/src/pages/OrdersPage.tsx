@@ -719,6 +719,18 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
     if (!genStart || !genEnd) return setGenError('청구 기간을 입력하세요.')
     if (genAmount == null || genAmount <= 0) return setGenError('청구 금액을 입력하세요.')
     if (genEnd < genStart) return setGenError('종료일은 시작일보다 빠를 수 없습니다.')
+    // [출고일 초과 경고] 예정 출고일이 정해진(미정이 아닌) 계약인데 새 회차가 그 이후까지
+    // 청구되면 — 이미 나가기로 한 계약에 실수로 회차를 더 만드는 걸 미리 확인시킨다.
+    // 미정 계약(expectedEndDate 없음)은 계속 연장되는 게 정상이라 경고하지 않는다.
+    if (target!.expectedEndDate && genEnd > target!.expectedEndDate) {
+      if (
+        !window.confirm(
+          `이 계약의 예정 출고일은 ${target!.expectedEndDate}인데, 새 회차 종료일(${genEnd})이 그 이후입니다.\n계속 진행할까요?`,
+        )
+      ) {
+        return
+      }
+    }
     setCreating(true)
     try {
       await billingApi.createLedger({
@@ -809,6 +821,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                   index={indexById.get(l.id)!}
                   isAdmin={isAdmin}
                   expanded={expandedLedgerId === l.id}
+                  isOnlyLedger={ledgers.length === 1}
                   onToggle={() => setExpandedLedgerId((cur) => (cur === l.id ? null : l.id))}
                   onCollapse={() => setExpandedLedgerId(null)}
                   onChanged={() => load(target.id)}
@@ -842,6 +855,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                         index={indexById.get(l.id)!}
                         isAdmin={isAdmin}
                         expanded={expandedLedgerId === l.id}
+                        isOnlyLedger={false}
                         onToggle={() => setExpandedLedgerId((cur) => (cur === l.id ? null : l.id))}
                         onCollapse={() => setExpandedLedgerId(null)}
                         onChanged={() => load(target.id)}
@@ -875,13 +889,10 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
             <form onSubmit={submitGenerate} className="space-y-2.5 rounded-xl bg-indigo-50/40 p-3.5 ring-1 ring-indigo-200/60">
               <p className="text-xs font-semibold text-slate-600">정산서 생성 · 생성하면 바로 입금을 기록할 수 있습니다</p>
               <FieldGrid>
-                <GridField label="청구 시작일">
-                  <CalendarField
-                    value={genStart}
-                    onChange={setGenStart}
-                    max={genEnd || undefined}
-                    className={gridInputCls}
-                  />
+                {/* [갭·중복 원천 차단] 시작일은 항상 "직전 회차 종료일 다음날"로 자동 계산되고
+                    고정된다 — 직접 입력하게 두면 실수로 겹치거나 비는 날짜를 넣을 수 있다. */}
+                <GridField label="청구 시작일" hint="자동 계산 (직전 회차 다음날)">
+                  <div className={gridReadonlyCls}>{md(genStart)}</div>
                 </GridField>
                 <GridField label="청구 종료일">
                   <CalendarField
@@ -926,6 +937,7 @@ function LedgerHistoryRow({
   index,
   isAdmin,
   expanded,
+  isOnlyLedger,
   onToggle,
   onCollapse,
   onChanged,
@@ -934,6 +946,8 @@ function LedgerHistoryRow({
   index: number
   isAdmin: boolean
   expanded: boolean
+  /** 이 계약에 회차가 이거 하나뿐인지 — 지우면 정산 이력이 통째로 사라지니 안내를 다르게 한다 */
+  isOnlyLedger: boolean
   onToggle: () => void
   onCollapse: () => void
   onChanged: () => void
@@ -951,7 +965,12 @@ function LedgerHistoryRow({
 
   async function handleDelete(e: MouseEvent) {
     e.stopPropagation()
-    if (!window.confirm('정말 이 정산 스케줄을 삭제하시겠습니까?')) return
+    // [단일 회차 경고] 이게 이 계약의 유일한 회차라면 지우는 순간 정산 이력이 통째로
+    // 사라진다 — 계약 자체를 잘못 등록한 거라면 여기서 지우지 말고 계약 삭제로 유도한다.
+    const msg = isOnlyLedger
+      ? '이 계약의 유일한 정산 회차입니다. 삭제하면 정산 이력이 전부 사라집니다.\n계약 자체를 잘못 등록하신 거라면 여기서 지우지 말고 "계약 관리"에서 계약을 삭제해주세요.\n\n그래도 이 회차만 삭제하시겠습니까?'
+      : '정말 이 정산 스케줄을 삭제하시겠습니까?'
+    if (!window.confirm(msg)) return
     try {
       await billingApi.remove(l.id)
       onChanged()
@@ -1071,6 +1090,11 @@ function ScheduleEditForm({
     if (baseAmount == null || baseAmount < 0) return setError('청구액을 입력하세요.')
     if (paidAmount == null || paidAmount < 0) return setError('입금액을 입력하세요.')
     if (periodEnd < periodStart) return setError('종료일은 시작일보다 빠를 수 없습니다.')
+    // [오터치 방지] 입금액이 실제로 바뀌는 경우만 변경 전후 금액을 보여주고 한 번 더 확인한다.
+    const currentPaid = Math.round(ledger.paidTotal)
+    if (paidAmount !== currentPaid) {
+      if (!window.confirm(`입금액을 ${won(currentPaid)}에서 ${won(paidAmount)}(으)로 정정하시겠습니까?`)) return
+    }
     setSubmitting(true)
     try {
       await billingApi.editLedger(ledger.id, { periodStart, periodEnd, baseAmount, paidAmount })
