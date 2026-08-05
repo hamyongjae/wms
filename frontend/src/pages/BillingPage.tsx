@@ -4,7 +4,6 @@ import {
   Loader2,
   Wallet,
   Coins,
-  X,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
@@ -12,11 +11,12 @@ import {
   PieChart,
 } from 'lucide-react'
 import { billingApi, type BillingLedger, type BillingStatus } from '@/api/billingApi'
+import { orderApi, type StorageOrder } from '@/api/orderApi'
 import StatCard from '@/components/ui/StatCard'
-import LedgerRow from '@/components/billing/LedgerRow'
+import { OrderBillingModal } from '@/pages/OrdersPage'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
-import { isOverdue, accruedPaidInRange } from '@/lib/billing'
+import { isOverdue, daysFromDue, displayStatus, accruedPaidInRange } from '@/lib/billing'
 import { computeRangeRevenue } from '@/lib/revenue'
 import { orderSync } from '@/lib/orderEvents'
 import { ymdKorean, addDays } from '@/lib/dates'
@@ -36,6 +36,7 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const pct = (r: number) => `${Math.round(r * 100)}%`
+const totalDue = (l: BillingLedger) => l.baseAmount + l.carriedOverIn + l.adjustmentTotal
 
 // 고객사별 입금 비중 바 색상 (구 매출관리 화면에서 이식)
 const BAR_COLORS = ['#6366f1', '#818cf8', '#38bdf8', '#34d399', '#fbbf24', '#f472b6', '#a78bfa', '#94a3b8']
@@ -46,6 +47,35 @@ function fullMonthOf(from: string, to: string): number | null {
   const [ty, tm, td] = to.split('-').map(Number)
   if (fd !== 1 || fy !== ty || fm !== tm) return null
   return td === new Date(fy, fm, 0).getDate() ? fm : null
+}
+
+/* [공용 셀 렌더] 테이블 셀과 모바일 카드가 동일 렌더를 공유(중복 제거) */
+function LedgerReceivable({ l }: { l: BillingLedger }) {
+  if (l.refundCompleted) return <span className="text-xs font-medium text-[#5C7C6B]">환불 완료</span>
+  if (l.balance < 0) return <span className="text-emerald-600">환불 {won(l.refundDue ?? -l.balance)}</span>
+  return <span className={l.balance > 0 ? 'text-slate-800' : 'text-slate-400'}>{won(l.outstanding ?? l.balance)}</span>
+}
+
+function LedgerDue({ l }: { l: BillingLedger }) {
+  if (l.dueDate == null) return <span className="text-xs text-slate-400">—</span>
+  const overdue = isOverdue(l)
+  const d = daysFromDue(l.dueDate)
+  const pending = l.balance > 0 && (l.status === 'ISSUED' || l.status === 'PARTIALLY_PAID')
+  return (
+    <span className={cn('text-xs', overdue ? 'font-semibold text-[#A65B44]' : 'text-slate-500')}>
+      {l.dueDate}
+      {pending && !overdue && d >= -7 && (
+        <span className="ml-1.5 rounded bg-[#E9EEF3] px-1 py-0.5 text-[10px] font-semibold text-[#5A748F]">
+          {d === 0 ? 'D-DAY' : `D${d}`}
+        </span>
+      )}
+    </span>
+  )
+}
+
+function LedgerStatusBadge({ l }: { l: BillingLedger }) {
+  const ds = displayStatus(l)
+  return <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>{ds.label}</span>
 }
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
@@ -74,8 +104,10 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [expandedId, setExpandedId] = useState<number | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  // [정산서 팝업] 클릭한 원장이 속한 계약 전체를 불러와, 계약관리 '정산 이력'과 동일한
+  // 팝업(OrderBillingModal)을 그대로 띄운다 — 회차 하나만 보여주는 별도 팝업을 두지 않는다.
+  const [selectedOrder, setSelectedOrder] = useState<StorageOrder | null>(null)
   // [제로 클릭] 진입 즉시 '당월 1일~말일'을 기본 조회 기간으로 세팅
   const [range, setRange] = useState(() => {
     const n = new Date()
@@ -88,10 +120,35 @@ export default function BillingPage() {
     const raw = searchParams.get('ledger')
     if (raw != null) {
       const id = Number(raw)
-      if (Number.isFinite(id)) setExpandedId(id)
+      if (Number.isFinite(id)) setSelectedId(id)
       setSearchParams({}, { replace: true }) // 한 번 소비 후 URL 정리
     }
   }, [searchParams, setSearchParams])
+
+  // [정산서 팝업 데이터] 목록 필터(range)와 무관하게 항상 열 수 있도록, 현재 화면에 보이는
+  // ledgers 배열에 기대지 않고 원장 단건 조회로 storageOrderId를 얻어 계약 정보를 불러온다.
+  useEffect(() => {
+    if (selectedId == null) {
+      setSelectedOrder(null)
+      return
+    }
+    let cancelled = false
+    billingApi
+      .detail(selectedId)
+      .then((d) => orderApi.get(d.ledger.storageOrderId))
+      .then((order) => {
+        if (!cancelled) setSelectedOrder(order)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSelectedOrder(null)
+          setSelectedId(null)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedId])
 
   // [딥링크] 대시보드 연체 알림에서 /billing?filter=OVERDUE 로 들어오면 연체 칩을 바로 켠다.
   //   기간이 이번 달로 좁혀져 있으면 지난달 이전에 밀린 연체 건이 안 보이므로 기간도 넓힌다.
@@ -191,15 +248,6 @@ export default function BillingPage() {
       <div className="flex items-start justify-between gap-4">
         <h2 className="text-xl font-bold text-slate-800">매출 관리</h2>
       </div>
-
-      {notice && (
-        <div className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
-          <span>{notice}</span>
-          <button type="button" onClick={() => setNotice(null)} className="text-indigo-400 hover:text-indigo-600">
-            <X size={16} />
-          </button>
-        </div>
-      )}
 
       {/* [기간 필터] 진입 즉시 당월. 월 이동(연·월 동시) + 사용자 지정 기간 — 변경 시 카드·표 동시 갱신 */}
       <div className="flex flex-col gap-2 rounded-2xl bg-white p-2.5 shadow-soft ring-1 ring-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
@@ -356,26 +404,114 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* [계약관리와 동일 템플릿] 화면 크기와 무관하게 회차 카드 하나로 통일 — 탭하면
-          그 자리에서 정산 시작일·종료일·입금액·정산금액을 바로 고칠 수 있다. 입금 기록·
-          조정·납기일변경·환불처리·이력조회는 이 화면에서 다루지 않는다(계약관리 정산
-          이력에도 원래 없는 기능들이다). */}
+      {/* ===== 데스크톱: 테이블 (md 이상) ===== */}
       {!loading && !error && visible.length > 0 && (
-        <ol className="space-y-2">
-          {visible.map((l) => (
-            <LedgerRow
-              key={l.id}
-              ledger={l}
-              label={l.customerName}
-              isAdmin={isAdmin}
-              expanded={expandedId === l.id}
-              onToggle={() => setExpandedId((cur) => (cur === l.id ? null : l.id))}
-              onCollapse={() => setExpandedId(null)}
-              onChanged={() => reload()}
-            />
-          ))}
-        </ol>
+        <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60 md:block">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
+                <th className="px-5 py-3 font-medium">고객</th>
+                <th className="px-5 py-3 font-medium">보관기간</th>
+                <th className="px-5 py-3 text-right font-medium">보관료</th>
+                <th className="px-5 py-3 text-right font-medium">미수금</th>
+                <th className="px-5 py-3 font-medium">납기</th>
+                <th className="px-5 py-3 font-medium">상태</th>
+                <th className="px-5 py-3 font-medium">세금계산서</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {visible.map((l) => (
+                <tr key={l.id} onClick={() => setSelectedId(l.id)} className="cursor-pointer transition hover:bg-slate-50">
+                  <td className="px-5 py-3 text-slate-600">{l.customerName}</td>
+                  <td className="px-5 py-3 text-slate-500">
+                    {l.periodStart} ~ {l.periodEnd}
+                  </td>
+                  <td className="px-5 py-3 text-right text-slate-700">{won(totalDue(l))}</td>
+                  <td className="px-5 py-3 text-right font-medium">
+                    <LedgerReceivable l={l} />
+                  </td>
+                  <td className="px-5 py-3">
+                    <LedgerDue l={l} />
+                  </td>
+                  <td className="px-5 py-3">
+                    <LedgerStatusBadge l={l} />
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className="text-xs text-slate-600">{l.taxInvoiceIssued ? '발행' : '미발행'}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
+
+      {/* ===== 모바일: 정산 내역 카드 (md 미만) — 탭하면 정산 이력 팝업 ===== */}
+      {!loading && !error && visible.length > 0 && (
+        <div className="space-y-2 md:hidden">
+          {visible.map((l) => {
+            const outstanding = l.outstanding ?? Math.max(l.balance, 0)
+            const refundDue = l.refundDue ?? Math.max(-l.balance, 0)
+            const overdue = isOverdue(l)
+            const dueLabel = l.refundCompleted ? '환불' : refundDue > 0 ? '환불 대상' : '미수금'
+            const dueValueCls = l.refundCompleted
+              ? 'text-slate-400'
+              : refundDue > 0
+                ? 'text-emerald-600'
+                : overdue
+                  ? 'text-red-600'
+                  : outstanding > 0
+                    ? 'text-slate-900'
+                    : 'text-slate-400'
+            return (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => setSelectedId(l.id)}
+                className="w-full overflow-hidden rounded-2xl bg-white p-3.5 text-left shadow-soft ring-1 ring-slate-200/60 transition active:bg-slate-50"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-lg font-bold text-slate-800">{l.customerName}</p>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <LedgerStatusBadge l={l} />
+                    <ChevronRight size={20} className="text-slate-300" />
+                  </div>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500">{l.periodStart} ~ {l.periodEnd}</p>
+                <div className="mt-2 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium text-slate-400">보관료</p>
+                    <p className="mt-0.5 text-base font-semibold text-slate-700">{won(totalDue(l))}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-medium text-slate-400">{dueLabel}</p>
+                    <p className={cn('mt-0.5 text-2xl font-extrabold leading-none', dueValueCls)}>
+                      {l.refundCompleted ? '완료' : won(refundDue > 0 ? refundDue : outstanding)}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-xs">
+                  <span className="text-slate-400">납기</span>
+                  <LedgerDue l={l} />
+                  <span className="ml-auto text-slate-400">세금계산서 {l.taxInvoiceIssued ? '발행' : '미발행'}</span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* [계약관리와 동일 템플릿] 카드를 누르면 계약관리 '정산 이력'과 똑같은 팝업이 뜬다 —
+          수정·삭제만 다루고, 입금 기록·조정·납기일변경·환불처리·이력조회는 여기서도 없다
+          (계약관리 정산 이력에 원래 없는 기능들이라 같은 팝업을 그대로 재사용한다). */}
+      <OrderBillingModal
+        target={selectedOrder}
+        isAdmin={isAdmin}
+        onClose={() => {
+          setSelectedId(null)
+          reload()
+        }}
+      />
     </div>
   )
 }
