@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { isAxiosError } from 'axios'
-import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Search, ChevronRight, ChevronDown, Trash2 } from 'lucide-react'
+import { Plus, Loader2, FileText, ShieldAlert, AlertTriangle, X, Search, ChevronDown, Trash2, Pencil } from 'lucide-react'
 import { orderApi, type StorageOrder, type OrderStatus, type PaymentType, type PaymentMethod as OrderPaymentMethod } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
 import { billingApi, type BillingLedger } from '@/api/billingApi'
@@ -983,18 +983,34 @@ function LedgerHistoryRow({
             )}
           </span>
         </button>
-        <div className="flex shrink-0 items-center gap-0.5">
+        {/* [잘 보이는 버튼] 옅은 화살표 대신 테두리·배경이 있는 명확한 버튼으로 — 60대
+            사용자도 "여기 누르면 된다"를 바로 알 수 있게. */}
+        <div className="flex shrink-0 items-center gap-1.5">
           {canEdit && (
-            <ChevronRight size={16} className={cn('text-slate-300 transition-transform', expanded && 'rotate-90')} />
+            <button
+              type="button"
+              onClick={onToggle}
+              className={cn(
+                'flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium ring-1 transition',
+                expanded
+                  ? 'bg-amber-100 text-amber-700 ring-amber-300'
+                  : 'bg-white text-slate-600 ring-slate-300 hover:bg-slate-50',
+              )}
+              title="일정 수정"
+            >
+              <Pencil size={14} />
+              수정
+            </button>
           )}
           {canDelete && (
             <button
               type="button"
               onClick={handleDelete}
-              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+              className="flex items-center gap-1 rounded-lg bg-white px-2 py-1.5 text-xs font-medium text-red-600 ring-1 ring-red-200 transition hover:bg-red-50"
               title="삭제"
             >
-              <Trash2 size={15} />
+              <Trash2 size={14} />
+              삭제
             </button>
           )}
         </div>
