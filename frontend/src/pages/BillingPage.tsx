@@ -446,11 +446,36 @@ export default function BillingPage() {
         )}
       </section>
 
-      {/* [항상 한 줄] flex-wrap이면 좁은 폰에서 칩 5개가 줄바꿈되어 둘째 줄이 생긴다 — nowrap +
-          가로 스크롤로 화면 폭과 무관하게 항상 한 줄을 유지하고, 안 보이는 칩은 옆으로 밀어 넘긴다.
-          pt/pb로 여유를 주는 건 overflow-x-auto가 overflow-y도 auto로 취급해 글자 위아래가
-          잘리는 걸 막기 위함(YardDispatchPage와 동일 이유). */}
-      <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto pt-0.5 pb-1">
+      {/* [항상 한 줄 — 스크롤 없이] 칩 5개를 옆으로 나란히 두면(flex) 좁은 폰에서 줄바꿈되거나
+          스크롤이 필요해진다 — grid-cols-5로 폭을 정확히 5등분해 화면 길이에 맞춰 각 칩이
+          스스로 줄어들게 한다. 라벨+숫자를 세로로 쌓아(OrdersPage 모바일 퀵탭과 동일 패턴)
+          가로로 필요한 공간을 최소화한다. 데스크톱은 공간이 넉넉하니 기존 가로 배지로 되돌린다. */}
+      <div className="grid grid-cols-5 gap-1 md:hidden">
+        {FILTERS.map((f) => {
+          const count =
+            f.key === 'ALL'
+              ? ledgers.length
+              : f.key === 'OVERDUE'
+                ? ledgers.filter(isOverdue).length
+                : ledgers.filter((l) => l.status === f.key).length
+          const active = statusFilter === f.key
+          return (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setStatusFilter(f.key)}
+              className={cn(
+                'flex min-w-0 flex-col items-center justify-center rounded-lg px-0.5 py-1.5 transition',
+                active ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 ring-1 ring-slate-200',
+              )}
+            >
+              <span className="w-full truncate text-center text-[11px] font-semibold">{f.label}</span>
+              <span className={cn('text-[10px]', active ? 'text-white/80' : 'text-slate-400')}>{count}</span>
+            </button>
+          )
+        })}
+      </div>
+      <div className="hidden items-center gap-1.5 md:flex">
         {FILTERS.map((f) => {
           const count =
             f.key === 'ALL'
@@ -464,7 +489,7 @@ export default function BillingPage() {
               type="button"
               onClick={() => setStatusFilter(f.key)}
               className={cn(
-                'shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition',
+                'rounded-lg px-3 py-1.5 text-xs font-medium transition',
                 statusFilter === f.key
                   ? 'bg-slate-800 text-white'
                   : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50',
