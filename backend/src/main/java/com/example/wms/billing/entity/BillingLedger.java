@@ -126,6 +126,11 @@ public class BillingLedger {
     @Column(name = "refunded_at")
     private LocalDateTime refundedAt;
 
+    // [세금계산서] 관리자가 (홈택스 등에서) 실제 발행한 뒤 수동으로 남기는 발행 완료 시각.
+    //   null이면 '미발행'. 이 시스템이 직접 발행하는 게 아니라 발행 여부만 기록한다.
+    @Column(name = "tax_invoice_issued_at")
+    private LocalDateTime taxInvoiceIssuedAt;
+
     // ===== 수금/조정 이력 (읽기용 뷰) =====
     @OneToMany(mappedBy = "billingLedger", fetch = FetchType.LAZY)
     private List<PaymentHistory> payments = new ArrayList<>();
@@ -346,6 +351,27 @@ public class BillingLedger {
         this.paidTotal = MoneyPolicy.normalize(this.paidTotal.subtract(refund));
         this.refundedAt = LocalDateTime.now();
         recompute();   // balance → 0, 상태 → PAID(정산 마감)
+    }
+
+    /** 세금계산서 발행 여부 (실제 발행은 이 시스템 밖에서 이뤄지고, 완료 표시만 여기 남는다) */
+    public boolean isTaxInvoiceIssued() {
+        return this.taxInvoiceIssuedAt != null;
+    }
+
+    /** [세금계산서 발행 표시] 실제로 발행을 마친 뒤 관리자가 수동으로 체크 */
+    public void markTaxInvoiceIssued() {
+        if (this.taxInvoiceIssuedAt != null) {
+            throw new IllegalStateException("이미 세금계산서 발행 처리된 원장입니다.");
+        }
+        this.taxInvoiceIssuedAt = LocalDateTime.now();
+    }
+
+    /** [발행 취소] 잘못 체크했거나 발행을 취소한 경우 되돌린다 */
+    public void unmarkTaxInvoiceIssued() {
+        if (this.taxInvoiceIssuedAt == null) {
+            throw new IllegalStateException("발행 처리되지 않은 원장입니다.");
+        }
+        this.taxInvoiceIssuedAt = null;
     }
 
     // ===== 내부 =====

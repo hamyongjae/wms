@@ -20,8 +20,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * 검증하는 규칙(도메인 계약):
  *  1. 기간은 시작·종료일 포함(inclusive). 하루짜리 계약도 1일로 센다.
- *  2. 일할 단가는 '그 달의 실제 일수'로 나눈다. 28·29·30·31일이 각각 다르게 나온다.
- *  3. 여러 달에 걸치면 달마다 따로 계산해 합산한다(달마다 단가가 다르므로).
+ *  2. 시작일로부터 정확히 N개월 뒤 하루 전까지(=흔한 롤링 청구 주기)면, 그 사이에 걸친 달들의
+ *     실제 일수가 달라도(예: 8/6~9/5, 8월 31일·9월 30일) 월 보관료 × N을 그대로 청구한다 —
+ *     고객은 "한 달 썼다"고 여기지 "31.x일치"라고 여기지 않는다.
+ *  3. 위 조건에 안 맞는 진짜 partial 기간(중도출고·수동 편집으로 어중간하게 끝나는 마지막
+ *     회차 등)은 '그 달의 실제 일수'로 나눈 일할 단가를 달마다 따로 계산해 합산한다.
  *  4. 중간 연산은 10자리, 최종만 2자리 반올림(HALF_UP) — 오차 누적 방지.
  *  5. 잘못된 기간(역전·null)은 조용히 0을 내지 않고 예외로 거부한다.
  */
@@ -88,6 +91,38 @@ class ProrationCalculatorTest {
                     won("300000"), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
             assertThat(result).isEqualByComparingTo(won("900000.00"));
+        }
+
+        @Test
+        @DisplayName("[신규] 롤링 1개월 회차가 일수 다른 두 달에 걸쳐도 월 보관료가 그대로 나온다")
+        void rollingFullMonthAcrossDifferentLengthMonthsEqualsMonthlyFee() {
+            // 8/6~9/5 = 딱 1개월(8월 31일 중 26일 + 9월 30일 중 5일) — 실제 서비스에서 재현된 사례.
+            // 예전엔 (250000/31)*26 + (250000/30)*5 = 251344.09로 어중간하게 나왔다.
+            BigDecimal result = calculator.prorateMonthly(
+                    won("250000"), LocalDate.of(2026, 8, 6), LocalDate.of(2026, 9, 5));
+
+            assertThat(result).isEqualByComparingTo(won("250000.00"));
+        }
+
+        @Test
+        @DisplayName("[신규] 롤링 2개월 회차도 일수가 달라도 월 보관료 × 2가 그대로 나온다")
+        void rollingTwoMonthsAcrossDifferentLengthMonthsEqualsTwiceMonthlyFee() {
+            // 8/6~10/5 = 딱 2개월(8·9·10월 각기 다른 일수를 지나감)
+            BigDecimal result = calculator.prorateMonthly(
+                    won("250000"), LocalDate.of(2026, 8, 6), LocalDate.of(2026, 10, 5));
+
+            assertThat(result).isEqualByComparingTo(won("500000.00"));
+        }
+
+        @Test
+        @DisplayName("[신규] 딱 1개월에서 하루 짧으면(진짜 partial) 여전히 일할 계산으로 넘어간다")
+        void oneDayShortOfFullMonthStillProrates() {
+            // 8/6~9/4 = 1개월에서 하루 모자람 — 통째로 청구하면 안 되고 여전히 일할 계산해야 한다
+            BigDecimal result = calculator.prorateMonthly(
+                    won("250000"), LocalDate.of(2026, 8, 6), LocalDate.of(2026, 9, 4));
+
+            // 8월분: (250000/31)*26 = 209677.4194.., 9월분: (250000/30)*4 = 33333.3333..
+            assertThat(result).isEqualByComparingTo(won("243010.75"));
         }
 
         @Test

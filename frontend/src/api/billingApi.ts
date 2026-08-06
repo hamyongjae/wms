@@ -46,7 +46,8 @@ export interface BillingLedger {
   overdue: boolean // [파생] 납기 경과 + 미납 잔액 → 연체/미수
   daysOverdue: number // 납기 경과 일수 (연체 아니면 0)
   carriedOverToLedgerId: number | null
-  taxInvoiceIssued: boolean
+  taxInvoiceIssued: boolean // 세금계산서 발행 여부 (관리자가 수동 체크 — 실제 발행은 홈택스 등 외부에서)
+  taxInvoiceIssuedAt: string | null // 발행 처리 시각 (미발행이면 null)
   version: number
   createdAt: string
   updatedAt: string
@@ -159,6 +160,11 @@ export const billingApi = {
   // 환불 완료 처리 — 환불 대상 금액을 실제 지급 후 마감(잔액 0·정산 마감)
   async completeRefund(id: number): Promise<BillingLedger> {
     const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/${id}/refund-complete`, {})
+    return data
+  },
+  // [세금계산서] 발행 여부 수동 체크/취소 — 실제 발행은 홈택스 등 이 시스템 밖에서 이뤄진다
+  async setTaxInvoiceIssued(id: number, issued: boolean): Promise<BillingLedger> {
+    const { data } = await api.post<BillingLedger>(`/api/billing/ledgers/${id}/tax-invoice`, { issued })
     return data
   },
   // [납기일 변경] 정산서 개별 원장의 납기일을 직접 조정

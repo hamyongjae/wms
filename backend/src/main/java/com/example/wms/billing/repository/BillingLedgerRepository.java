@@ -2,6 +2,7 @@ package com.example.wms.billing.repository;
 
 import com.example.wms.billing.entity.BillingLedger;
 import com.example.wms.billing.entity.BillingStatus;
+import com.example.wms.billing.entity.BillingType;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +19,10 @@ public interface BillingLedgerRepository extends JpaRepository<BillingLedger, Lo
 
     // [격리] 일반 조회 — 반드시 tenant 소유일 때만
     Optional<BillingLedger> findByIdAndTenantId(Long id, Long tenantId);
+
+    // [1회성 정정 배치] 상태·청구유형으로 전 테넌트 조회 — 기동 시 ROOT 컨텍스트에서만 호출된다
+    // (WmsTenantIdentifierResolver가 ROOT에는 tenant_id 필터를 걸지 않는다).
+    List<BillingLedger> findByStatusAndBillingType(BillingStatus status, BillingType billingType);
 
     Page<BillingLedger> findByTenantId(Long tenantId, Pageable pageable);
 

@@ -2,10 +2,13 @@ package com.example.wms.billing.service;
 
 import com.example.wms.billing.entity.BillingLedger;
 import com.example.wms.billing.entity.BillingStatus;
+import com.example.wms.billing.entity.BillingType;
 import com.example.wms.billing.notification.BillingNotification;
 import com.example.wms.billing.notification.BillingNotificationEvent;
 import com.example.wms.billing.notification.NotificationType;
 import com.example.wms.billing.repository.BillingLedgerRepository;
+import com.example.wms.billing.support.MoneyPolicy;
+import com.example.wms.billing.support.ProrationCalculator;
 import com.example.wms.order.entity.OrderStatus;
 import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.order.repository.StorageOrderRepository;
@@ -17,8 +20,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,6 +48,7 @@ public class BillingBatchService {
     private final StorageOrderRepository storageOrderRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final BillingLedgerIssuer ledgerIssuer;
+    private final ProrationCalculator prorationCalculator;
 
     // [폭주 방지] 계약당 1회 실행에서 소급 생성할 수 있는 최대 회차(약 2년). 장기 다운타임 복구 시
     //   밀린 회차를 한 번에 캐치업하되, 데이터 이상(예: 원장이 영영 안 생기는 버그)으로 무한정 쌓이는
@@ -194,6 +200,73 @@ public class BillingBatchService {
             if (issued) created++;
         }
         return created;
+    }
+
+    /**
+     * [정산 규칙 정정 - 1회성 정합화] "완전한 롤링 개월수"(예: 8/6~9/5) 회차는 그 사이에 걸친
+     * 달들의 실제 일수가 달라도 월 보관료 × N을 그대로 청구하도록 {@link ProrationCalculator} 규칙이
+     * 바뀌면서, 그 전에 예전 방식(달마다 일할 나눠 합산)으로 이미 발행된 미납(ISSUED) 원장은 여전히
+     * 어중간한 금액으로 남아 있다. 그런 원장만 새 규칙값으로 소급 정정한다.
+     *
+     * 완납·취소·이월된(닫힌) 원장은 조회 조건(status=ISSUED)에서 아예 빠지고, 그 사이 월 보관료가
+     * 바뀌었거나 관리자가 금액을 수동으로 고친 원장도(예전 방식을 그대로 재현했을 때 지금 저장된
+     * 청구액과 정확히 같지 않으면) 건드리지 않는다. 고칠 대상이 없으면(이미 정정됐거나 원래 없음)
+     * 다음 기동부터는 항상 0건 — 멱등.
+     *
+     * [트랜잭션 경계] 새 원장을 만드는(INSERT) generateDueLedgers·backfillMissingLedgers와 달리
+     * 이미 있는 원장의 필드만 고치는(UPDATE) 순수 정정이라, OrderBillingTermsBackfillRunner와
+     * 동일하게 하나의 {@code @Transactional} 안에서 여러 테넌트를 순회해도 안전하다(신규 저장 시의
+     * "두 번째 테넌트부터 세션이 고정돼 실패" 문제는 INSERT에서만 발생한다).
+     *
+     * @return 실제로 정정한 원장 수
+     */
+    @Transactional
+    public int recalcRollingMonthProration() {
+        List<BillingLedger> candidates = ledgerRepository.findByStatusAndBillingType(
+                BillingStatus.ISSUED, BillingType.MONTHLY);
+        int fixed = 0;
+        for (BillingLedger ledger : candidates) {
+            StorageOrder order = ledger.getStorageOrder();
+            if (order.getMonthlyFee() == null || order.getMonthlyFee() <= 0) continue;
+            BigDecimal fee = BigDecimal.valueOf(order.getMonthlyFee());
+            LocalDate start = ledger.getBillingPeriodStart();
+            LocalDate end = ledger.getBillingPeriodEnd();
+
+            BigDecimal legacy = legacyProrateMonthly(fee, start, end);
+            if (legacy.compareTo(ledger.getBaseAmount()) != 0) {
+                continue;   // 요금 변경·수동 편집 등으로 예전 알고리즘 재현이 안 맞음 — 건드리지 않음
+            }
+            BigDecimal correct = prorationCalculator.prorateMonthly(fee, start, end);
+            if (correct.compareTo(ledger.getBaseAmount()) == 0) {
+                continue;   // 이미 새 규칙값과 같음(=진짜 partial 기간) — 고칠 게 없음
+            }
+            ledger.reviseSchedule(start, end, correct);
+            fixed++;
+        }
+        return fixed;
+    }
+
+    /**
+     * [정정 판별 전용] 새 규칙 도입 "전" 알고리즘을 그대로 재현한다 — 달마다 (월요금/그달일수)
+     * × 그달사용일수를 합산, 완전한 롤링 개월수 예외 없음. {@link ProrationCalculator#prorateMonthly}
+     * 최신 버전과 절대 같은 코드를 공유하지 않는다(공유하면 새 규칙이 바뀔 때 이 판별식도 같이
+     * 바뀌어버려 "예전 값과 정확히 같은지" 비교가 무의미해진다).
+     */
+    private BigDecimal legacyProrateMonthly(BigDecimal fee, LocalDate start, LocalDate end) {
+        BigDecimal total = BigDecimal.ZERO;
+        LocalDate cursor = start;
+        while (!cursor.isAfter(end)) {
+            YearMonth ym = YearMonth.from(cursor);
+            LocalDate monthEnd = ym.atEndOfMonth();
+            LocalDate segmentEnd = monthEnd.isBefore(end) ? monthEnd : end;
+            long daysInMonth = ym.lengthOfMonth();
+            long usedDays = ChronoUnit.DAYS.between(cursor, segmentEnd) + 1;
+            BigDecimal dailyRate = fee.divide(
+                    BigDecimal.valueOf(daysInMonth), MoneyPolicy.CALC_SCALE, MoneyPolicy.ROUNDING);
+            total = total.add(dailyRate.multiply(BigDecimal.valueOf(usedDays)));
+            cursor = segmentEnd.plusDays(1);
+        }
+        return MoneyPolicy.normalize(total);
     }
 
     /**

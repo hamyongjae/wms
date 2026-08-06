@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Loader2,
@@ -76,6 +76,57 @@ function LedgerDue({ l }: { l: BillingLedger }) {
 function LedgerStatusBadge({ l }: { l: BillingLedger }) {
   const ds = displayStatus(l)
   return <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1', ds.cls)}>{ds.label}</span>
+}
+
+/**
+ * [세금계산서 발행 표시] 실제 발행은 홈택스·팝빌 등 이 시스템 밖에서 이뤄진다 — 여기서는
+ * 관리자가 발행을 마친 뒤 체크만 남긴다. 행 전체가 클릭되면 정산 이력 팝업이 열리므로
+ * stopPropagation으로 그 동작과 분리한다. 관리자가 아니면 누를 수 없는 단순 표시로 남긴다.
+ */
+function TaxInvoiceToggle({
+  l,
+  isAdmin,
+  onChanged,
+}: {
+  l: BillingLedger
+  isAdmin: boolean
+  onChanged: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+
+  async function toggle(e: MouseEvent) {
+    e.stopPropagation()
+    if (busy) return
+    setBusy(true)
+    try {
+      await billingApi.setTaxInvoiceIssued(l.id, !l.taxInvoiceIssued)
+      onChanged()
+    } catch {
+      window.alert('세금계산서 발행 상태 변경에 실패했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!isAdmin) {
+    return <span className="text-xs text-slate-600">{l.taxInvoiceIssued ? '발행' : '미발행'}</span>
+  }
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={busy}
+      className={cn(
+        'rounded-full px-2 py-0.5 text-xs font-medium ring-1 transition disabled:opacity-50',
+        l.taxInvoiceIssued
+          ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100'
+          : 'bg-slate-100 text-slate-500 ring-slate-200 hover:bg-slate-200',
+      )}
+      title="눌러서 발행 상태 전환"
+    >
+      {l.taxInvoiceIssued ? '발행' : '미발행'}
+    </button>
+  )
 }
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
@@ -437,7 +488,7 @@ export default function BillingPage() {
                     <LedgerStatusBadge l={l} />
                   </td>
                   <td className="px-5 py-3">
-                    <span className="text-xs text-slate-600">{l.taxInvoiceIssued ? '발행' : '미발행'}</span>
+                    <TaxInvoiceToggle l={l} isAdmin={isAdmin} onChanged={reload} />
                   </td>
                 </tr>
               ))}
@@ -464,11 +515,12 @@ export default function BillingPage() {
                     ? 'text-slate-900'
                     : 'text-slate-400'
             return (
-              <button
+              // [삭제 버튼 nesting 방지] 세금계산서 토글이 버튼이라 카드 전체를 button으로 두면
+              // button 안에 button이 들어가는 잘못된 DOM이 된다 — div+onClick으로 대체.
+              <div
                 key={l.id}
-                type="button"
                 onClick={() => setSelectedId(l.id)}
-                className="w-full overflow-hidden rounded-2xl bg-white p-3.5 text-left shadow-soft ring-1 ring-slate-200/60 transition active:bg-slate-50"
+                className="w-full cursor-pointer overflow-hidden rounded-2xl bg-white p-3.5 text-left shadow-soft ring-1 ring-slate-200/60 transition active:bg-slate-50"
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-lg font-bold text-slate-800">{l.customerName}</p>
@@ -493,9 +545,11 @@ export default function BillingPage() {
                 <div className="mt-2 flex items-center gap-2 text-xs">
                   <span className="text-slate-400">납기</span>
                   <LedgerDue l={l} />
-                  <span className="ml-auto text-slate-400">세금계산서 {l.taxInvoiceIssued ? '발행' : '미발행'}</span>
+                  <span className="ml-auto flex items-center gap-1 text-slate-400">
+                    세금계산서 <TaxInvoiceToggle l={l} isAdmin={isAdmin} onChanged={reload} />
+                  </span>
                 </div>
-              </button>
+              </div>
             )
           })}
         </div>

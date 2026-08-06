@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Period;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 
@@ -34,6 +35,16 @@ public class ProrationCalculator {
                                      LocalDate endInclusive) {
         validatePeriod(startInclusive, endInclusive);
         BigDecimal fee = MoneyPolicy.nvl(monthlyFee);
+
+        // [완전한 롤링 개월 수] 시작일 기준 정확히 N개월 뒤 하루 전이 종료일과 같으면(=흔한 롤링
+        // 청구 주기, 예: 8/6~9/5) 그 사이에 걸친 달들의 실제 일수가 달라도(8월 31일·9월 30일)
+        // 월 보관료 × N을 그대로 청구한다 — 고객은 "한 달 썼다"고 여기지 "31.x일치"라고 여기지
+        // 않는다. 이 조건에 안 맞는 진짜 partial 기간(중도출고·수동 편집으로 어중간하게 끝나는
+        // 마지막 회차 등)만 아래 달력월 기준 일할 계산으로 넘어간다.
+        int wholeMonths = fullRollingMonthsBetween(startInclusive, endInclusive);
+        if (wholeMonths > 0) {
+            return MoneyPolicy.normalize(fee.multiply(BigDecimal.valueOf(wholeMonths)));
+        }
 
         BigDecimal total = BigDecimal.ZERO;
         LocalDate cursor = startInclusive;
@@ -103,6 +114,19 @@ public class ProrationCalculator {
         BigDecimal additionalCharge = diff.signum() < 0 ? diff.negate() : MoneyPolicy.ZERO;
 
         return new MidReleaseResult(actualUsage, refund, additionalCharge, effectiveEnd);
+    }
+
+    /**
+     * startInclusive로부터 정확히 N개월 뒤 하루 전 == endInclusive 이면 N(1 이상), 안 맞으면 0.
+     * {@code Period.between(start, end+1일)}의 나머지 일수(getDays())가 0이어야 "딱 N개월"이다 —
+     * 1일이라도 남으면 진짜 partial 기간이므로 0을 돌려줘 일할 계산으로 넘어가게 한다.
+     */
+    private int fullRollingMonthsBetween(LocalDate startInclusive, LocalDate endInclusive) {
+        LocalDate next = endInclusive.plusDays(1);
+        Period p = Period.between(startInclusive, next);
+        if (p.getDays() != 0) return 0;
+        int months = p.getYears() * 12 + p.getMonths();
+        return Math.max(months, 0);
     }
 
     private void validatePeriod(LocalDate start, LocalDate end) {

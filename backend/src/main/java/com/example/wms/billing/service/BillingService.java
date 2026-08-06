@@ -318,6 +318,21 @@ public class BillingService {
     }
 
     /**
+     * [세금계산서 발행 표시] 실제 발행은 홈택스/팝빌 등 이 시스템 밖에서 이뤄진다 — 여기서는
+     * 관리자가 발행을 마쳤음을 체크해 정산 화면에 "발행" 여부만 정확히 남긴다.
+     */
+    @Transactional
+    public BillingLedgerResponse setTaxInvoiceIssued(Long ledgerId, boolean issued) {
+        BillingLedger ledger = lockLedger(ledgerId);
+        if (issued) {
+            ledger.markTaxInvoiceIssued();
+        } else {
+            ledger.unmarkTaxInvoiceIssued();
+        }
+        return new BillingLedgerResponse(ledger);
+    }
+
+    /**
      * [납기일 변경] 정산서 화면에서 관리자가 개별 원장의 납기일을 직접 조정한다.
      * 취소/이월된 원장은 도메인 규칙(requireActive)이 막는다.
      */

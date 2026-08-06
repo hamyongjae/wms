@@ -261,6 +261,40 @@ class BillingLedgerTest {
     }
 
     @Nested
+    @DisplayName("세금계산서 발행 표시(markTaxInvoiceIssued/unmark)")
+    class TaxInvoice {
+        @Test
+        @DisplayName("발행 표시하면 isTaxInvoiceIssued가 true가 되고, 취소하면 다시 false가 된다")
+        void marksAndUnmarks() {
+            BillingLedger l = issuedLedger(new BigDecimal("100000"));
+            assertThat(l.isTaxInvoiceIssued()).isFalse();
+
+            l.markTaxInvoiceIssued();
+            assertThat(l.isTaxInvoiceIssued()).isTrue();
+            assertThat(l.getTaxInvoiceIssuedAt()).isNotNull();
+
+            l.unmarkTaxInvoiceIssued();
+            assertThat(l.isTaxInvoiceIssued()).isFalse();
+            assertThat(l.getTaxInvoiceIssuedAt()).isNull();
+        }
+
+        @Test
+        @DisplayName("이미 발행 표시된 원장을 다시 발행 표시하면 예외(중복 방지)")
+        void cannotMarkTwice() {
+            BillingLedger l = issuedLedger(new BigDecimal("100000"));
+            l.markTaxInvoiceIssued();
+            assertThatThrownBy(l::markTaxInvoiceIssued).isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("발행 표시가 안 된 원장의 발행을 취소하면 예외")
+        void cannotUnmarkWhenNotIssued() {
+            BillingLedger l = issuedLedger(new BigDecimal("100000"));
+            assertThatThrownBy(l::unmarkTaxInvoiceIssued).isInstanceOf(IllegalStateException.class);
+        }
+    }
+
+    @Nested
     @DisplayName("취소(cancel)")
     class Cancel {
         @Test

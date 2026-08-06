@@ -37,6 +37,9 @@ public class BillingLedgerResponse {
     private final boolean refundCompleted;  // 환불 완료 처리 여부 (지급 후 마감)
     private final LocalDateTime refundedAt;  // 환불 완료 시각 (미완료면 null)
 
+    private final boolean taxInvoiceIssued;      // 세금계산서 발행 여부 (관리자가 수동 체크)
+    private final LocalDateTime taxInvoiceIssuedAt;  // 발행 처리 시각 (미발행이면 null)
+
     private final BillingStatus status;
     // [파생 연체/미수] 상태 enum을 늘리지 않고(회계 원장 진실 보존 + DDL 마이그레이션 회피),
     //   납기 경과 + 미납 잔액을 실시간 계산해 노출한다. 프론트 미수금 파이프라인이 이 값을 소비한다.
@@ -69,6 +72,8 @@ public class BillingLedgerResponse {
         this.refundDue = l.refundDue();
         this.refundCompleted = l.isRefundCompleted();
         this.refundedAt = l.getRefundedAt();
+        this.taxInvoiceIssued = l.isTaxInvoiceIssued();
+        this.taxInvoiceIssuedAt = l.getTaxInvoiceIssuedAt();
         this.status = l.getStatus();
 
         // [연체 파생 계산] 오늘 기준 납기 경과 + 미납 잔액이 있으면 연체/미수로 판정.

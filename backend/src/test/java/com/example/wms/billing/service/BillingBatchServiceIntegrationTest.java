@@ -281,6 +281,51 @@ class BillingBatchServiceIntegrationTest extends IntegrationTestBase {
         assertThat(refreshed.getExpectedEndDate()).isNull();
     }
 
+    @Test
+    @DisplayName("[신규] 완전한 롤링 개월수인데 예전 방식으로 어중간하게 청구된 미납 원장을 새 규칙값으로 정정한다")
+    void recalcsLegacyProratedLedgerToFlatFee() {
+        Tenant tenant = createTenant("정정대상업체");
+        Warehouse warehouse = createWarehouse(tenant);
+        Customer customer = createCustomer(tenant);
+        StorageOrder order = createOrder(tenant, customer, warehouse,
+                LocalDate.of(2026, 8, 6), null, 250_000);
+        // 8/6~9/5 = 딱 1개월인데, 예전 방식(달마다 일할 나눠 합산)으로 어중간하게 청구된 상태를 재현
+        BillingLedger ledger = createLedger(tenant, order, customer,
+                LocalDate.of(2026, 8, 6), LocalDate.of(2026, 9, 5), new BigDecimal("251344.09"));
+        ledger = billingLedgerRepository.findById(ledger.getId()).orElseThrow();
+        ledger.issue(LocalDate.of(2026, 9, 5));
+        billingLedgerRepository.save(ledger);
+
+        int fixed = billingBatchService.recalcRollingMonthProration();
+
+        assertThat(fixed).isGreaterThanOrEqualTo(1);
+        BillingLedger refreshed = billingLedgerRepository.findById(ledger.getId()).orElseThrow();
+        assertThat(refreshed.getBaseAmount()).isEqualByComparingTo("250000.00");
+        assertThat(refreshed.getBalance()).isEqualByComparingTo("250000.00");
+    }
+
+    @Test
+    @DisplayName("[신규] 예전 방식으로 재현이 안 되는(요금 변경·수동 편집된) 원장은 건드리지 않는다")
+    void doesNotTouchLedgerNotMatchingLegacyFormula() {
+        Tenant tenant = createTenant("수동편집업체");
+        Warehouse warehouse = createWarehouse(tenant);
+        Customer customer = createCustomer(tenant);
+        StorageOrder order = createOrder(tenant, customer, warehouse,
+                LocalDate.of(2026, 8, 6), null, 250_000);
+        // 예전 알고리즘으로도 나올 수 없는 임의의 금액 — 관리자가 수동으로 고친 상황을 재현
+        BillingLedger ledger = createLedger(tenant, order, customer,
+                LocalDate.of(2026, 8, 6), LocalDate.of(2026, 9, 5), new BigDecimal("123456.78"));
+        ledger = billingLedgerRepository.findById(ledger.getId()).orElseThrow();
+        ledger.issue(LocalDate.of(2026, 9, 5));
+        billingLedgerRepository.save(ledger);
+        Long ledgerId = ledger.getId();
+
+        billingBatchService.recalcRollingMonthProration();
+
+        BillingLedger refreshed = billingLedgerRepository.findById(ledgerId).orElseThrow();
+        assertThat(refreshed.getBaseAmount()).isEqualByComparingTo("123456.78");
+    }
+
     /** 8/15 시작, 최초 원장 [8/15~9/14](월경계 아닌 롤링 기간)까지 세팅된 계약을 만든다. */
     private StorageOrder seedOrderWithInitialLedger() {
         Tenant tenant = createTenant("테스트업체");

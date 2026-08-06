@@ -112,6 +112,15 @@ public class BillingController {
         return ResponseEntity.ok(billingService.completeRefund(id));
     }
 
+    // ===== 세금계산서 발행 표시 — ADMIN 전용 (실제 발행은 이 시스템 밖에서, 여기는 체크만) =====
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{id}/tax-invoice")
+    public ResponseEntity<BillingLedgerResponse> setTaxInvoiceIssued(
+            @PathVariable Long id,
+            @Valid @RequestBody TaxInvoiceRequest request) {
+        return ResponseEntity.ok(billingService.setTaxInvoiceIssued(id, request.getIssued()));
+    }
+
     // ===== 납기일 변경 — ADMIN 전용 =====
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/{id}/due-date")
