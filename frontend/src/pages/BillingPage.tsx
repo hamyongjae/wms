@@ -446,7 +446,11 @@ export default function BillingPage() {
         )}
       </section>
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      {/* [항상 한 줄] flex-wrap이면 좁은 폰에서 칩 5개가 줄바꿈되어 둘째 줄이 생긴다 — nowrap +
+          가로 스크롤로 화면 폭과 무관하게 항상 한 줄을 유지하고, 안 보이는 칩은 옆으로 밀어 넘긴다.
+          pt/pb로 여유를 주는 건 overflow-x-auto가 overflow-y도 auto로 취급해 글자 위아래가
+          잘리는 걸 막기 위함(YardDispatchPage와 동일 이유). */}
+      <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto pt-0.5 pb-1">
         {FILTERS.map((f) => {
           const count =
             f.key === 'ALL'
@@ -460,7 +464,7 @@ export default function BillingPage() {
               type="button"
               onClick={() => setStatusFilter(f.key)}
               className={cn(
-                'rounded-lg px-3 py-1.5 text-xs font-medium transition',
+                'shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition',
                 statusFilter === f.key
                   ? 'bg-slate-800 text-white'
                   : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50',
