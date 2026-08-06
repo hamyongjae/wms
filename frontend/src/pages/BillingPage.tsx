@@ -9,6 +9,7 @@ import {
   ChevronUp,
   ChevronDown,
   PieChart,
+  Download,
 } from 'lucide-react'
 import { billingApi, type BillingLedger, type BillingStatus } from '@/api/billingApi'
 import { orderApi, type StorageOrder } from '@/api/orderApi'
@@ -21,6 +22,7 @@ import { computeRangeRevenue } from '@/lib/revenue'
 import { orderSync } from '@/lib/orderEvents'
 import { ymdKorean, addDays } from '@/lib/dates'
 import { CalendarField } from '@/components/order/orderFormUi'
+import { downloadCsv } from '@/lib/csvExport'
 
 /* '연체'는 저장 상태가 아니라 시점 해석 — 클라이언트 파생 필터로 제공한다 */
 type FilterKey = 'ALL' | BillingStatus | 'OVERDUE'
@@ -37,6 +39,30 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const pct = (r: number) => `${Math.round(r * 100)}%`
 const totalDue = (l: BillingLedger) => l.baseAmount + l.carriedOverIn + l.adjustmentTotal
+
+/** [엑셀 다운로드] 지금 화면에 걸린 조회 조건(기간·상태 필터)이 그대로 반영된 목록만 내보낸다 —
+ *  화면과 다른 걸 받으면 회계 처리 시 혼동이 생기므로, "보이는 게 곧 받는 것"을 지킨다. */
+function exportVisibleToExcel(ledgers: BillingLedger[], range: { from: string; to: string }) {
+  const headers = ['정산서번호', '고객명', '청구시작일', '청구종료일', '결제방식', '청구액', '입금액', '미수금', '환불대상', '납기일', '상태', '세금계산서']
+  const rows = ledgers.map((l) => {
+    const ds = displayStatus(l)
+    return [
+      l.ledgerNo,
+      l.customerName,
+      l.periodStart,
+      l.periodEnd,
+      l.settlementType === 'PREPAID' ? '선불' : '후불',
+      Math.round(totalDue(l)),
+      Math.round(l.paidTotal),
+      Math.round(l.outstanding ?? Math.max(l.balance, 0)),
+      Math.round(l.refundDue ?? Math.max(-l.balance, 0)),
+      l.dueDate ?? '',
+      ds.label,
+      l.taxInvoiceIssued ? '발행' : '미발행',
+    ]
+  })
+  downloadCsv(`매출관리_${range.from}_${range.to}.csv`, headers, rows)
+}
 
 // 고객사별 입금 비중 바 색상 (구 매출관리 화면에서 이식)
 const BAR_COLORS = ['#6366f1', '#818cf8', '#38bdf8', '#34d399', '#fbbf24', '#f472b6', '#a78bfa', '#94a3b8']
@@ -298,6 +324,15 @@ export default function BillingPage() {
     <div className="mx-auto max-w-6xl space-y-3 md:space-y-6">
       <div className="flex items-start justify-between gap-4">
         <h2 className="text-xl font-bold text-slate-800">매출 관리</h2>
+        <button
+          type="button"
+          onClick={() => exportVisibleToExcel(visible, range)}
+          disabled={visible.length === 0}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 md:px-2.5 md:py-1.5 md:text-xs"
+        >
+          <Download size={14} />
+          엑셀 다운로드
+        </button>
       </div>
 
       {/* [기간 필터] 진입 즉시 당월. 월 이동(연·월 동시) + 사용자 지정 기간 — 변경 시 카드·표 동시 갱신 */}
