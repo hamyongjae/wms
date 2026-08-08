@@ -162,12 +162,6 @@ function monthBounds(year: number, month1: number): { from: string; to: string }
   return { from: `${year}-${pad2(month1)}-01`, to: `${year}-${pad2(month1)}-${pad2(last)}` }
 }
 
-/** [연체 딥링크용 '전체' 대체] 날짜 입력칸이 비어 보이지 않도록, 충분히 넓은 실제 기간을 준다. */
-function wideRange(): { from: string; to: string } {
-  const y = new Date().getFullYear()
-  return { from: `${y - 10}-01-01`, to: `${y + 1}-12-31` }
-}
-
 export default function BillingPage() {
   const isAdmin = authStorage.getUser()?.role === 'ADMIN'
 
@@ -192,6 +186,11 @@ export default function BillingPage() {
   })
   // [딥링크] 캘린더 등에서 /billing?ledger=ID 로 진입하면 해당 원장 상세를 바로 연다
   const [searchParams, setSearchParams] = useSearchParams()
+  // [연체 딥링크 전용] true인 동안은 목록 조회에서 조회기간(range)을 무시하고 전체를 가져온다 —
+  //   '연체'는 특정 기간 소속이 아니라 오늘 기준 파생 상태라, 기간을 좁히면 예전 달에 발행된
+  //   미납 건이 빠질 수 있다. 화면에 보이는 날짜칸은 정상적으로 '이번 달'을 유지해 더 이상
+  //   2016~2027 같은 비현실적인 범위가 보이지 않게 한다. 사용자가 기간·필터를 직접 건드리면 해제.
+  const [overdueUnscoped, setOverdueUnscoped] = useState(false)
 
   useEffect(() => {
     const raw = searchParams.get('ledger')
@@ -228,14 +227,15 @@ export default function BillingPage() {
   }, [selectedId])
 
   // [딥링크] 대시보드 연체 알림에서 /billing?filter=OVERDUE 로 들어오면 연체 칩을 바로 켠다.
-  //   기간이 이번 달로 좁혀져 있으면 지난달 이전에 밀린 연체 건이 안 보이므로 기간도 넓힌다.
-  //   빈 문자열('전체')로 두면 날짜 입력칸이 비어 보이고 고객별 입금 비중 계산도 깨지므로
-  //   (조회기간이 없으면 일할 계산 기준점이 없어 0건으로 나옴) 충분히 넓은 실제 날짜로 대신한다.
+  //   조회기간은 오늘이 포함된 '이번 달'로 두어 화면은 정상적으로 보이게 하고, 대신
+  //   overdueUnscoped로 목록 조회 자체는 기간 제한 없이 돌려 지난달 이전 미납 건도 놓치지 않는다.
   useEffect(() => {
     const f = searchParams.get('filter')
     if (f === 'OVERDUE') {
       setStatusFilter('OVERDUE')
-      setRange(wideRange())
+      setOverdueUnscoped(true)
+      const n = new Date()
+      setRange(monthBounds(n.getFullYear(), n.getMonth() + 1))
       setSearchParams({}, { replace: true })
     }
   }, [searchParams, setSearchParams])
@@ -249,13 +249,15 @@ export default function BillingPage() {
   useEffect(() => {
     setLoading(true)
     setError(null)
-    // 기간(range)이나 새로고침 키가 바뀌면 해당 기간 원장만 서버에서 받아 카드·표를 함께 갱신
+    // 기간(range)이나 새로고침 키가 바뀌면 해당 기간 원장만 서버에서 받아 카드·표를 함께 갱신.
+    // 단, 연체 딥링크로 들어와 overdueUnscoped가 켜져 있으면 기간 제한 없이 전체를 받는다.
+    const query = overdueUnscoped ? undefined : range.from && range.to ? range : undefined
     billingApi
-      .list(range.from && range.to ? range : undefined)
+      .list(query)
       .then(setLedgers)
       .catch(() => setError('정산서를 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
-  }, [refreshKey, range])
+  }, [refreshKey, range, overdueUnscoped])
 
   // [구 매출관리 통합] 고객별 입금 비중 · 전월 대비는 조회 기간 밖(직전 기간)도 봐야 하므로
   //   기간 스코프 없이 전체를 따로 받아 클라이언트에서 계산한다(구 매출관리 화면과 동일 패턴).
@@ -311,13 +313,16 @@ export default function BillingPage() {
   }, [range.from])
 
   // 월 단위 이동 — 해당 월의 1일~말일로 기간을 통째로 세팅 (연·월 동시 전환)
+  // 사용자가 기간을 직접 조작하면 연체 딥링크의 '기간 무시' 상태는 더 이상 유효하지 않다.
   function moveMonth(step: number) {
     const d = new Date(cursor.year, cursor.month1 - 1 + step, 1)
     setRange(monthBounds(d.getFullYear(), d.getMonth() + 1))
+    setOverdueUnscoped(false)
   }
   function goThisMonth() {
     const n = new Date()
     setRange(monthBounds(n.getFullYear(), n.getMonth() + 1))
+    setOverdueUnscoped(false)
   }
 
   return (
@@ -352,7 +357,10 @@ export default function BillingPage() {
         <div className="flex flex-1 items-center gap-2 text-sm sm:flex-none">
           <CalendarField
             value={range.from}
-            onChange={(v) => setRange((r) => ({ ...r, from: v }))}
+            onChange={(v) => {
+              setRange((r) => ({ ...r, from: v }))
+              setOverdueUnscoped(false)
+            }}
             max={range.to || undefined}
             format={ymdKorean}
             className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:w-36 sm:flex-none"
@@ -360,7 +368,10 @@ export default function BillingPage() {
           <span className="shrink-0 text-slate-400">~</span>
           <CalendarField
             value={range.to}
-            onChange={(v) => setRange((r) => ({ ...r, to: v }))}
+            onChange={(v) => {
+              setRange((r) => ({ ...r, to: v }))
+              setOverdueUnscoped(false)
+            }}
             min={range.from || undefined}
             format={ymdKorean}
             className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:w-36 sm:flex-none"
@@ -463,7 +474,10 @@ export default function BillingPage() {
             <button
               key={f.key}
               type="button"
-              onClick={() => setStatusFilter(f.key)}
+              onClick={() => {
+                setStatusFilter(f.key)
+                setOverdueUnscoped(false)
+              }}
               className={cn(
                 'flex min-w-0 flex-col items-center justify-center rounded-lg px-0.5 py-1.5 transition',
                 active ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 ring-1 ring-slate-200',
@@ -487,7 +501,10 @@ export default function BillingPage() {
             <button
               key={f.key}
               type="button"
-              onClick={() => setStatusFilter(f.key)}
+              onClick={() => {
+                setStatusFilter(f.key)
+                setOverdueUnscoped(false)
+              }}
               className={cn(
                 'rounded-lg px-3 py-1.5 text-xs font-medium transition',
                 statusFilter === f.key
