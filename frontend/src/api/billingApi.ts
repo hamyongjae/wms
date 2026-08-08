@@ -181,11 +181,6 @@ export const billingApi = {
     const { data } = await api.put<BillingLedger>(`/api/billing/ledgers/${id}`, body)
     return data
   },
-  // 미납(연체) 촉구 일괄 발송 → 결과 메시지 문자열
-  async sendOverdueReminders(): Promise<string> {
-    const { data } = await api.post<string>('/api/billing/ledgers/notify/overdue', {})
-    return data
-  },
   // 특정 원장 청구 안내(알림톡) 재발송 — 202 Accepted
   async sendPaymentRequest(id: number): Promise<void> {
     await api.post(`/api/billing/ledgers/${id}/notify/payment-request`, {})

@@ -107,18 +107,6 @@ public interface BillingLedgerRepository extends JpaRepository<BillingLedger, Lo
     @Query("select l from BillingLedger l where l.id = :id and l.tenant.id = :tenantId")
     Optional<BillingLedger> findForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
-    /** 미납(잔액 > 0) & 납기 경과 원장 — 특정 테넌트 대상 */
-    @Query("""
-            select l from BillingLedger l
-            where l.tenant.id = :tenantId
-              and l.balance > 0
-              and l.status in (com.example.wms.billing.entity.BillingStatus.ISSUED,
-                               com.example.wms.billing.entity.BillingStatus.PARTIALLY_PAID)
-              and l.dueDate < :baseDate
-            """)
-    List<BillingLedger> findOverdue(@Param("tenantId") Long tenantId,
-                                    @Param("baseDate") LocalDate baseDate);
-
     /**
      * [차트 집계] 월별 청구·수금 합계 — 원장 필드를 DB에서 직접 GROUP BY 합산(런타임 풀스캔·앱단 집계 제거).
      *   billed    = base_amount + carried_over_in + adjustment_total (중도출고 차감·환불 조정 반영)

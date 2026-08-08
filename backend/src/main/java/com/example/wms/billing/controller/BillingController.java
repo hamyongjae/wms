@@ -183,10 +183,4 @@ public class BillingController {
         return ResponseEntity.accepted().build();
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/notify/overdue")
-    public ResponseEntity<String> sendOverdueReminders() {
-        int count = billingService.sendOverdueReminders();
-        return ResponseEntity.ok("미납 촉구 발송 대상: " + count + "건");
-    }
 }

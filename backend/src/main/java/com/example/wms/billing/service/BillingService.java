@@ -580,17 +580,6 @@ public class BillingService {
         publish(ledger, NotificationType.PAYMENT_REQUEST);
     }
 
-    /** 미납(납기 경과 + 잔액>0) 원장 일괄 미납 촉구 발송. 발송 건수 반환 */
-    @Transactional
-    public int sendOverdueReminders() {
-        Long tenantId = SecurityUtils.getCurrentTenantId();
-        List<BillingLedger> overdue = ledgerRepository.findOverdue(tenantId, LocalDate.now());
-        for (BillingLedger ledger : overdue) {
-            publish(ledger, NotificationType.OVERDUE_REMINDER);
-        }
-        return overdue.size();
-    }
-
     // ===================== 조회 =====================
 
     @Transactional(readOnly = true)
