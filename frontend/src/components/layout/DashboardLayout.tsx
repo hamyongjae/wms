@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import MobileTabBar from './MobileTabBar'
+import { autoRequestPushOnce } from '@/lib/push'
 
 const COLLAPSE_KEY = 'wms.sidebar.collapsed'
 
@@ -20,6 +21,12 @@ export default function DashboardLayout() {
   useEffect(() => {
     localStorage.setItem(COLLAPSE_KEY, String(collapsed))
   }, [collapsed])
+
+  // [알림 권한 자동 요청] 로그인 후 앱 셸이 처음 뜰 때 한 번, 설정 화면까지 가지 않아도
+  // 브라우저 알림 권한을 바로 물어본다(기기당 1회만 시도 — lib/push.ts 참고).
+  useEffect(() => {
+    autoRequestPushOnce()
+  }, [])
 
   return (
     // h-app-screen: 100dvh(폴백 100vh) — 모바일 주소창이 보일 때도 셸이 화면을 넘지 않아 하단이 잘리지 않는다

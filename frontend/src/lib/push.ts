@@ -70,6 +70,27 @@ export async function enablePush(): Promise<void> {
   })
 }
 
+const AUTO_ASK_KEY = 'wms.push.autoAsked'
+
+/**
+ * [로그인 후 자동 권한 요청] 앱을 처음 열 때 설정 화면까지 찾아가지 않아도 브라우저 알림
+ * 권한을 한 번 자동으로 물어본다. 기기당 딱 한 번만 시도한다 — 허용이든 거부든 응답이 나면
+ * (또는 시도 자체를 했으면) 다시는 자동으로 띄우지 않는다. 이후엔 설정 화면에서 수동으로만 켤 수 있다.
+ * 아이폰 사파리는 사용자 탭(제스처) 없이는 권한 창 자체가 뜨지 않는 정책이라 자동 호출은
+ * 조용히 실패한다 — 그 경우도 설정 화면 안내를 그대로 따라야 한다.
+ */
+export async function autoRequestPushOnce(): Promise<void> {
+  if (!isPushSupported()) return
+  if (localStorage.getItem(AUTO_ASK_KEY) === '1') return
+  if (Notification.permission !== 'default') return
+  localStorage.setItem(AUTO_ASK_KEY, '1') // 시도 자체를 표시 — StrictMode 이중 실행·재실행 방어
+  try {
+    await enablePush()
+  } catch {
+    // 자동 요청은 사용자 조작 없이 일어나므로 실패해도 화면에 에러를 띄우지 않는다
+  }
+}
+
 /** 브라우저 구독 해제 + 서버에서도 삭제 */
 export async function disablePush(): Promise<void> {
   if (!isPushSupported()) return
