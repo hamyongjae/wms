@@ -795,8 +795,12 @@ function EventCard({
       <div className="mt-3 flex flex-wrap gap-1.5">
         {(event.type === 'INBOUND' || event.type === 'OUTBOUND') && (
           <>
-            {/* 이미 실제 출고 완료된 계약은 다시 출고 처리할 필요가 없다 */}
-            {event.status !== 'COMPLETED' && (
+            {/* [버그 수정] event.status는 이 카드 자체(입고 또는 출고)의 완료 여부라, 입고 카드는
+                입고일이 지나면 항상 COMPLETED라 출고 버튼이 영영 안 보였다 — 이미 출고 완료된
+                계약은 다시 출고할 필요가 없다는 의도는 '출고' 타입 카드에만 적용해야 한다.
+                (버튼을 눌러 여는 StatusChangeModal은 최신 계약 상태를 다시 조회해 반영하므로,
+                 뒤늦게 다른 달에서 이미 출고된 계약의 입고 카드를 봐도 안전하게 동작한다.) */}
+            {!(event.type === 'OUTBOUND' && event.status === 'COMPLETED') && (
               <QuickBtn onClick={() => onOutbound(event.id)} disabled={actionLoading} icon={<LogOut size={13} />} tone="amber">
                 출고
               </QuickBtn>
