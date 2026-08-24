@@ -81,6 +81,17 @@ export interface LedgerDetail {
   adjustments: Adjustment[]
 }
 
+// [매출관리 - 입금일 기준] 청구기간 일할계산 없이 실제 입금일(paidOn) 그대로 매출을 잡기 위한 원시 입금 1건
+export interface RevenuePayment {
+  id: number
+  billingLedgerId: number
+  storageOrderId: number
+  customerId: number
+  customerName: string
+  amount: number
+  paidOn: string
+}
+
 export interface PaymentRequest {
   amount: number
   method: PaymentMethod
@@ -124,6 +135,11 @@ export const billingApi = {
   },
   async detail(id: number): Promise<LedgerDetail> {
     const { data } = await api.get<LedgerDetail>(`/api/billing/ledgers/${id}/detail`)
+    return data
+  },
+  // [매출관리 - 입금일 기준] 취소 아닌 입금 전량(고객·계약 정보 포함) — 기간 필터는 프론트에서 paidOn으로 처리
+  async revenuePayments(): Promise<RevenuePayment[]> {
+    const { data } = await api.get<RevenuePayment[]>('/api/billing/ledgers/payments/revenue')
     return data
   },
   // [차트] 월별 청구·수금 추이 — DB GROUP BY 집계 (기본 6개월)

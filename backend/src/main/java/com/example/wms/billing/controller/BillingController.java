@@ -79,6 +79,12 @@ public class BillingController {
         return ResponseEntity.ok(billingService.getPayments(id));
     }
 
+    // [매출관리 - 입금일 기준] 청구기간 일할계산 없이 실제 입금일 그대로 집계하기 위한 원시 입금 전량
+    @GetMapping("/payments/revenue")
+    public ResponseEntity<List<RevenuePaymentResponse>> revenuePayments() {
+        return ResponseEntity.ok(billingService.getRevenuePayments());
+    }
+
     @GetMapping("/{id}/adjustments")
     public ResponseEntity<List<AdjustmentResponse>> getAdjustments(@PathVariable Long id) {
         return ResponseEntity.ok(billingService.getAdjustments(id));

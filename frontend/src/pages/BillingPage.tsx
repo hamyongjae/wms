@@ -11,14 +11,14 @@ import {
   PieChart,
   Download,
 } from 'lucide-react'
-import { billingApi, type BillingLedger, type BillingStatus } from '@/api/billingApi'
+import { billingApi, type BillingLedger, type BillingStatus, type RevenuePayment } from '@/api/billingApi'
 import { orderApi, type StorageOrder } from '@/api/orderApi'
 import StatCard from '@/components/ui/StatCard'
 import { OrderBillingModal } from '@/pages/OrdersPage'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
-import { isOverdue, daysFromDue, displayStatus, accruedPaidInRange } from '@/lib/billing'
-import { computeRangeRevenue } from '@/lib/revenue'
+import { isOverdue, daysFromDue, displayStatus } from '@/lib/billing'
+import { computeRangeRevenue, sumPaymentsInRange } from '@/lib/revenue'
 import { orderSync } from '@/lib/orderEvents'
 import { ymdKorean, addDays } from '@/lib/dates'
 import { CalendarField } from '@/components/order/orderFormUi'
@@ -166,9 +166,9 @@ export default function BillingPage() {
   const isAdmin = authStorage.getUser()?.role === 'ADMIN'
 
   const [ledgers, setLedgers] = useState<BillingLedger[]>([])
-  // [구 매출관리 통합] 목록·KPI용 ledgers는 기간 스코프 조회를 유지하고, 고객별 입금 비중과
-  // 전월 대비 비교는 직전 기간까지 걸치므로 별도로 전체를 조회해 클라이언트에서 계산한다.
-  const [revenueLedgers, setRevenueLedgers] = useState<BillingLedger[]>([])
+  // [입금일 기준 매출] '기간 입금액'·고객별 비중·전월 대비 비교 모두 이 입금 전량(기간 제한 없음)에서
+  // paidOn으로 직접 걸러 계산한다 — 청구기간 일할계산을 쓰지 않는다.
+  const [revenuePayments, setRevenuePayments] = useState<RevenuePayment[]>([])
   // [스크롤 절약] 고객별 입금 비중은 부가 정보라 기본 접힘 — 헤더 탭으로 펼친다
   const [revenueOpen, setRevenueOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<FilterKey>('ALL')
@@ -259,10 +259,10 @@ export default function BillingPage() {
       .finally(() => setLoading(false))
   }, [refreshKey, range, overdueUnscoped])
 
-  // [구 매출관리 통합] 고객별 입금 비중 · 전월 대비는 조회 기간 밖(직전 기간)도 봐야 하므로
-  //   기간 스코프 없이 전체를 따로 받아 클라이언트에서 계산한다(구 매출관리 화면과 동일 패턴).
+  // [입금일 기준 매출] 고객별 입금 비중 · 전월 대비는 조회 기간 밖(직전 기간)도 봐야 하므로
+  //   기간 제한 없이 전체 입금 내역을 받아 클라이언트에서 paidOn으로 계산한다.
   useEffect(() => {
-    billingApi.list().then(setRevenueLedgers).catch(() => {})
+    billingApi.revenuePayments().then(setRevenuePayments).catch(() => {})
   }, [refreshKey])
 
   const kpi = useMemo(() => {
@@ -270,23 +270,23 @@ export default function BillingPage() {
     // [계정 과목 분리] 미수금은 양수 잔액(outstanding)만 합산 — 음수(과오납)가 미수금을 갉아먹지 않도록.
     const outstanding = active.reduce((s, l) => s + (l.outstanding ?? Math.max(l.balance, 0)), 0)
     const refundDue = active.reduce((s, l) => s + (l.refundDue ?? Math.max(-l.balance, 0)), 0)
-    // [조회기간 일할 입금액] 기간이 지정돼 있으면(전체 조회가 아니면) 원장 청구기간과 겹친
-    // 일수만큼만 입금액을 잘라 인식 — '전체'(무기한) 조회는 자를 기준이 없으므로 누적 그대로.
+    // [입금일 기준 기간 입금액] 청구기간 일할계산 없이, 입금일(paidOn)이 조회기간 안인 건만
+    // 전액 합산 — '전체'(무기한) 조회는 자를 기준이 없으므로 전체 입금을 그대로 합산.
     const collected =
       range.from && range.to
-        ? active.reduce((s, l) => s + accruedPaidInRange(l, range.from, range.to), 0)
-        : active.reduce((s, l) => s + l.paidTotal, 0)
+        ? sumPaymentsInRange(revenuePayments, range.from, range.to)
+        : revenuePayments.reduce((s, p) => s + p.amount, 0)
     const overdueCount = ledgers.filter(isOverdue).length
     return { outstanding, refundDue, collected, overdueCount, count: ledgers.length }
-  }, [ledgers, range])
+  }, [ledgers, revenuePayments, range])
 
-  // [구 매출관리 통합] 고객별 입금 비중 — 조회 기간 안에서 발생한 입금을 고객별로 묶는다.
+  // [입금일 기준 매출] 고객별 입금 비중 — 조회 기간 안에 입금일이 찍힌 건만 고객별로 묶는다.
   const revenueSummary = useMemo(
     () =>
       range.from && range.to
-        ? computeRangeRevenue(revenueLedgers, range.from, range.to)
-        : computeRangeRevenue(revenueLedgers, range.from, range.from),
-    [revenueLedgers, range],
+        ? computeRangeRevenue(revenuePayments, range.from, range.to)
+        : computeRangeRevenue(revenuePayments, range.from, range.from),
+    [revenuePayments, range],
   )
   // [구 매출관리 통합] 직전 '동일 길이' 기간 대비 증감 — "기간 입금액" 카드의 sub 줄에 사용.
   const prevTotal = useMemo(() => {
@@ -294,8 +294,8 @@ export default function BillingPage() {
     const prevTo = addDays(range.from, -1)
     const spanDays = Math.max(1, Math.round((new Date(range.to).getTime() - new Date(range.from).getTime()) / 86_400_000) + 1)
     const prevFrom = addDays(prevTo, -(spanDays - 1))
-    return computeRangeRevenue(revenueLedgers, prevFrom, prevTo).total
-  }, [revenueLedgers, range])
+    return computeRangeRevenue(revenuePayments, prevFrom, prevTo).total
+  }, [revenuePayments, range])
   const delta = kpi.collected - prevTotal
   const deltaPct = prevTotal > 0 ? Math.round((delta / prevTotal) * 100) : null
   const deltaLabel = fullMonthOf(range.from, range.to) != null ? '전월 대비' : '직전 동일기간 대비'

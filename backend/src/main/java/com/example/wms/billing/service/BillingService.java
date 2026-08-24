@@ -649,6 +649,18 @@ public class BillingService {
                 .stream().map(PaymentHistoryResponse::new).toList();
     }
 
+    /**
+     * [매출관리 - 입금일 기준] 청구기간 일할계산 없이 실제 입금일 그대로 매출을 잡기 위한
+     * 원천 데이터. 조회 기간을 서버에서 미리 자르지 않고 취소 아닌 입금 전량을 내려주며,
+     * 화면의 기간·전월 대비 계산은 프론트(lib/revenue.ts)에서 paidOn으로 필터링한다.
+     */
+    @Transactional(readOnly = true)
+    public List<RevenuePaymentResponse> getRevenuePayments() {
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        return paymentHistoryRepository.findRevenuePayments(tenantId)
+                .stream().map(RevenuePaymentResponse::new).toList();
+    }
+
     @Transactional(readOnly = true)
     public List<AdjustmentResponse> getAdjustments(Long ledgerId) {
         Long tenantId = SecurityUtils.getCurrentTenantId();
