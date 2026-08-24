@@ -376,9 +376,10 @@ public class BillingService {
             if (delta.signum() != 0) {
                 Long userId = SecurityUtils.getCurrentUser().getUserId();
                 String memo = delta.signum() > 0 ? "일정 수정에서 입금 처리" : "일정 수정에서 감액 정정";
+                LocalDate paidOn = req.getPaidOn() != null ? req.getPaidOn() : LocalDate.now();
                 PaymentHistory payment = new PaymentHistory(
                         ledger.getTenant(), ledger, delta, PaymentMethod.BANK_TRANSFER,
-                        LocalDate.now(), memo, userId);
+                        paidOn, memo, userId);
                 paymentHistoryRepository.save(payment);
                 if (delta.signum() > 0) {
                     ledger.applyPayment(delta);

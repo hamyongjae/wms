@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn'
 import { orderSync } from '@/lib/orderEvents'
 import { CalendarField, FieldGrid, GridField, gridInputCls, gridReadonlyCls } from '@/components/order/orderFormUi'
 import MoneyInput from '@/components/ui/MoneyInput'
-import { md } from '@/lib/dates'
+import { md, today } from '@/lib/dates'
 
 /**
  * [정산 일정 수정 — 단일 공용 템플릿] 회차의 정산 시작일·종료일·입금액·정산금액을 한
@@ -38,6 +38,9 @@ export default function ScheduleEditForm({
   const [periodEnd, setPeriodEnd] = useState(ledger.periodEnd)
   const [baseAmount, setBaseAmount] = useState<number | null>(Math.round(ledger.baseAmount))
   const [paidAmount, setPaidAmount] = useState<number | null>(Math.round(ledger.paidTotal))
+  // [입금일 기준 매출] 이 입금액이 실제로 통장에 찍힌 날짜 — 매출관리 화면이 이 날짜로 매출을
+  // 인식하므로, 과거에 받은 입금을 뒤늦게 입력할 땐 오늘이 아니라 실제 입금일을 골라야 한다.
+  const [paidOn, setPaidOn] = useState(today())
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -49,11 +52,12 @@ export default function ScheduleEditForm({
     // [오터치 방지] 입금액이 실제로 바뀌는 경우만 변경 전후 금액을 보여주고 한 번 더 확인한다.
     const currentPaid = Math.round(ledger.paidTotal)
     if (paidAmount !== currentPaid) {
-      if (!window.confirm(`입금액을 ${won(currentPaid)}에서 ${won(paidAmount)}(으)로 정정하시겠습니까?`)) return
+      if (!paidOn) return setError('입금 날짜를 입력하세요.')
+      if (!window.confirm(`입금액을 ${won(currentPaid)}에서 ${won(paidAmount)}(으)로 정정하시겠습니까?\n입금일: ${md(paidOn)}`)) return
     }
     setSubmitting(true)
     try {
-      await billingApi.editLedger(ledger.id, { periodStart, periodEnd, baseAmount, paidAmount })
+      await billingApi.editLedger(ledger.id, { periodStart, periodEnd, baseAmount, paidAmount, paidOn })
       onDone()
       orderSync.emit()
     } catch (err) {
@@ -84,6 +88,9 @@ export default function ScheduleEditForm({
         </GridField>
         <GridField label="정산금액">
           <MoneyInput value={baseAmount} onChange={setBaseAmount} required className={cn(gridInputCls, 'pr-8')} />
+        </GridField>
+        <GridField label="입금 날짜" hint="매출관리에 이 날짜로 반영됩니다">
+          <CalendarField value={paidOn} onChange={setPaidOn} max={today()} className={gridInputCls} />
         </GridField>
       </FieldGrid>
       {error && <p className="text-xs text-red-600">{error}</p>}

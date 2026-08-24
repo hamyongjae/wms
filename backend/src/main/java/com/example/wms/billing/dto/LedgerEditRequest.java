@@ -23,4 +23,7 @@ public class LedgerEditRequest {
 
     /** [선택] 보내면 현재 입금 누계와의 차액만큼 실제 입금으로 처리한다. 안 보내면 입금액은 그대로 둔다. */
     private BigDecimal paidAmount;
+
+    /** [선택] paidAmount로 새로 생기는 입금 이력의 실제 입금일. 안 보내면 오늘 날짜로 처리한다. */
+    private LocalDate paidOn;
 }
