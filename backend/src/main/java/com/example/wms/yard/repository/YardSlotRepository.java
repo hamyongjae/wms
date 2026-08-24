@@ -31,6 +31,15 @@ public interface YardSlotRepository extends JpaRepository<YardSlot, Long> {
     // 특정 컨테이너가 현재 놓인 슬롯
     Optional<YardSlot> findByTenantIdAndContainerId(Long tenantId, Long containerId);
 
+    // [캘린더] 여러 계약의 현재 적재 위치를 한 번에 조회 — 계약별 N+1 조회 방지
+    @Query("""
+            select s from YardSlot s
+            where s.tenant.id = :tenantId and s.occupied = true
+              and s.container.currentOrder.id in :orderIds
+            """)
+    List<YardSlot> findOccupiedByCurrentOrderIds(@Param("tenantId") Long tenantId,
+                                                  @Param("orderIds") java.util.Collection<Long> orderIds);
+
     // [정합화] 컨테이너 id로 슬롯 조회 (전 테넌트 — 기동 시 self-heal용)
     Optional<YardSlot> findByContainerId(Long containerId);
 

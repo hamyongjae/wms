@@ -27,10 +27,15 @@ public class CalendarEventResponse {
     private final LocalDate endDate;
     private final BigDecimal unitPrice;
 
+    // 상세 표시용: 창고명 / 실제 적재 위치(예: "1층-15", 복수 컨테이너면 콤마 구분). 위치 미배정이면 null.
+    private final String warehouseName;
+    private final String location;
+
     public CalendarEventResponse(Long id, String title, LocalDateTime startAt, LocalDateTime endAt,
                                  CalendarEventType type, CalendarEventStatus status,
                                  String customerName, BigDecimal amount,
-                                 LocalDate startDate, LocalDate endDate, BigDecimal unitPrice) {
+                                 LocalDate startDate, LocalDate endDate, BigDecimal unitPrice,
+                                 String warehouseName, String location) {
         this.id = id;
         this.title = title;
         this.startAt = startAt;
@@ -42,5 +47,7 @@ public class CalendarEventResponse {
         this.startDate = startDate;
         this.endDate = endDate;
         this.unitPrice = unitPrice;
+        this.warehouseName = warehouseName;
+        this.location = location;
     }
 }

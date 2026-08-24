@@ -22,6 +22,8 @@ export interface CalendarEvent {
   startDate?: string | null // 시작일 (입고일/보관시작/청구기간 시작)
   endDate?: string | null // 종료일 (출고예정/보관종료/청구기간 종료)
   unitPrice?: number | null // 단가 (월 보관료/기본 청구액)
+  warehouseName?: string | null // 창고명 (입출고 타입일 때만 값)
+  location?: string | null // 실제 적재 위치(예: "1층-15", 복수면 콤마 구분). 미배정이면 null
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')

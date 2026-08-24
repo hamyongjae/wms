@@ -6,6 +6,8 @@ import com.example.wms.calendar.dto.CalendarEventType;
 import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.order.repository.StorageOrderRepository;
 import com.example.wms.security.SecurityUtils;
+import com.example.wms.yard.entity.YardSlot;
+import com.example.wms.yard.repository.YardSlotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,7 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 입고/출고/청구를 하나의 캘린더 이벤트 시계열로 정규화하는 서비스.
@@ -34,6 +39,7 @@ public class CalendarService {
     private static final LocalTime EVENT_TIME = LocalTime.of(9, 0);
 
     private final StorageOrderRepository orderRepository;
+    private final YardSlotRepository yardSlotRepository;
 
     @Transactional(readOnly = true)
     public List<CalendarEventResponse> getEvents(LocalDate from, LocalDate to) {
@@ -41,9 +47,25 @@ public class CalendarService {
         LocalDate today = LocalDate.now();
         List<CalendarEventResponse> events = new ArrayList<>();
 
+        List<StorageOrder> orders = orderRepository.findAllByTenantId(tenantId);
+
+        // [위치 일괄 조회] 계약별로 슬롯을 하나씩 조회하면 N+1이 되므로, 이 화면에 보일 계약들의
+        //   현재 적재 위치를 한 번에 가져와 orderId → 위치라벨[] 맵으로 만들어둔다.
+        List<Long> orderIds = orders.stream().map(StorageOrder::getId).collect(Collectors.toList());
+        Map<Long, List<String>> locationsByOrderId = new HashMap<>();
+        if (!orderIds.isEmpty()) {
+            for (YardSlot slot : yardSlotRepository.findOccupiedByCurrentOrderIds(tenantId, orderIds)) {
+                Long orderId = slot.getContainer().getCurrentOrder().getId();
+                locationsByOrderId.computeIfAbsent(orderId, k -> new ArrayList<>()).add(slot.getLocationLabel());
+            }
+        }
+
         // ===== 계약 → 입고/출고 (일정의 단일 소스) =====
-        for (StorageOrder order : orderRepository.findAllByTenantId(tenantId)) {
+        for (StorageOrder order : orders) {
             String customer = order.getCustomer().getName();
+            String warehouseName = order.getWarehouse().getName();
+            List<String> locs = locationsByOrderId.get(order.getId());
+            String location = (locs == null || locs.isEmpty()) ? null : String.join(", ", locs);
 
             java.math.BigDecimal fee = order.getMonthlyFee() != null
                     ? java.math.BigDecimal.valueOf(order.getMonthlyFee()) : null;
@@ -61,7 +83,8 @@ public class CalendarService {
                     status = inDate.isAfter(today) ? CalendarEventStatus.PENDING : CalendarEventStatus.COMPLETED;
                 }
                 events.add(event(order.getId(), "[" + customer + "] 입고", inDate,
-                        CalendarEventType.INBOUND, status, customer, null, periodStart, periodEnd, fee));
+                        CalendarEventType.INBOUND, status, customer, null, periodStart, periodEnd, fee,
+                        warehouseName, location));
             }
 
             // 출고 이벤트 — [단일 이진 상태] 계약의 status(OUTBOUND) 를 유일 기준으로 삼는다.
@@ -80,7 +103,8 @@ public class CalendarService {
                     status = CalendarEventStatus.PENDING;
                 }
                 events.add(event(order.getId(), "[" + customer + "] 출고", outDate,
-                        CalendarEventType.OUTBOUND, status, customer, null, periodStart, periodEnd, fee));
+                        CalendarEventType.OUTBOUND, status, customer, null, periodStart, periodEnd, fee,
+                        warehouseName, location));
             }
         }
 
@@ -91,10 +115,12 @@ public class CalendarService {
     private CalendarEventResponse event(Long id, String title, LocalDate date,
                                         CalendarEventType type, CalendarEventStatus status,
                                         String customer, java.math.BigDecimal amount,
-                                        LocalDate startDate, LocalDate endDate, java.math.BigDecimal unitPrice) {
+                                        LocalDate startDate, LocalDate endDate, java.math.BigDecimal unitPrice,
+                                        String warehouseName, String location) {
         return new CalendarEventResponse(id, title,
                 date.atTime(EVENT_TIME), date.atTime(EVENT_TIME),
-                type, status, customer, amount, startDate, endDate, unitPrice);
+                type, status, customer, amount, startDate, endDate, unitPrice,
+                warehouseName, location);
     }
 
     private boolean inRange(LocalDate d, LocalDate from, LocalDate to) {

@@ -753,7 +753,7 @@ function EventCard({
             <p className="text-xs text-slate-500">미수 {won(event.amount)}</p>
           )}
 
-          {(event.startDate || event.endDate || event.unitPrice != null) && (
+          {(event.startDate || event.endDate || event.unitPrice != null || event.warehouseName) && (
             <dl className="mt-2 space-y-1 border-t border-slate-100 pt-2 text-xs">
               {event.startDate && (
                 <div className="flex items-center gap-2">
@@ -771,6 +771,15 @@ function EventCard({
                 <div className="flex items-center gap-2">
                   <dt className="w-10 shrink-0 text-slate-400">보관료</dt>
                   <dd className="font-semibold text-indigo-600">{won(event.unitPrice)}</dd>
+                </div>
+              )}
+              {event.warehouseName && (
+                <div className="flex items-center gap-2">
+                  <dt className="w-10 shrink-0 text-slate-400">위치</dt>
+                  <dd className="font-medium text-slate-700">
+                    {event.warehouseName}
+                    {event.location ? ` · ${event.location}` : ' · 위치 미배정'}
+                  </dd>
                 </div>
               )}
             </dl>
