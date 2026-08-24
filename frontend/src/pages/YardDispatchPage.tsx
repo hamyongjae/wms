@@ -21,6 +21,8 @@ import { containerApi, type Container } from '@/api/containerApi'
 import { customerApi, type Customer } from '@/api/customerApi'
 import { orderApi, type StorageOrder, type PaymentType, type PaymentMethod } from '@/api/orderApi'
 import { orderSync } from '@/lib/orderEvents'
+import { placeContainerAtSlot } from '@/lib/containerPlacement'
+import { today } from '@/lib/dates'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
 import MoneyInput from '@/components/ui/MoneyInput'
@@ -86,6 +88,14 @@ export default function YardDispatchPage() {
   const [matchedIds, setMatchedIds] = useState<Set<number>>(new Set())
   const [searching, setSearching] = useState(false)
   const [inboundSlot, setInboundSlot] = useState<YardSlot | null>(null)
+  // [기존 예약계약 배치] 빈 자리를 눌렀을 때, 이 창고에 '입고일은 지났는데 아직 컨테이너가 없는'
+  // 예약 계약이 있으면 새로 등록하지 않고 그 계약에 바로 이어 붙일 수 있도록 먼저 고르게 한다.
+  //   (계약관리에서 미리 등록만 해둔 예약 계약은 원래 컨테이너 관리에서 자리를 배정하도록 안내하는데,
+  //    지금까지는 그 경로가 없어 직원들이 매번 새 계약을 또 만들어 계약관리에 '입고 미배치'로 영영 남는
+  //    중복 계약이 쌓이는 문제가 있었다 — 실제 보고된 버그)
+  const [pendingSlot, setPendingSlot] = useState<YardSlot | null>(null)
+  const [pendingCandidates, setPendingCandidates] = useState<StorageOrder[]>([])
+  const [placingOrderId, setPlacingOrderId] = useState<number | null>(null)
   const [actionSlot, setActionSlot] = useState<YardSlot | null>(null)
   const [editSlot, setEditSlot] = useState<YardSlot | null>(null)
   const [billingOrder, setBillingOrder] = useState<StorageOrder | null>(null) // [통합] 정산 보기 — 계약관리와 동일한 정산 타임라인 팝업
@@ -340,6 +350,48 @@ export default function YardDispatchPage() {
     }
   }
 
+  // [빈 자리 입고 진입] 이 창고에 입고일 지난 미배치 예약 계약이 있으면 먼저 골라보게 하고,
+  //   없으면 지금까지처럼 바로 새 계약 등록 팝업으로 직행한다(흔한 경우의 절차를 늘리지 않는다).
+  function openInboundFlow(slot: YardSlot) {
+    const linkedOrderIds = new Set(
+      [...containersById.values()].map((c) => c.currentOrderId).filter((id): id is number => id != null),
+    )
+    const candidates = orders.filter(
+      (o) =>
+        o.warehouseId === selectedId &&
+        o.status === 'INBOUND' &&
+        o.storageStartDate <= today() &&
+        !linkedOrderIds.has(o.id),
+    )
+    if (candidates.length === 0) {
+      setInboundSlot(slot)
+      return
+    }
+    setPendingCandidates(candidates)
+    setPendingSlot(slot)
+  }
+
+  // [기존 예약계약 배치] 골라둔 계약을 이 자리에 컨테이너 생성·배정·적재까지 이어서 처리
+  async function handlePlaceExisting(order: StorageOrder, slot: YardSlot) {
+    setPlacingOrderId(order.id)
+    try {
+      await placeContainerAtSlot(order.id, order.warehouseId, slot.id, {
+        customerName: order.customerName,
+        inboundDate: order.storageStartDate,
+        outboundDate: order.expectedEndDate ?? undefined,
+      })
+      orderSync.emit() // 계약관리의 '입고 미배치' 배너가 이 신호로 즉시 해제된다
+      setPendingSlot(null)
+      setPendingCandidates([])
+      setBanner('입고 배치 완료')
+      reload()
+    } catch (e) {
+      window.alert(`배치에 실패했습니다.\n(${errMsg(e, '원인 미상')})`)
+    } finally {
+      setPlacingOrderId(null)
+    }
+  }
+
   // [운영 상태] 빈 자리를 미사용(운영 중지) ↔ 사용 으로 전환
   async function handleToggleActive(slot: YardSlot, active: boolean) {
     try {
@@ -551,7 +603,7 @@ export default function YardDispatchPage() {
                         if (s.occupied) return setActionSlot(s)
                         // 빈 자리는 운영 중지 상태일 때만 옵션 시트(재사용 전환)를 거치고,
                         // 정상 빈 자리는 옵션 없이 바로 계약 등록 팝업으로 직행한다.
-                        return s.active === false ? setEmptyActionSlot(s) : setInboundSlot(s)
+                        return s.active === false ? setEmptyActionSlot(s) : openInboundFlow(s)
                       }}
                       onDragStartCell={() => {
                         if (bulkMode) return
@@ -626,7 +678,7 @@ export default function YardDispatchPage() {
                               if (dragging) return handleDropMove(s)
                               // 빈 자리는 운영 중지 상태일 때만 옵션 시트(재사용 전환)를 거치고,
                               // 정상 빈 자리는 옵션 없이 바로 계약 등록 팝업으로 직행한다.
-                              return s.active === false ? setEmptyActionSlot(s) : setInboundSlot(s)
+                              return s.active === false ? setEmptyActionSlot(s) : openInboundFlow(s)
                             }}
                           />
                         ))}
@@ -686,6 +738,52 @@ export default function YardDispatchPage() {
         </Modal>
       )}
 
+      {/* [기존 예약계약 배치] 빈 자리 입고 시, 입고일 지난 미배치 예약 계약이 있으면 먼저 고르게 한다.
+          여기서 하나를 고르면 새 계약을 또 만들지 않고 그 계약에 바로 컨테이너를 배정·적재한다. */}
+      {pendingSlot && (
+        <Modal open onClose={() => { setPendingSlot(null); setPendingCandidates([]) }} title={`${pendingSlot.locationLabel} 자리 입고`}>
+          <div className="space-y-3">
+            <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+              입고일이 지났지만 아직 자리를 배정받지 못한 예약 계약이 있어요. 지금 입고하는 컨테이너가 그 계약 것이라면
+              새로 등록하지 말고 아래에서 골라 이어주세요.
+            </p>
+            <div className="space-y-2">
+              {pendingCandidates.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  disabled={placingOrderId != null}
+                  onClick={() => handlePlaceExisting(o, pendingSlot)}
+                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50 disabled:opacity-50"
+                >
+                  <span>
+                    <span className="block text-sm font-bold text-slate-800">{o.customerName}</span>
+                    <span className="block text-xs text-slate-500">보관 시작 {fmtDate(o.storageStartDate)}</span>
+                  </span>
+                  {placingOrderId === o.id ? (
+                    <Loader2 size={16} className="animate-spin text-indigo-500" />
+                  ) : (
+                    <span className="shrink-0 text-xs font-semibold text-indigo-600">이 계약에 배치</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              disabled={placingOrderId != null}
+              onClick={() => {
+                setInboundSlot(pendingSlot)
+                setPendingSlot(null)
+                setPendingCandidates([])
+              }}
+              className="w-full rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm font-semibold text-slate-500 transition hover:border-slate-400 hover:text-slate-700 disabled:opacity-50"
+            >
+              해당 없음 · 새 계약으로 등록
+            </button>
+          </div>
+        </Modal>
+      )}
+
       {/* 계약 등록(통합) — 컨테이너 관리 입고: 선택한 창고·자리 자동 고정(변경 불가) */}
       {inboundSlot && selectedId != null && (
         <CreateOrderModal
@@ -708,6 +806,7 @@ export default function YardDispatchPage() {
           onDone={() => {
             setInboundSlot(null)
             setBanner('입고 배치 완료')
+            orderSync.emit() // 계약관리·대시보드 등 다른 화면에도 새 계약·배치를 전파
             reload()
           }}
         />
