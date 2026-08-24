@@ -137,7 +137,7 @@ export default function LedgerRow({
               title="일정 수정"
             >
               <Pencil size={14} />
-              수정
+              입금
             </button>
           )}
           {canDelete && (

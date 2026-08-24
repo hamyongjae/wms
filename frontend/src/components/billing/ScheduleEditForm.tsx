@@ -107,7 +107,7 @@ export default function ScheduleEditForm({
           disabled={submitting}
           className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-700 disabled:opacity-60"
         >
-          {submitting ? '저장 중…' : '일정 저장'}
+          {submitting ? '저장 중…' : '저장'}
         </button>
       </div>
     </form>
