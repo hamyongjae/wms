@@ -7,16 +7,11 @@ import com.example.wms.warehouse.entity.Warehouse;
 import com.example.wms.warehouse.repository.WarehouseRepository;
 import com.example.wms.security.SecurityUtils;
 import com.example.wms.yard.dto.*;
-import com.example.wms.yard.entity.ContainerLocationHistory;
-import com.example.wms.yard.entity.LocationEventType;
 import com.example.wms.yard.entity.YardSlot;
-import com.example.wms.yard.repository.ContainerLocationHistoryRepository;
 import com.example.wms.yard.repository.YardSlotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 
 /**
  * 보관창고 입고/이동/반출 처리 + 슬롯 등록.
@@ -33,16 +28,6 @@ public class YardOperationService {
     private final YardSlotRepository yardSlotRepository;
     private final ContainerRepository containerRepository;
     private final WarehouseRepository warehouseRepository;
-    private final ContainerLocationHistoryRepository locationHistoryRepository;
-
-    /** [위치 이력] 계약이 연결된 컨테이너일 때만 남긴다 — 계약 없는 컨테이너는 이력 화면에 쓸 곳이 없다. */
-    private void recordLocation(Container container, YardSlot slot, LocationEventType type) {
-        StorageOrder order = container.getCurrentOrder();
-        if (order == null) return;
-        locationHistoryRepository.save(new ContainerLocationHistory(
-                container.getTenant(), order, container.getWarehouse().getName(),
-                slot.getLocationLabel(), type, LocalDateTime.now()));
-    }
 
     // ===================== 슬롯 등록 =====================
 
@@ -143,7 +128,6 @@ public class YardOperationService {
         }
         target.place(container);   // 이미 차 있으면 LocationFullException → 409
         container.markPlacedInYard();   // 가용 → 사용중
-        recordLocation(container, target, LocationEventType.INBOUND);
         return new YardSlotResponse(target);
     }
 
@@ -181,7 +165,6 @@ public class YardOperationService {
         from.vacate();
         target.place(container);   // 대상이 차 있으면 LocationFullException → 409
         container.markPlacedInYard();   // 안전상 사용중 유지
-        recordLocation(container, target, LocationEventType.MOVE);
         return new YardSlotResponse(target);
     }
 
@@ -198,7 +181,6 @@ public class YardOperationService {
                 .orElseThrow(() -> new IllegalStateException("적재된 적 없는 컨테이너입니다."));
 
         YardSlot from = lockSlot(current.getId(), tenantId);
-        recordLocation(container, from, LocationEventType.OUTBOUND);   // 비우기 전에 마지막 자리를 남긴다
         from.vacate();
         container.markRemovedFromYard();   // 사용중 → 가용
 

@@ -56,6 +56,10 @@ public interface ContainerRepository extends JpaRepository<Container, Long> {
     // 특정 계약이 점유 중인 컨테이너 목록
     List<Container> findByTenantIdAndCurrentOrderId(Long tenantId, Long currentOrderId);
 
+    // [캘린더 - 출고 위치] 여러 계약을 한 번에 — currentOrderId는 출고 후에도 재배정 전까지 유지되므로
+    // releasedSlotId(출고 시 비운 자리)로 '출고 시점 위치'를 되짚어볼 때 쓴다.
+    List<Container> findByTenantIdAndCurrentOrderIdIn(Long tenantId, java.util.Collection<Long> currentOrderIds);
+
     // [정합화] 계약 연결이 끊긴 유령 컨테이너 (전 테넌트 — 기동 시 self-heal용)
     List<Container> findByCurrentOrderIsNull();
 }
