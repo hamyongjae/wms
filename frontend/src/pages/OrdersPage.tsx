@@ -24,7 +24,6 @@ import MoneyInput from '@/components/ui/MoneyInput'
 import DateRangeLabel from '@/components/ui/DateRangeLabel'
 import CustomerListPicker from '@/components/customer/CustomerListPicker'
 import LocationPickerField from '@/components/yard/LocationPickerField'
-import ContainerPickerField from '@/components/yard/ContainerPickerField'
 import EditOrderModal from '@/components/order/EditOrderModal'
 import PaymentAccountPicker from '@/components/order/PaymentAccountPicker'
 import { placeContainerAtSlot } from '@/lib/containerPlacement'
@@ -1267,20 +1266,12 @@ export function CreateOrderModal({
                       warehouseId={warehouseId ? Number(warehouseId) : null}
                       value={slotId}
                       onChange={setSlotId}
+                      existingContainer={existingContainer}
+                      onExistingContainerChange={setExistingContainer}
                     />
                   )}
                 </div>
               </>
-            )}
-
-            {/* [미사용 컨테이너 재사용] 자리를 실제로 배정할 때만 의미가 있다 — 예약 계약(미래 입고)엔 숨긴다.
-                미사용 컨테이너가 없는 창고면 필드 자체가 렌더되지 않는다(ContainerPickerField 내부 판단). */}
-            {!isFutureStart && (
-              <ContainerPickerField
-                warehouseId={fixedSlot ? fixedSlot.warehouseId : warehouseId ? Number(warehouseId) : null}
-                value={existingContainer?.id ?? null}
-                onChange={setExistingContainer}
-              />
             )}
 
             <div>

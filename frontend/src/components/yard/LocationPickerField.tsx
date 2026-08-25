@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, MapPin, Check } from 'lucide-react'
 import { yardApi, type YardSlot } from '@/api/yardApi'
+import { containerApi, type Container } from '@/api/containerApi'
 import { cn } from '@/lib/cn'
 
 /**
@@ -9,6 +10,8 @@ import { cn } from '@/lib/cn'
  * - value(선택 슬롯 id) 단일 선택. null = 미지정
  * - currentSlotId: 수정 모드에서 이 계약이 현재 쓰는 자리(강조 + 선택 가능)
  * - disabled: 읽기 전용(출고완료 등 잠금 계약)
+ * - onExistingContainerChange를 넘기면, 이 창고의 미사용(AVAILABLE) 컨테이너를 칩으로 보여주고
+ *   골라서 새로 발급하지 않고 재사용할 수 있게 한다(자리 지정과 같은 박스 안에서 함께 고른다).
  */
 export default function LocationPickerField({
   warehouseId,
@@ -17,6 +20,8 @@ export default function LocationPickerField({
   onPickSlot,
   currentSlotId = null,
   disabled = false,
+  existingContainer = null,
+  onExistingContainerChange,
 }: {
   warehouseId: number | null
   value: number | null
@@ -24,9 +29,12 @@ export default function LocationPickerField({
   onPickSlot?: (slot: YardSlot | null) => void // 선택된 슬롯 전체(층 단가 연동용)
   currentSlotId?: number | null
   disabled?: boolean
+  existingContainer?: Container | null // 재사용하기로 고른 미사용 컨테이너. null = 새로 발급
+  onExistingContainerChange?: (container: Container | null) => void
 }) {
   const [slots, setSlots] = useState<YardSlot[]>([])
   const [loading, setLoading] = useState(false)
+  const [availableContainers, setAvailableContainers] = useState<Container[]>([])
 
   useEffect(() => {
     if (warehouseId == null) {
@@ -44,6 +52,22 @@ export default function LocationPickerField({
       alive = false
     }
   }, [warehouseId])
+
+  // [미사용 컨테이너 재사용] 호출부가 이 기능을 쓰겠다고 핸들러를 넘겼을 때만 조회한다.
+  useEffect(() => {
+    if (warehouseId == null || !onExistingContainerChange) {
+      setAvailableContainers([])
+      return
+    }
+    let alive = true
+    containerApi
+      .list({ warehouseId, status: 'AVAILABLE' })
+      .then((cs) => alive && setAvailableContainers(cs))
+      .catch(() => alive && setAvailableContainers([]))
+    return () => {
+      alive = false
+    }
+  }, [warehouseId, onExistingContainerChange])
 
   // 층(tier)별로 묶어 높은 층이 위로 오게 정렬. 각 층은 자리 번호(columnNo) 오름차순.
   const floors = useMemo(() => {
@@ -96,6 +120,42 @@ export default function LocationPickerField({
           위치 미지정(추후 지정)
         </label>
       </div>
+
+      {/* (b) 미사용 컨테이너 재사용 — 이 창고에 놀고 있는 컨테이너가 있을 때만 보여준다 */}
+      {onExistingContainerChange && availableContainers.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-slate-50/60 px-3 py-2">
+          <span className="shrink-0 text-xs font-semibold text-slate-500">미사용 컨테이너 재사용</span>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onExistingContainerChange(null)}
+            className={cn(
+              'rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition',
+              existingContainer == null
+                ? 'bg-indigo-600 text-white ring-indigo-600'
+                : 'bg-white text-slate-500 ring-slate-300 hover:bg-slate-100',
+            )}
+          >
+            새로 발급
+          </button>
+          {availableContainers.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => onExistingContainerChange(c)}
+              className={cn(
+                'rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition',
+                existingContainer?.id === c.id
+                  ? 'bg-indigo-600 text-white ring-indigo-600'
+                  : 'bg-white text-slate-500 ring-slate-300 hover:bg-slate-100',
+              )}
+            >
+              {c.containerNo}번{c.memo ? ` · ${c.memo}` : ''}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* (c) 격자 맵 */}
       <div className={cn('max-h-52 overflow-y-auto p-3', isUnassigned && !disabled && 'opacity-70')}>

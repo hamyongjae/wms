@@ -19,7 +19,6 @@ import { orderSync } from '@/lib/orderEvents'
 import Modal from '@/components/ui/Modal'
 import MoneyInput from '@/components/ui/MoneyInput'
 import LocationPickerField from '@/components/yard/LocationPickerField'
-import ContainerPickerField from '@/components/yard/ContainerPickerField'
 import PaymentAccountPicker from './PaymentAccountPicker'
 import {
   AutoBillingToggle,
@@ -349,19 +348,13 @@ export default function EditOrderModal({
               value={slotId}
               onChange={setSlotId}
               currentSlotId={currentSlotId}
+              existingContainer={existingContainer}
+              // [미사용 컨테이너 재사용] 이미 컨테이너가 배정된 계약을 다른 자리로 옮기거나 회수하는
+              //   중에는 의미가 없다 — 처음 자리를 배정하는 경우(currentSlotId==null)에만 켠다.
+              onExistingContainerChange={currentSlotId == null ? setExistingContainer : undefined}
             />
           )}
         </div>
-
-        {/* [미사용 컨테이너 재사용] 이미 컨테이너가 배정된 계약을 다른 자리로 옮기거나 회수하는
-            중에는 의미가 없다 — 처음 자리를 배정하는 경우(currentSlotId==null)에만 보여준다. */}
-        {!isFutureStart && currentSlotId == null && (
-          <ContainerPickerField
-            warehouseId={target.warehouseId}
-            value={existingContainer?.id ?? null}
-            onChange={setExistingContainer}
-          />
-        )}
 
         <FieldGrid>
           <GridField label="보관 시작일" required>
