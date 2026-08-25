@@ -601,14 +601,16 @@ public class BillingService {
 
     /**
      * [배치 위치 조회] 원장 여러 건을 한 번에 내려줄 때 계약별로 슬롯을 하나씩 조회하면 N+1이
-     * 되므로, 화면에 보일 계약들의 현재 적재 위치를 한 번에 가져와 orderId → 위치라벨 맵으로
-     * 만들어둔다(계약관리 목록·캘린더가 쓰는 것과 동일한 패턴).
+     * 되므로, 화면에 보일 계약들의 위치를 한 번에 가져와 orderId → 위치라벨 맵으로 만들어둔다
+     * (계약관리 목록·캘린더가 쓰는 것과 동일한 패턴).
      *
-     * [정식 배정 우선 + 화주명 폴백] 컨테이너가 계약에 직접 연결(currentOrder)된 경우가 가장
-     * 정확하지만, 과거에 이 링크 없이 자리만 잡힌 데이터도 있다 — 그런 계약은 같은 창고에서
-     * 배정 없는 컨테이너의 memo 화주 태그가 계약 고객명과 일치하는지로 보완한다
-     * (계약관리 화면 loadPlacements와 동일한 2단계 매칭 규칙 — 여기서만 다르게 하면 화면마다
-     * "배치됐다/안 됐다"가 서로 다르게 보이는 혼란이 생긴다).
+     * 3단계로 순서대로 시도하고, 앞 단계에서 못 찾은 계약만 다음 단계로 넘어간다.
+     *  1) 정식 배정 — 컨테이너가 계약에 직접 연결(currentOrder)되어 지금 슬롯에 적재된 경우(가장 정확).
+     *  2) 화주명 폴백 — 직접 링크 없이 자리만 잡힌 과거 데이터를, 같은 창고의 배정 없는 컨테이너 중
+     *     memo 화주 태그가 계약 고객명과 일치하는 것으로 보완(계약관리 loadPlacements와 동일 규칙).
+     *  3) 출고 위치 — 이미 출고돼 슬롯이 비워진 계약은 1)·2) 모두 못 찾는다. 컨테이너는 출고 후에도
+     *     그 계약에 연결된 채로 남고 출고 시 비운 자리(releasedSlotId)를 기억해두므로, 그 자리를
+     *     '마지막 출고 위치'로 대신 보여준다(일정관리 출고 카드와 동일 방식).
      */
     private Map<Long, String> locationsByOrderId(Long tenantId, List<StorageOrder> orders) {
         Map<Long, String> result = new HashMap<>();
@@ -644,6 +646,25 @@ public class BillingService {
             for (StorageOrder o : unresolved) {
                 String label = byKey.get(o.getWarehouse().getId() + "|" + o.getCustomer().getName());
                 if (label != null) result.put(o.getId(), label);
+            }
+        }
+
+        // 3) 출고 위치 — 위 두 단계로도 못 찾은 계약은 이미 출고돼 슬롯이 빈 경우다.
+        List<Long> stillUnresolvedIds = orders.stream()
+                .map(StorageOrder::getId).filter(id -> !result.containsKey(id)).toList();
+        if (!stillUnresolvedIds.isEmpty()) {
+            List<Container> containers = containerRepository.findByTenantIdAndCurrentOrderIdIn(tenantId, stillUnresolvedIds);
+            List<Long> releasedSlotIds = containers.stream()
+                    .map(Container::getReleasedSlotId)
+                    .filter(java.util.Objects::nonNull)
+                    .distinct().toList();
+            if (!releasedSlotIds.isEmpty()) {
+                Map<Long, String> slotLabelById = yardSlotRepository.findAllById(releasedSlotIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(YardSlot::getId, YardSlot::getLocationLabel));
+                for (Container c : containers) {
+                    String label = c.getReleasedSlotId() != null ? slotLabelById.get(c.getReleasedSlotId()) : null;
+                    if (label != null) result.put(c.getCurrentOrder().getId(), label);
+                }
             }
         }
         return result;
