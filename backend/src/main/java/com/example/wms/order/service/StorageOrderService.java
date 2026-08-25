@@ -17,6 +17,9 @@ import com.example.wms.billing.repository.BillingLedgerRepository;
 import com.example.wms.billing.repository.PaymentHistoryRepository;
 import com.example.wms.billing.repository.BillingAdjustmentRepository;
 import com.example.wms.billing.service.BillingService;
+import com.example.wms.yard.entity.ContainerLocationHistory;
+import com.example.wms.yard.entity.LocationEventType;
+import com.example.wms.yard.repository.ContainerLocationHistoryRepository;
 import com.example.wms.yard.repository.YardSlotRepository;
 import com.example.wms.order.repository.StorageOrderRepository;
 import com.example.wms.warehouse.repository.WarehouseRepository;
@@ -28,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +45,7 @@ public class StorageOrderService {
     private final PaymentHistoryRepository paymentHistoryRepository;
     private final BillingAdjustmentRepository billingAdjustmentRepository;
     private final YardSlotRepository yardSlotRepository;
+    private final ContainerLocationHistoryRepository locationHistoryRepository;
     private final BillingService billingService;
     private final com.example.wms.user.repository.UserRepository userRepository;
 
@@ -267,6 +272,10 @@ public class StorageOrderService {
             // [자원 동기화] 점유하던 슬롯을 즉시 공실 처리 (원자리는 컨테이너에 기억 → 출고취소 복구용)
             for (Container c : containerRepository.findByTenantIdAndCurrentOrderId(tenantId, order.getId())) {
                 yardSlotRepository.findByTenantIdAndContainerId(tenantId, c.getId()).ifPresent(slot -> {
+                    // [위치 이력] 비우기 전에 마지막 자리를 남긴다 — 일정관리 화면의 출고 카드가 여기서 읽는다.
+                    locationHistoryRepository.save(new ContainerLocationHistory(
+                            order.getTenant(), order, c.getWarehouse().getName(),
+                            slot.getLocationLabel(), LocationEventType.OUTBOUND, LocalDateTime.now()));
                     c.markReleasedFromSlot(slot.getId());
                     slot.vacate();
                 });
@@ -307,6 +316,9 @@ public class StorageOrderService {
                         .ifPresent(slot -> {
                             if (!slot.isOccupied()) slot.place(c);   // 이미 이 컨테이너면 멱등, 아니면 원자리 재적재
                             c.restoredToSlot();
+                            locationHistoryRepository.save(new ContainerLocationHistory(
+                                    order.getTenant(), order, c.getWarehouse().getName(),
+                                    slot.getLocationLabel(), LocationEventType.RESTORE, LocalDateTime.now()));
                         });
             }
             syncContainerSchedule(order, order.getStorageStartDate(), order.getExpectedEndDate());
@@ -333,7 +345,8 @@ public class StorageOrderService {
      *  1. 보관창고 슬롯 공석 처리  : 계약에 배정된 컨테이너가 적재된 슬롯을 vacate → 자원(자리) 즉시 해제
      *  2. 컨테이너 삭제           : 계약 등록 시 자동 생성된 물리 단위이므로 유령 데이터로 남기지 않고 제거
      *  3. 청구 원장 연쇄 삭제      : 입금 내역 → 조정 내역 → 원장 순 (FK 역순)
-     *  4. 계약 삭제
+     *  4. 위치 이력 삭제          : 계약이 사라지면 그 위치 이력도 의미가 없다
+     *  5. 계약 삭제
      */
     @Transactional
     public void deleteOrder(Long id) {
@@ -354,7 +367,10 @@ public class StorageOrderService {
             billingLedgerRepository.delete(ledger);
         }
 
-        // 4. 계약 삭제
+        // 4. 위치 이력 삭제
+        locationHistoryRepository.deleteByOrderId(order.getId());
+
+        // 5. 계약 삭제
         storageOrderRepository.delete(order);
     }
 

@@ -6,6 +6,17 @@ export type CalendarEventType = 'INBOUND' | 'OUTBOUND' | 'BILLING'
 /** 이벤트 진행 상태. INDEFINITE = 출고일 미정 장기 계약의 입고 이벤트 전용. */
 export type CalendarEventStatus = 'PENDING' | 'COMPLETED' | 'OVERDUE' | 'INDEFINITE'
 
+/** 위치 이력 종류. INBOUND=입고(첫 적재), MOVE=자리 이동, OUTBOUND=출고, RESTORE=출고 취소로 원자리 복구. */
+export type LocationEventType = 'INBOUND' | 'MOVE' | 'OUTBOUND' | 'RESTORE'
+
+/** [위치 이력 1건] 계약이 거쳐간 자리 하나 — 입고/이동/출고/복구 시점의 창고·자리 스냅샷. */
+export interface LocationHistoryEntry {
+  eventType: LocationEventType
+  warehouseName: string
+  locationLabel: string
+  occurredAt: string // ISO datetime
+}
+
 /**
  * 백엔드 시계열 API 연동 규격.
  * GET /api/calendar/events?from=&to= 응답과 1:1로 매칭한다.
@@ -24,6 +35,7 @@ export interface CalendarEvent {
   unitPrice?: number | null // 단가 (월 보관료/기본 청구액)
   warehouseName?: string | null // 창고명 (입출고 타입일 때만 값)
   location?: string | null // 실제 적재 위치(예: "1층-15", 복수면 콤마 구분). 미배정이면 null
+  locationHistory?: LocationHistoryEntry[] // 이 계약이 거쳐간 입고→이동→출고 자리 전체(시간순)
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')

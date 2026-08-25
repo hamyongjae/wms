@@ -3,12 +3,14 @@ package com.example.wms.calendar.service;
 import com.example.wms.calendar.dto.CalendarEventResponse;
 import com.example.wms.calendar.dto.CalendarEventStatus;
 import com.example.wms.calendar.dto.CalendarEventType;
-import com.example.wms.container.entity.Container;
-import com.example.wms.container.repository.ContainerRepository;
+import com.example.wms.calendar.dto.LocationHistoryEntry;
 import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.order.repository.StorageOrderRepository;
 import com.example.wms.security.SecurityUtils;
+import com.example.wms.yard.entity.ContainerLocationHistory;
+import com.example.wms.yard.entity.LocationEventType;
 import com.example.wms.yard.entity.YardSlot;
+import com.example.wms.yard.repository.ContainerLocationHistoryRepository;
 import com.example.wms.yard.repository.YardSlotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,10 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -43,7 +45,7 @@ public class CalendarService {
 
     private final StorageOrderRepository orderRepository;
     private final YardSlotRepository yardSlotRepository;
-    private final ContainerRepository containerRepository;
+    private final ContainerLocationHistoryRepository locationHistoryRepository;
 
     @Transactional(readOnly = true)
     public List<CalendarEventResponse> getEvents(LocalDate from, LocalDate to) {
@@ -64,28 +66,17 @@ public class CalendarService {
             }
         }
 
-        // [출고 위치 이력] 출고가 끝나면 슬롯이 즉시 비워져 위 '현재 점유' 조회로는 위치를 알 수
-        //   없다 — 컨테이너는 출고 직후에도 그 계약에 연결(currentOrder)된 채로 남고 출고 시 비운
-        //   자리(releasedSlotId)를 기억해두므로, 그 자리 라벨을 '출고 시점 위치'로 되짚어 보여준다.
-        //   (그 컨테이너가 이후 다른 계약에 재배정되면 currentOrder가 바뀌어 더 이상 찾을 수 없다 —
-        //   최근 출고에 대해서만 신뢰할 수 있는 정보다.)
-        Map<Long, String> releasedLocationByOrderId = new HashMap<>();
+        // [위치 이력] 계약이 거쳐간 입고→이동→출고 자리를 시간순으로 — 입고/출고 카드 모두 이 목록을
+        //   공유해 보여준다. 출고 완료 건은 슬롯이 이미 비워져 '현재 점유' 조회로는 위치를 알 수 없으므로,
+        //   이 이력의 마지막 출고 기록을 '출고 시점 위치'로 대신 쓴다(컨테이너 재사용 여부와 무관하게
+        //   영구 보존되므로 releasedSlotId 단일 필드보다 신뢰할 수 있다).
+        Map<Long, List<ContainerLocationHistory>> historyByOrderId = new HashMap<>();
         if (!orderIds.isEmpty()) {
-            List<Container> containers = containerRepository.findByTenantIdAndCurrentOrderIdIn(tenantId, orderIds);
-            List<Long> releasedSlotIds = containers.stream()
-                    .map(Container::getReleasedSlotId)
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .toList();
-            if (!releasedSlotIds.isEmpty()) {
-                Map<Long, String> slotLabelById = yardSlotRepository.findAllById(releasedSlotIds).stream()
-                        .collect(Collectors.toMap(YardSlot::getId, YardSlot::getLocationLabel));
-                for (Container c : containers) {
-                    String label = c.getReleasedSlotId() != null ? slotLabelById.get(c.getReleasedSlotId()) : null;
-                    if (label != null) {
-                        releasedLocationByOrderId.put(c.getCurrentOrder().getId(), label);
-                    }
-                }
+            for (ContainerLocationHistory h : locationHistoryRepository.findByTenantIdAndOrderIdIn(tenantId, orderIds)) {
+                historyByOrderId.computeIfAbsent(h.getOrder().getId(), k -> new ArrayList<>()).add(h);
+            }
+            for (List<ContainerLocationHistory> list : historyByOrderId.values()) {
+                list.sort(Comparator.comparing(ContainerLocationHistory::getOccurredAt));
             }
         }
 
@@ -95,6 +86,14 @@ public class CalendarService {
             String warehouseName = order.getWarehouse().getName();
             List<String> locs = locationsByOrderId.get(order.getId());
             String location = (locs == null || locs.isEmpty()) ? null : String.join(", ", locs);
+
+            List<ContainerLocationHistory> rawHistory = historyByOrderId.getOrDefault(order.getId(), List.of());
+            List<LocationHistoryEntry> locationHistory = rawHistory.stream().map(LocationHistoryEntry::new).toList();
+            String lastOutboundLocation = rawHistory.stream()
+                    .filter(h -> h.getEventType() == LocationEventType.OUTBOUND)
+                    .reduce((first, second) -> second)
+                    .map(ContainerLocationHistory::getLocationLabel)
+                    .orElse(null);
 
             java.math.BigDecimal fee = order.getMonthlyFee() != null
                     ? java.math.BigDecimal.valueOf(order.getMonthlyFee()) : null;
@@ -113,7 +112,7 @@ public class CalendarService {
                 }
                 events.add(event(order.getId(), "[" + customer + "] 입고", inDate,
                         CalendarEventType.INBOUND, status, customer, null, periodStart, periodEnd, fee,
-                        warehouseName, location));
+                        warehouseName, location, locationHistory));
             }
 
             // 출고 이벤트 — [단일 이진 상태] 계약의 status(OUTBOUND) 를 유일 기준으로 삼는다.
@@ -133,10 +132,10 @@ public class CalendarService {
                 }
                 // 이미 출고된 건은 지금 어디 있는지(현재 점유)가 아니라 어디서 나갔는지(출고 시점
                 // 위치)가 궁금한 정보다 — 출고 예정(아직 안 나감)은 현재 점유 위치를 그대로 쓴다.
-                String outLocation = released ? releasedLocationByOrderId.get(order.getId()) : location;
+                String outLocation = released ? lastOutboundLocation : location;
                 events.add(event(order.getId(), "[" + customer + "] 출고", outDate,
                         CalendarEventType.OUTBOUND, status, customer, null, periodStart, periodEnd, fee,
-                        warehouseName, outLocation));
+                        warehouseName, outLocation, locationHistory));
             }
         }
 
@@ -148,11 +147,12 @@ public class CalendarService {
                                         CalendarEventType type, CalendarEventStatus status,
                                         String customer, java.math.BigDecimal amount,
                                         LocalDate startDate, LocalDate endDate, java.math.BigDecimal unitPrice,
-                                        String warehouseName, String location) {
+                                        String warehouseName, String location,
+                                        List<LocationHistoryEntry> locationHistory) {
         return new CalendarEventResponse(id, title,
                 date.atTime(EVENT_TIME), date.atTime(EVENT_TIME),
                 type, status, customer, amount, startDate, endDate, unitPrice,
-                warehouseName, location);
+                warehouseName, location, locationHistory);
     }
 
     private boolean inRange(LocalDate d, LocalDate from, LocalDate to) {
