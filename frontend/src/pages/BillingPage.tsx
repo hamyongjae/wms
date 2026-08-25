@@ -557,6 +557,11 @@ export default function BillingPage() {
                   <td className="px-5 py-3 text-slate-600">{l.customerName}</td>
                   <td className="px-5 py-3 text-slate-500">
                     {l.periodStart} ~ {l.periodEnd}
+                    {l.location && (
+                      <span className="ml-1.5 text-xs text-slate-400">
+                        · {l.warehouseName} {l.location}
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-3 text-right text-slate-700">{won(totalDue(l))}</td>
                   <td className="px-5 py-3 text-right font-medium">
@@ -610,7 +615,12 @@ export default function BillingPage() {
                     <ChevronRight size={20} className="text-slate-300" />
                   </div>
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">{l.periodStart} ~ {l.periodEnd}</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {l.periodStart} ~ {l.periodEnd}
+                  {l.location && (
+                    <span className="text-slate-400"> · {l.warehouseName} {l.location}</span>
+                  )}
+                </p>
                 <div className="mt-2 flex items-end justify-between gap-3">
                   <div>
                     <p className="text-xs font-medium text-slate-400">보관료</p>
