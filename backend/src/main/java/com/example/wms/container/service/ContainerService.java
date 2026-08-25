@@ -5,6 +5,7 @@ import com.example.wms.common.validation.TemporalValidator;
 import com.example.wms.container.entity.Container;
 import com.example.wms.container.entity.ContainerStatus;
 import com.example.wms.container.repository.ContainerRepository;
+import com.example.wms.container.support.ContainerOwnerTag;
 import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.order.repository.StorageOrderRepository;
 import com.example.wms.security.SecurityUtils;
@@ -18,8 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 컨테이너 관리 서비스.
@@ -34,9 +33,6 @@ public class ContainerService {
     private final ContainerRepository containerRepository;
     private final WarehouseRepository warehouseRepository;
     private final StorageOrderRepository storageOrderRepository;
-
-    // memo 앞머리의 [화주·규격·소유] 태그를 파싱하기 위한 패턴
-    private static final Pattern OWNER_TAG = Pattern.compile("^\\[([^\\]]+)\\]");
 
     // ===== 등록 =====
     @Transactional
@@ -102,28 +98,12 @@ public class ContainerService {
 
         String needle = ownerName.trim().toLowerCase();
         for (Container c : containerRepository.findAllByTenantIdAndWarehouseId(tenantId, warehouseId)) {
-            String owner = ownerFromMemo(c.getMemo());
+            String owner = ContainerOwnerTag.extractOwner(c.getMemo());
             if (owner != null && owner.toLowerCase().contains(needle)) {
                 matched.add(c.getId());
             }
         }
         return matched;
-    }
-
-    /** memo 앞 [화주·규격·소유] 태그에서 화주명만 추출 (규격/소유 토큰 제외). 없으면 null. */
-    private String ownerFromMemo(String memo) {
-        if (memo == null) return null;
-        Matcher m = OWNER_TAG.matcher(memo);
-        if (!m.find()) return null;
-        List<String> keep = new ArrayList<>();
-        for (String token : m.group(1).split("·")) {
-            String t = token.trim();
-            if (t.isEmpty() || t.matches("(?i)\\d+ft") || t.equals("자가") || t.equals("임차")) {
-                continue;
-            }
-            keep.add(t);
-        }
-        return keep.isEmpty() ? null : String.join(" · ", keep);
     }
 
     // ===== 기본 정보 수정 =====

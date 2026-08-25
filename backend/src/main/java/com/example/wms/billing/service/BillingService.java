@@ -11,6 +11,8 @@ import com.example.wms.billing.repository.PaymentHistoryRepository;
 import com.example.wms.billing.support.MoneyPolicy;
 import com.example.wms.billing.support.ProrationCalculator;
 import com.example.wms.billing.support.ProrationCalculator.MidReleaseResult;
+import com.example.wms.container.entity.Container;
+import com.example.wms.container.support.ContainerOwnerTag;
 import com.example.wms.customer.entity.Customer;
 import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.tenant.entity.Tenant;
@@ -592,7 +594,7 @@ public class BillingService {
         BillingLedger ledger = getLedgerOrThrow(ledgerId);
         BillingLedgerResponse response = new BillingLedgerResponse(ledger);
         Long tenantId = SecurityUtils.getCurrentTenantId();
-        response.setLocation(locationsByOrderId(tenantId, List.of(ledger.getStorageOrder().getId()))
+        response.setLocation(locationsByOrderId(tenantId, List.of(ledger.getStorageOrder()))
                 .get(ledger.getStorageOrder().getId()));
         return response;
     }
@@ -600,15 +602,49 @@ public class BillingService {
     /**
      * [배치 위치 조회] 원장 여러 건을 한 번에 내려줄 때 계약별로 슬롯을 하나씩 조회하면 N+1이
      * 되므로, 화면에 보일 계약들의 현재 적재 위치를 한 번에 가져와 orderId → 위치라벨 맵으로
-     * 만들어둔다(계약관리 목록·캘린더가 쓰는 것과 동일한 패턴 — 위치는 슬롯의 현재 점유 여부에서
-     * 파생되므로 여러 화면에서 각자 계산한다). 슬롯이 여러 개면(드문 경우) 첫 번째만 쓴다.
+     * 만들어둔다(계약관리 목록·캘린더가 쓰는 것과 동일한 패턴).
+     *
+     * [정식 배정 우선 + 화주명 폴백] 컨테이너가 계약에 직접 연결(currentOrder)된 경우가 가장
+     * 정확하지만, 과거에 이 링크 없이 자리만 잡힌 데이터도 있다 — 그런 계약은 같은 창고에서
+     * 배정 없는 컨테이너의 memo 화주 태그가 계약 고객명과 일치하는지로 보완한다
+     * (계약관리 화면 loadPlacements와 동일한 2단계 매칭 규칙 — 여기서만 다르게 하면 화면마다
+     * "배치됐다/안 됐다"가 서로 다르게 보이는 혼란이 생긴다).
      */
-    private Map<Long, String> locationsByOrderId(Long tenantId, List<Long> orderIds) {
+    private Map<Long, String> locationsByOrderId(Long tenantId, List<StorageOrder> orders) {
         Map<Long, String> result = new HashMap<>();
-        if (orderIds.isEmpty()) return result;
+        if (orders.isEmpty()) return result;
+        List<Long> orderIds = orders.stream().map(StorageOrder::getId).distinct().toList();
+
+        // 1) 정식 배정
         for (YardSlot slot : yardSlotRepository.findOccupiedByCurrentOrderIds(tenantId, orderIds)) {
             Long orderId = slot.getContainer().getCurrentOrder().getId();
             result.putIfAbsent(orderId, slot.getLocationLabel());
+        }
+
+        // 2) 화주명 폴백 — 정식 배정이 없는 계약만, 배정 없는 컨테이너 중 화주명이 일치하는 것으로 보완
+        List<StorageOrder> unresolved = orders.stream().filter(o -> !result.containsKey(o.getId())).toList();
+        if (!unresolved.isEmpty()) {
+            java.util.Set<Long> warehouseIds = unresolved.stream()
+                    .map(o -> o.getWarehouse().getId()).collect(java.util.stream.Collectors.toSet());
+            Map<String, String> byKey = new HashMap<>(); // "창고id|화주명" → 위치 라벨
+            for (Long warehouseId : warehouseIds) {
+                Map<Long, Container> containerById = containerRepository
+                        .findAllByTenantIdAndWarehouseId(tenantId, warehouseId).stream()
+                        .collect(java.util.stream.Collectors.toMap(Container::getId, c -> c));
+                for (YardSlot slot : yardSlotRepository.findByTenantIdAndWarehouseId(
+                        tenantId, warehouseId, org.springframework.data.domain.PageRequest.of(0, 2000))) {
+                    if (!slot.isOccupied() || slot.getContainer() == null) continue;
+                    Container c = containerById.get(slot.getContainer().getId());
+                    if (c == null || c.getCurrentOrder() != null) continue; // 정식 배정된 건 1)에서 이미 처리
+                    String owner = ContainerOwnerTag.extractOwner(c.getMemo());
+                    if (owner == null) continue;
+                    byKey.putIfAbsent(warehouseId + "|" + owner, slot.getLocationLabel());
+                }
+            }
+            for (StorageOrder o : unresolved) {
+                String label = byKey.get(o.getWarehouse().getId() + "|" + o.getCustomer().getName());
+                if (label != null) result.put(o.getId(), label);
+            }
         }
         return result;
     }
@@ -632,9 +668,11 @@ public class BillingService {
         Page<BillingLedger> page = (from != null && to != null)
                 ? ledgerRepository.findByTenantIdAndPeriodOverlap(tenantId, from, to, pageable)
                 : ledgerRepository.findByTenantId(tenantId, pageable);
-        List<Long> orderIds = page.getContent().stream()
-                .map(l -> l.getStorageOrder().getId()).distinct().toList();
-        Map<Long, String> locations = locationsByOrderId(tenantId, orderIds);
+        List<StorageOrder> orders = page.getContent().stream()
+                .map(BillingLedger::getStorageOrder)
+                .collect(java.util.stream.Collectors.toMap(StorageOrder::getId, o -> o, (a, b) -> a))
+                .values().stream().toList();
+        Map<Long, String> locations = locationsByOrderId(tenantId, orders);
         return page.map(l -> {
             BillingLedgerResponse response = new BillingLedgerResponse(l);
             response.setLocation(locations.get(l.getStorageOrder().getId()));
