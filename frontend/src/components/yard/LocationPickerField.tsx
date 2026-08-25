@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, MapPin, Check } from 'lucide-react'
+import { Loader2, MapPin, Check, X } from 'lucide-react'
 import { yardApi, type YardSlot } from '@/api/yardApi'
-import { containerApi, type Container } from '@/api/containerApi'
 import { cn } from '@/lib/cn'
 
 /**
@@ -10,8 +9,8 @@ import { cn } from '@/lib/cn'
  * - value(선택 슬롯 id) 단일 선택. null = 미지정
  * - currentSlotId: 수정 모드에서 이 계약이 현재 쓰는 자리(강조 + 선택 가능)
  * - disabled: 읽기 전용(출고완료 등 잠금 계약)
- * - onExistingContainerChange를 넘기면, 이 창고의 미사용(AVAILABLE) 컨테이너를 칩으로 보여주고
- *   골라서 새로 발급하지 않고 재사용할 수 있게 한다(자리 지정과 같은 박스 안에서 함께 고른다).
+ * - 미사용(운영 중지) 자리는 컨테이너 관리 격자와 동일하게 'X' 오버레이로 표시하고 선택 불가로 막는다
+ *   (예전엔 빈자리와 구분 없이 선택돼, 제출 시점에야 "미사용 자리에는 입고할 수 없습니다" 에러가 났다).
  */
 export default function LocationPickerField({
   warehouseId,
@@ -20,8 +19,6 @@ export default function LocationPickerField({
   onPickSlot,
   currentSlotId = null,
   disabled = false,
-  existingContainer = null,
-  onExistingContainerChange,
 }: {
   warehouseId: number | null
   value: number | null
@@ -29,12 +26,9 @@ export default function LocationPickerField({
   onPickSlot?: (slot: YardSlot | null) => void // 선택된 슬롯 전체(층 단가 연동용)
   currentSlotId?: number | null
   disabled?: boolean
-  existingContainer?: Container | null // 재사용하기로 고른 미사용 컨테이너. null = 새로 발급
-  onExistingContainerChange?: (container: Container | null) => void
 }) {
   const [slots, setSlots] = useState<YardSlot[]>([])
   const [loading, setLoading] = useState(false)
-  const [availableContainers, setAvailableContainers] = useState<Container[]>([])
 
   useEffect(() => {
     if (warehouseId == null) {
@@ -53,22 +47,6 @@ export default function LocationPickerField({
     }
   }, [warehouseId])
 
-  // [미사용 컨테이너 재사용] 호출부가 이 기능을 쓰겠다고 핸들러를 넘겼을 때만 조회한다.
-  useEffect(() => {
-    if (warehouseId == null || !onExistingContainerChange) {
-      setAvailableContainers([])
-      return
-    }
-    let alive = true
-    containerApi
-      .list({ warehouseId, status: 'AVAILABLE' })
-      .then((cs) => alive && setAvailableContainers(cs))
-      .catch(() => alive && setAvailableContainers([]))
-    return () => {
-      alive = false
-    }
-  }, [warehouseId, onExistingContainerChange])
-
   // 층(tier)별로 묶어 높은 층이 위로 오게 정렬. 각 층은 자리 번호(columnNo) 오름차순.
   const floors = useMemo(() => {
     const map = new Map<number, YardSlot[]>()
@@ -84,7 +62,11 @@ export default function LocationPickerField({
       }))
   }, [slots])
 
-  const emptyCount = useMemo(() => slots.filter((s) => !s.occupied).length, [slots])
+  // [미사용 제외] 실제로 배치 가능한 빈자리만 센다 — 운영 중지 자리는 빈자리이긴 해도 고를 수 없다.
+  const emptyCount = useMemo(
+    () => slots.filter((s) => !s.occupied && s.active !== false).length,
+    [slots],
+  )
   const selectedLabel = useMemo(
     () => slots.find((s) => s.id === value)?.locationLabel ?? null,
     [slots, value],
@@ -121,43 +103,7 @@ export default function LocationPickerField({
         </label>
       </div>
 
-      {/* (b) 미사용 컨테이너 재사용 — 이 창고에 놀고 있는 컨테이너가 있을 때만 보여준다 */}
-      {onExistingContainerChange && availableContainers.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-slate-50/60 px-3 py-2">
-          <span className="shrink-0 text-xs font-semibold text-slate-500">미사용 컨테이너 재사용</span>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => onExistingContainerChange(null)}
-            className={cn(
-              'rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition',
-              existingContainer == null
-                ? 'bg-indigo-600 text-white ring-indigo-600'
-                : 'bg-white text-slate-500 ring-slate-300 hover:bg-slate-100',
-            )}
-          >
-            새로 발급
-          </button>
-          {availableContainers.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              disabled={disabled}
-              onClick={() => onExistingContainerChange(c)}
-              className={cn(
-                'rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition',
-                existingContainer?.id === c.id
-                  ? 'bg-indigo-600 text-white ring-indigo-600'
-                  : 'bg-white text-slate-500 ring-slate-300 hover:bg-slate-100',
-              )}
-            >
-              {c.containerNo}번{c.memo ? ` · ${c.memo}` : ''}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* (c) 격자 맵 */}
+      {/* (b) 격자 맵 */}
       <div className={cn('max-h-52 overflow-y-auto p-3', isUnassigned && !disabled && 'opacity-70')}>
         {warehouseId == null ? (
           <p className="py-6 text-center text-xs text-slate-400">먼저 창고를 선택하세요.</p>
@@ -181,7 +127,9 @@ export default function LocationPickerField({
                   {cells.map((s) => {
                     const isSelected = s.id === value
                     const isCurrent = s.id === currentSlotId
-                    const selectable = !disabled && (!s.occupied || isCurrent)
+                    // [미사용] 운영 중지 자리는 비어 있어도 고를 수 없다 — 컨테이너 관리 격자와 동일 규칙.
+                    const isInactive = !s.occupied && s.active === false && !isCurrent
+                    const selectable = !disabled && !isInactive && (!s.occupied || isCurrent)
                     // 사용중(남의 자리) 칸은 칸 안에 화주명까지 보여준다 — 굳이 하나씩 눌러보거나
                     // 마우스를 올려보지 않아도 누구 자리인지 한눈에 보이도록.
                     const showOwner = s.occupied && !isCurrent && s.ownerName
@@ -196,9 +144,11 @@ export default function LocationPickerField({
                           onPickSlot?.(next)
                         }}
                         title={
-                          s.occupied && !isCurrent
-                            ? `사용중 (${s.containerNo ?? '점유'}${s.ownerName ? ` · ${s.ownerName}` : ''})`
-                            : `빈자리 (${s.locationLabel})`
+                          isInactive
+                            ? `${s.locationLabel} · 미사용(운영 중지)`
+                            : s.occupied && !isCurrent
+                              ? `사용중 (${s.containerNo ?? '점유'}${s.ownerName ? ` · ${s.ownerName}` : ''})`
+                              : `빈자리 (${s.locationLabel})`
                         }
                         className={cn(
                           'relative flex h-14 w-14 flex-col items-center justify-center rounded-lg border-2 tabular-nums transition',
@@ -208,7 +158,9 @@ export default function LocationPickerField({
                               ? 'border-dashed border-indigo-500 bg-indigo-50 text-indigo-700'
                               : s.occupied
                                 ? 'cursor-not-allowed border-indigo-900 bg-indigo-900 text-white shadow-inner'
-                                : 'border-dashed border-emerald-500 bg-emerald-50 text-emerald-700 hover:border-emerald-600 hover:bg-emerald-100',
+                                : isInactive
+                                  ? 'cursor-not-allowed border-slate-400 bg-slate-200 text-slate-500'
+                                  : 'border-dashed border-emerald-500 bg-emerald-50 text-emerald-700 hover:border-emerald-600 hover:bg-emerald-100',
                         )}
                       >
                         {isSelected ? (
@@ -228,6 +180,12 @@ export default function LocationPickerField({
                             현재
                           </span>
                         )}
+                        {/* 미사용 지정 — 블록 전체를 덮는 X 레이어 (컨테이너 관리 격자와 동일) */}
+                        {isInactive && (
+                          <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-slate-600/70">
+                            <X size={16} strokeWidth={3} className="text-white" />
+                          </div>
+                        )}
                       </button>
                     )
                   })}
@@ -245,6 +203,9 @@ export default function LocationPickerField({
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-4 w-4 rounded border-2 border-indigo-900 bg-indigo-900" /> 사용중
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-4 w-4 rounded border-2 border-slate-400 bg-slate-200" /> 미사용
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-4 w-4 rounded bg-indigo-600" /> 선택
