@@ -3,6 +3,8 @@ package com.example.wms.calendar.service;
 import com.example.wms.calendar.dto.CalendarEventResponse;
 import com.example.wms.calendar.dto.CalendarEventStatus;
 import com.example.wms.calendar.dto.CalendarEventType;
+import com.example.wms.container.entity.Container;
+import com.example.wms.container.repository.ContainerRepository;
 import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.order.repository.StorageOrderRepository;
 import com.example.wms.security.SecurityUtils;
@@ -18,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -40,6 +43,7 @@ public class CalendarService {
 
     private final StorageOrderRepository orderRepository;
     private final YardSlotRepository yardSlotRepository;
+    private final ContainerRepository containerRepository;
 
     @Transactional(readOnly = true)
     public List<CalendarEventResponse> getEvents(LocalDate from, LocalDate to) {
@@ -57,6 +61,31 @@ public class CalendarService {
             for (YardSlot slot : yardSlotRepository.findOccupiedByCurrentOrderIds(tenantId, orderIds)) {
                 Long orderId = slot.getContainer().getCurrentOrder().getId();
                 locationsByOrderId.computeIfAbsent(orderId, k -> new ArrayList<>()).add(slot.getLocationLabel());
+            }
+        }
+
+        // [출고 위치 이력] 출고가 끝나면 슬롯이 즉시 비워져 위 '현재 점유' 조회로는 위치를 알 수
+        //   없다 — 컨테이너는 출고 직후에도 그 계약에 연결(currentOrder)된 채로 남고 출고 시 비운
+        //   자리(releasedSlotId)를 기억해두므로, 그 자리 라벨을 '출고 시점 위치'로 되짚어 보여준다.
+        //   (그 컨테이너가 이후 다른 계약에 재배정되면 currentOrder가 바뀌어 더 이상 찾을 수 없다 —
+        //   최근 출고에 대해서만 신뢰할 수 있는 정보다.)
+        Map<Long, String> releasedLocationByOrderId = new HashMap<>();
+        if (!orderIds.isEmpty()) {
+            List<Container> containers = containerRepository.findByTenantIdAndCurrentOrderIdIn(tenantId, orderIds);
+            List<Long> releasedSlotIds = containers.stream()
+                    .map(Container::getReleasedSlotId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+            if (!releasedSlotIds.isEmpty()) {
+                Map<Long, String> slotLabelById = yardSlotRepository.findAllById(releasedSlotIds).stream()
+                        .collect(Collectors.toMap(YardSlot::getId, YardSlot::getLocationLabel));
+                for (Container c : containers) {
+                    String label = c.getReleasedSlotId() != null ? slotLabelById.get(c.getReleasedSlotId()) : null;
+                    if (label != null) {
+                        releasedLocationByOrderId.put(c.getCurrentOrder().getId(), label);
+                    }
+                }
             }
         }
 
@@ -102,9 +131,12 @@ public class CalendarService {
                 } else {
                     status = CalendarEventStatus.PENDING;
                 }
+                // 이미 출고된 건은 지금 어디 있는지(현재 점유)가 아니라 어디서 나갔는지(출고 시점
+                // 위치)가 궁금한 정보다 — 출고 예정(아직 안 나감)은 현재 점유 위치를 그대로 쓴다.
+                String outLocation = released ? releasedLocationByOrderId.get(order.getId()) : location;
                 events.add(event(order.getId(), "[" + customer + "] 출고", outDate,
                         CalendarEventType.OUTBOUND, status, customer, null, periodStart, periodEnd, fee,
-                        warehouseName, location));
+                        warehouseName, outLocation));
             }
         }
 

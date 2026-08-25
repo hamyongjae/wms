@@ -773,15 +773,16 @@ function EventCard({
                   <dd className="font-semibold text-indigo-600">{won(event.unitPrice)}</dd>
                 </div>
               )}
-              {/* [출고 창고 명시] 출고 완료 건은 자리가 이미 비워져 location이 항상 없으므로,
-                  "위치 미배정"으로 뭉뚱그리면 어느 창고에서 나갔는지가 안 보인다 — 출고 이벤트는
-                  "창고"로 라벨을 따로 달아 창고명만 명확히 보여주고, 입고는 기존처럼 창고+자리를 같이 보여준다. */}
+              {/* [출고 위치 명시] 출고 완료 건은 백엔드가 '출고 시점에 비운 자리'를 되짚어
+                  event.location으로 내려준다(컨테이너가 이후 다른 계약에 재배정되기 전까지만
+                  추적 가능) — 있으면 창고+층·번호까지, 없으면(오래된 건 등) 창고명만 보여준다.
+                  입고는 기존처럼 현재 점유 위치를 창고+자리로 보여준다. */}
               {event.warehouseName && (
                 <div className="flex items-center gap-2">
-                  <dt className="w-10 shrink-0 text-slate-400">{event.type === 'OUTBOUND' ? '창고' : '위치'}</dt>
+                  <dt className="w-10 shrink-0 text-slate-400">위치</dt>
                   <dd className="font-medium text-slate-700">
                     {event.type === 'OUTBOUND'
-                      ? event.warehouseName
+                      ? `${event.warehouseName}${event.location ? ` · ${event.location}` : ''}`
                       : `${event.warehouseName}${event.location ? ` · ${event.location}` : ' · 위치 미배정'}`}
                   </dd>
                 </div>
