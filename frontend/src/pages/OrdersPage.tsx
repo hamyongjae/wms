@@ -9,7 +9,7 @@ import { isOpenLedger } from '@/lib/billing'
 import LedgerRow from '@/components/billing/LedgerRow'
 import { customerApi, type Customer, type CustomerType } from '@/api/customerApi'
 import { warehouseApi, type Warehouse } from '@/api/warehouseApi'
-import { containerApi } from '@/api/containerApi'
+import { containerApi, type Container } from '@/api/containerApi'
 import { yardApi } from '@/api/yardApi'
 import { authStorage } from '@/lib/auth'
 import { cn } from '@/lib/cn'
@@ -24,6 +24,7 @@ import MoneyInput from '@/components/ui/MoneyInput'
 import DateRangeLabel from '@/components/ui/DateRangeLabel'
 import CustomerListPicker from '@/components/customer/CustomerListPicker'
 import LocationPickerField from '@/components/yard/LocationPickerField'
+import ContainerPickerField from '@/components/yard/ContainerPickerField'
 import EditOrderModal from '@/components/order/EditOrderModal'
 import PaymentAccountPicker from '@/components/order/PaymentAccountPicker'
 import { placeContainerAtSlot } from '@/lib/containerPlacement'
@@ -966,6 +967,8 @@ export function CreateOrderModal({
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [warehouseId, setWarehouseId] = useState('')
   const [slotId, setSlotId] = useState<number | null>(null) // 선택 슬롯(null=미지정)
+  // [미사용 컨테이너 재사용] 고르면 새로 발급하지 않고 이 컨테이너를 그대로 쓴다. null=새로 발급.
+  const [existingContainer, setExistingContainer] = useState<Container | null>(null)
   // [수동 입력 원칙] 날짜 3종(보관 시작일·출고 예정일·납기일)은 기본값 없이 빈 값으로 시작한다.
   //   자동 프리필은 담당자가 확인 없이 저장할 여지를 만들어 계약 기간·납기 오류의 원인이 되므로 제거.
   const [storageStartDate, setStartDate] = useState('')
@@ -1152,6 +1155,7 @@ export function CreateOrderModal({
             customerName: selectedCustomer?.name,
             inboundDate: storageStartDate,
             outboundDate: expectedEndDate || undefined,
+            existingContainer,
           })
         } catch (e) {
           window.alert(`계약은 등록됐지만 위치 배치에 실패했습니다.\n(${errMsg(e, '원인 미상')})`)
@@ -1268,7 +1272,17 @@ export function CreateOrderModal({
                 </div>
               </>
             )}
-            
+
+            {/* [미사용 컨테이너 재사용] 자리를 실제로 배정할 때만 의미가 있다 — 예약 계약(미래 입고)엔 숨긴다.
+                미사용 컨테이너가 없는 창고면 필드 자체가 렌더되지 않는다(ContainerPickerField 내부 판단). */}
+            {!isFutureStart && (
+              <ContainerPickerField
+                warehouseId={fixedSlot ? fixedSlot.warehouseId : warehouseId ? Number(warehouseId) : null}
+                value={existingContainer?.id ?? null}
+                onChange={setExistingContainer}
+              />
+            )}
+
             <div>
               <label className={labelCls}>고객 *</label>
               {selectedCustomer ? (

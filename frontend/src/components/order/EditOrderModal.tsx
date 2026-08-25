@@ -19,6 +19,7 @@ import { orderSync } from '@/lib/orderEvents'
 import Modal from '@/components/ui/Modal'
 import MoneyInput from '@/components/ui/MoneyInput'
 import LocationPickerField from '@/components/yard/LocationPickerField'
+import ContainerPickerField from '@/components/yard/ContainerPickerField'
 import PaymentAccountPicker from './PaymentAccountPicker'
 import {
   AutoBillingToggle,
@@ -101,6 +102,9 @@ export default function EditOrderModal({
   const [slotId, setSlotId] = useState<number | null>(null)
   const [currentSlotId, setCurrentSlotId] = useState<number | null>(null)
   const [container, setContainer] = useState<Container | null>(null)
+  // [미사용 컨테이너 재사용] 처음 자리를 배정할 때(currentSlotId==null)만 의미가 있다.
+  //   고르면 새로 발급하지 않고 이 컨테이너를 그대로 쓴다. null=새로 발급.
+  const [existingContainer, setExistingContainer] = useState<Container | null>(null)
 
   // ===== 계약 원장 → 폼 바인딩 (두 진입 경로 공통) =====
   useEffect(() => {
@@ -259,6 +263,7 @@ export default function EditOrderModal({
               customerName: target!.customerName,
               inboundDate: storageStartDate || undefined,
               outboundDate: endDateToSend,
+              existingContainer,
             })
           } else if (currentSlotId != null && slotId == null && container != null) {
             await containerApi.outbound({ containerId: container.id })
@@ -347,6 +352,16 @@ export default function EditOrderModal({
             />
           )}
         </div>
+
+        {/* [미사용 컨테이너 재사용] 이미 컨테이너가 배정된 계약을 다른 자리로 옮기거나 회수하는
+            중에는 의미가 없다 — 처음 자리를 배정하는 경우(currentSlotId==null)에만 보여준다. */}
+        {!isFutureStart && currentSlotId == null && (
+          <ContainerPickerField
+            warehouseId={target.warehouseId}
+            value={existingContainer?.id ?? null}
+            onChange={setExistingContainer}
+          />
+        )}
 
         <FieldGrid>
           <GridField label="보관 시작일" required>
