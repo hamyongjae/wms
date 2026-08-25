@@ -103,9 +103,15 @@ export default function LedgerRow({
             </span>
           </span>
           {/* [한 줄 고정] 우측 수정·삭제 버튼에 밀려 두 줄로 깨지지 않도록 짧은 날짜
-              포맷(점 표기)을 쓰고 줄바꿈 자체를 막는다. */}
+              포맷(점 표기)을 쓰고 줄바꿈 자체를 막는다. 위치(창고 층-번호)는 보관일자 바로
+              옆에 옅은 색으로 붙여, 어디에 있는지 목록에서 바로 눈에 띄게 한다. */}
           <span className="whitespace-nowrap text-sm font-medium text-slate-700">
             <DateRangeLabel start={l.periodStart} end={l.periodEnd} format={md} />
+            {l.location && (
+              <span className="ml-1.5 text-xs font-normal text-slate-400">
+                · {l.warehouseName} {l.location}
+              </span>
+            )}
           </span>
           <span className="text-sm">
             {isNoCharge ? (

@@ -5,6 +5,7 @@ import com.example.wms.billing.entity.BillingStatus;
 import com.example.wms.billing.entity.BillingType;
 import com.example.wms.billing.entity.SettlementType;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -19,6 +20,11 @@ public class BillingLedgerResponse {
     private final Long customerId;
     private final String customerName;
     private final String ledgerNo;
+    private final String warehouseName;
+    // [배치 조회] 현재 적재 위치(예: "2층-11")는 슬롯 점유 현황을 봐야 알 수 있어 생성자에서
+    //   바로 못 채운다 — 서비스가 여러 원장을 한 번에 조회한 뒤 일괄로 채워 넣는다(N+1 방지).
+    @Setter
+    private String location;
 
     private final BillingType billingType;
     private final SettlementType settlementType;
@@ -58,6 +64,7 @@ public class BillingLedgerResponse {
         this.customerId = l.getCustomer().getId();
         this.customerName = l.getCustomer().getName();
         this.ledgerNo = l.getLedgerNo();
+        this.warehouseName = l.getStorageOrder().getWarehouse().getName();
         this.billingType = l.getBillingType();
         this.settlementType = l.getSettlementType();
         this.periodStart = l.getBillingPeriodStart();

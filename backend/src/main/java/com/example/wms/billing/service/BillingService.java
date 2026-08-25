@@ -16,6 +16,8 @@ import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.tenant.entity.Tenant;
 import com.example.wms.order.repository.StorageOrderRepository;
 import com.example.wms.security.SecurityUtils;
+import com.example.wms.yard.entity.YardSlot;
+import com.example.wms.yard.repository.YardSlotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -27,6 +29,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +53,7 @@ public class BillingService {
     private final BillingAdjustmentRepository adjustmentRepository;
     private final StorageOrderRepository storageOrderRepository;
     private final com.example.wms.container.repository.ContainerRepository containerRepository;
+    private final YardSlotRepository yardSlotRepository;
     private final ProrationCalculator prorationCalculator;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -585,7 +589,28 @@ public class BillingService {
 
     @Transactional(readOnly = true)
     public BillingLedgerResponse getLedger(Long ledgerId) {
-        return new BillingLedgerResponse(getLedgerOrThrow(ledgerId));
+        BillingLedger ledger = getLedgerOrThrow(ledgerId);
+        BillingLedgerResponse response = new BillingLedgerResponse(ledger);
+        Long tenantId = SecurityUtils.getCurrentTenantId();
+        response.setLocation(locationsByOrderId(tenantId, List.of(ledger.getStorageOrder().getId()))
+                .get(ledger.getStorageOrder().getId()));
+        return response;
+    }
+
+    /**
+     * [배치 위치 조회] 원장 여러 건을 한 번에 내려줄 때 계약별로 슬롯을 하나씩 조회하면 N+1이
+     * 되므로, 화면에 보일 계약들의 현재 적재 위치를 한 번에 가져와 orderId → 위치라벨 맵으로
+     * 만들어둔다(계약관리 목록·캘린더가 쓰는 것과 동일한 패턴 — 위치는 슬롯의 현재 점유 여부에서
+     * 파생되므로 여러 화면에서 각자 계산한다). 슬롯이 여러 개면(드문 경우) 첫 번째만 쓴다.
+     */
+    private Map<Long, String> locationsByOrderId(Long tenantId, List<Long> orderIds) {
+        Map<Long, String> result = new HashMap<>();
+        if (orderIds.isEmpty()) return result;
+        for (YardSlot slot : yardSlotRepository.findOccupiedByCurrentOrderIds(tenantId, orderIds)) {
+            Long orderId = slot.getContainer().getCurrentOrder().getId();
+            result.putIfAbsent(orderId, slot.getLocationLabel());
+        }
+        return result;
     }
 
     /** 원장 상세 (수금·조정 이력 포함) */
@@ -607,7 +632,14 @@ public class BillingService {
         Page<BillingLedger> page = (from != null && to != null)
                 ? ledgerRepository.findByTenantIdAndPeriodOverlap(tenantId, from, to, pageable)
                 : ledgerRepository.findByTenantId(tenantId, pageable);
-        return page.map(BillingLedgerResponse::new);
+        List<Long> orderIds = page.getContent().stream()
+                .map(l -> l.getStorageOrder().getId()).distinct().toList();
+        Map<Long, String> locations = locationsByOrderId(tenantId, orderIds);
+        return page.map(l -> {
+            BillingLedgerResponse response = new BillingLedgerResponse(l);
+            response.setLocation(locations.get(l.getStorageOrder().getId()));
+            return response;
+        });
     }
 
     /**

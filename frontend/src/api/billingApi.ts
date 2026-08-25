@@ -28,6 +28,8 @@ export interface BillingLedger {
   customerId: number
   customerName: string
   ledgerNo: string
+  warehouseName: string
+  location: string | null // 현재 적재 위치(예: "2층-11"). 위치 미배정이면 null
   billingType: BillingType
   settlementType: SettlementType
   periodStart: string
