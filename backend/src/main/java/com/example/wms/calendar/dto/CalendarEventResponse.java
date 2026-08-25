@@ -5,7 +5,6 @@ import lombok.Getter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * 프론트 캘린더가 소비하는 단일 이벤트 규격.
@@ -32,15 +31,11 @@ public class CalendarEventResponse {
     private final String warehouseName;
     private final String location;
 
-    // [위치 이력] 이 계약이 거쳐간 입고→이동→출고 자리를 시간순으로 — 입고/출고 카드 모두 동일 목록을 공유한다.
-    private final List<LocationHistoryEntry> locationHistory;
-
     public CalendarEventResponse(Long id, String title, LocalDateTime startAt, LocalDateTime endAt,
                                  CalendarEventType type, CalendarEventStatus status,
                                  String customerName, BigDecimal amount,
                                  LocalDate startDate, LocalDate endDate, BigDecimal unitPrice,
-                                 String warehouseName, String location,
-                                 List<LocationHistoryEntry> locationHistory) {
+                                 String warehouseName, String location) {
         this.id = id;
         this.title = title;
         this.startAt = startAt;
@@ -54,6 +49,5 @@ public class CalendarEventResponse {
         this.unitPrice = unitPrice;
         this.warehouseName = warehouseName;
         this.location = location;
-        this.locationHistory = locationHistory;
     }
 }

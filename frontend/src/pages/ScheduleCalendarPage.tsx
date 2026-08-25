@@ -4,8 +4,6 @@ import { isAxiosError } from 'axios'
 import {
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
-  ChevronDown,
   Loader2,
   X,
   CalendarDays,
@@ -17,13 +15,11 @@ import {
   Trash2,
   LogOut,
   Wallet,
-  History,
 } from 'lucide-react'
 import {
   getMonthEvents,
   type CalendarEvent,
   type CalendarEventType,
-  type LocationEventType,
 } from '@/api/calendarApi'
 import { billingApi } from '@/api/billingApi'
 import { orderApi, type StorageOrder } from '@/api/orderApi'
@@ -93,19 +89,6 @@ const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const fmtDate = (s: string) => {
   const [y, m, d] = s.split('-')
   return d ? `${y}. ${m}. ${d}` : s
-}
-// [위치 이력] 'YYYY-MM-DDTHH:mm:ss' → 'MM.DD HH:mm' — 같은 날 여러 번 이동해도 구분되게 시간까지 짧게 표기
-const fmtDateTime = (iso: string) => {
-  const [datePart, timePart] = iso.split('T')
-  const [, m, d] = datePart.split('-')
-  const hm = timePart ? timePart.slice(0, 5) : ''
-  return `${m}.${d}${hm ? ` ${hm}` : ''}`
-}
-const LOCATION_EVENT_LABEL: Record<LocationEventType, string> = {
-  INBOUND: '입고',
-  MOVE: '이동',
-  OUTBOUND: '출고',
-  RESTORE: '복구',
 }
 
 // [정책] 예정/지연 구분 없이 입고/출고 라벨만 표시한다.
@@ -704,7 +687,6 @@ function EventCard({
   actionLoading: boolean
 }) {
   const [busy, setBusy] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
   const isBilling = event.type === 'BILLING'
   // 청구(BILLING)는 상태 색상 설정 대상이 아니라 기존 고정 톤을 유지한다
   const meta = isBilling ? TYPE_META.BILLING : SCHEDULE_META[eventColorKey(event)]
@@ -809,38 +791,6 @@ function EventCard({
           )}
         </div>
       </div>
-
-      {/* [위치 이력] 이 계약이 거쳐간 입고→이동→출고 자리를 시간순으로 — 입고·출고 카드 모두 동일
-          목록을 보여준다(백엔드가 계약 하나에 대한 전체 이력을 함께 내려준다). 기본은 접어둬서
-          평소엔 카드가 짧고, 궁금할 때만 펼쳐 본다. */}
-      {event.locationHistory && event.locationHistory.length > 0 && (
-        <div className="mt-2 border-t border-slate-100 pt-2">
-          <button
-            type="button"
-            onClick={() => setHistoryOpen((v) => !v)}
-            className="flex items-center gap-1 text-[11px] font-medium text-slate-500 transition hover:text-slate-700"
-          >
-            <History size={12} />
-            위치 이력 {event.locationHistory.length}건
-            {historyOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-          </button>
-          {historyOpen && (
-            <ol className="mt-1.5 space-y-1 text-[11px]">
-              {event.locationHistory.map((h, i) => (
-                <li key={i} className="flex items-center gap-1.5">
-                  <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-500">
-                    {LOCATION_EVENT_LABEL[h.eventType]}
-                  </span>
-                  <span className="shrink-0 text-slate-400">{fmtDateTime(h.occurredAt)}</span>
-                  <span className="truncate font-medium text-slate-700">
-                    {h.warehouseName} · {h.locationLabel}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      )}
 
       {/* 유형별 퀵 액션 — 순서: 출고, 정산, 수정, 삭제 (컨테이너관리 액션 패널과 통일) */}
       <div className="mt-3 flex flex-wrap gap-1.5">

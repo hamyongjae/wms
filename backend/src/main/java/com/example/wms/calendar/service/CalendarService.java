@@ -3,7 +3,6 @@ package com.example.wms.calendar.service;
 import com.example.wms.calendar.dto.CalendarEventResponse;
 import com.example.wms.calendar.dto.CalendarEventStatus;
 import com.example.wms.calendar.dto.CalendarEventType;
-import com.example.wms.calendar.dto.LocationHistoryEntry;
 import com.example.wms.order.entity.StorageOrder;
 import com.example.wms.order.repository.StorageOrderRepository;
 import com.example.wms.security.SecurityUtils;
@@ -66,10 +65,9 @@ public class CalendarService {
             }
         }
 
-        // [위치 이력] 계약이 거쳐간 입고→이동→출고 자리를 시간순으로 — 입고/출고 카드 모두 이 목록을
-        //   공유해 보여준다. 출고 완료 건은 슬롯이 이미 비워져 '현재 점유' 조회로는 위치를 알 수 없으므로,
-        //   이 이력의 마지막 출고 기록을 '출고 시점 위치'로 대신 쓴다(컨테이너 재사용 여부와 무관하게
-        //   영구 보존되므로 releasedSlotId 단일 필드보다 신뢰할 수 있다).
+        // [출고 위치 이력] 출고 완료 건은 슬롯이 이미 비워져 '현재 점유' 조회로는 위치를 알 수 없다 —
+        //   계약이 거쳐간 입고→이동→출고 이력 중 가장 최근 출고 기록을 '출고 시점 위치'로 대신 쓴다
+        //   (컨테이너 재사용 여부와 무관하게 영구 보존되므로 releasedSlotId 단일 필드보다 신뢰할 수 있다).
         Map<Long, List<ContainerLocationHistory>> historyByOrderId = new HashMap<>();
         if (!orderIds.isEmpty()) {
             for (ContainerLocationHistory h : locationHistoryRepository.findByTenantIdAndOrderIdIn(tenantId, orderIds)) {
@@ -88,7 +86,6 @@ public class CalendarService {
             String location = (locs == null || locs.isEmpty()) ? null : String.join(", ", locs);
 
             List<ContainerLocationHistory> rawHistory = historyByOrderId.getOrDefault(order.getId(), List.of());
-            List<LocationHistoryEntry> locationHistory = rawHistory.stream().map(LocationHistoryEntry::new).toList();
             String lastOutboundLocation = rawHistory.stream()
                     .filter(h -> h.getEventType() == LocationEventType.OUTBOUND)
                     .reduce((first, second) -> second)
@@ -112,7 +109,7 @@ public class CalendarService {
                 }
                 events.add(event(order.getId(), "[" + customer + "] 입고", inDate,
                         CalendarEventType.INBOUND, status, customer, null, periodStart, periodEnd, fee,
-                        warehouseName, location, locationHistory));
+                        warehouseName, location));
             }
 
             // 출고 이벤트 — [단일 이진 상태] 계약의 status(OUTBOUND) 를 유일 기준으로 삼는다.
@@ -135,7 +132,7 @@ public class CalendarService {
                 String outLocation = released ? lastOutboundLocation : location;
                 events.add(event(order.getId(), "[" + customer + "] 출고", outDate,
                         CalendarEventType.OUTBOUND, status, customer, null, periodStart, periodEnd, fee,
-                        warehouseName, outLocation, locationHistory));
+                        warehouseName, outLocation));
             }
         }
 
@@ -147,12 +144,11 @@ public class CalendarService {
                                         CalendarEventType type, CalendarEventStatus status,
                                         String customer, java.math.BigDecimal amount,
                                         LocalDate startDate, LocalDate endDate, java.math.BigDecimal unitPrice,
-                                        String warehouseName, String location,
-                                        List<LocationHistoryEntry> locationHistory) {
+                                        String warehouseName, String location) {
         return new CalendarEventResponse(id, title,
                 date.atTime(EVENT_TIME), date.atTime(EVENT_TIME),
                 type, status, customer, amount, startDate, endDate, unitPrice,
-                warehouseName, location, locationHistory);
+                warehouseName, location);
     }
 
     private boolean inRange(LocalDate d, LocalDate from, LocalDate to) {
