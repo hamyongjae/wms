@@ -8,6 +8,7 @@ import {
   type PaymentMethod as OrderPaymentMethod,
 } from '@/api/orderApi'
 import { staffApi, type Staff } from '@/api/staffApi'
+import { billingApi } from '@/api/billingApi'
 import { containerApi, type Container } from '@/api/containerApi'
 import { yardApi } from '@/api/yardApi'
 import { cn } from '@/lib/cn'
@@ -120,6 +121,28 @@ export default function EditOrderModal({
     setAutoBillingEnabled(target.autoBillingEnabled ?? false)
     setBillingCycleMonths(target.billingCycleMonths ?? 1)
     setFormError(null)
+  }, [target])
+
+  // [보관료 기본값 = 정산 합계] 계약 목록 '보관료' 칼럼·정산 이력 팝업 요약과 같은 계산으로,
+  //   이 계약에 지금까지 쌓인 정산서 총액을 보관료 기본값으로 덮어쓴다(완납 여부 무관, 취소·
+  //   이월 회차 제외 — OrdersPage의 계산과 동일 규칙). 아직 정산서가 하나도 없는 신규 계약은
+  //   합계가 0이라 위 effect가 채운 계약의 월 요금(target.monthlyFee)을 그대로 둔다.
+  useEffect(() => {
+    if (!target) return
+    let alive = true
+    billingApi
+      .list()
+      .then((ledgers) => {
+        if (!alive) return
+        const total = ledgers
+          .filter((l) => l.storageOrderId === target.id && l.status !== 'CANCELED' && l.status !== 'CARRIED_OVER')
+          .reduce((s, l) => s + l.baseAmount + l.carriedOverIn + l.adjustmentTotal, 0)
+        if (total > 0) setMonthlyFee(total)
+      })
+      .catch(() => undefined) // 부가 표시 — 실패해도 계약 수정은 계속 가능해야 한다
+    return () => {
+      alive = false
+    }
   }, [target])
 
   // [컨테이너 관리 진입] 이미 아는 자리·컨테이너를 즉시 반영 — 서버 조회를 기다리지 않는다.
