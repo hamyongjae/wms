@@ -817,6 +817,15 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
               <p className={cn('mt-0.5 font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-[#5C7C6B]')}>
                 {totalDue > 0 ? won(totalDue) : '미수 없음'}
               </p>
+              {/* [미수금 자동 표시] 진행 중인 회차의 잔액만 더한 것 — 완납 회차는 balance가
+                  0이라 자연히 빠진다. 보관료(청구 총액) 바로 아래에 둬서 "청구액 대비 아직
+                  안 들어온 돈"을 한눈에 비교할 수 있게 한다. */}
+              <p className="mt-1 text-xs text-slate-400">
+                미수금{' '}
+                <span className={cn('font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-slate-400')}>
+                  {won(totalBalance)}
+                </span>
+              </p>
             </div>
             {ledgers.length > 0 && (
               <p className="col-span-2 text-xs text-slate-400">
