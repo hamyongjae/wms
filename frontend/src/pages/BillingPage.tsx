@@ -262,6 +262,22 @@ export default function BillingPage() {
       .finally(() => setLoading(false))
   }, [refreshKey, range, overdueUnscoped])
 
+  // [고객명 검색 — 기간 무시] 상단 요약 카드는 계속 조회 기간(range) 기준으로 두되,
+  //   검색 중인 목록만 기간과 무관하게 전체에서 찾는다 — 그대로 두면 이번 달에 정산서가
+  //   없는 고객은 검색해도 "정산서가 없습니다"로 나와 검색이 안 되는 것처럼 보인다.
+  const searching = query.trim().length > 0
+  const [searchLedgers, setSearchLedgers] = useState<BillingLedger[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  useEffect(() => {
+    if (!searching) return
+    setSearchLoading(true)
+    billingApi
+      .list()
+      .then(setSearchLedgers)
+      .catch(() => setSearchLedgers([]))
+      .finally(() => setSearchLoading(false))
+  }, [searching, refreshKey])
+
   // [입금일 기준 매출] 고객별 입금 비중 · 전월 대비는 조회 기간 밖(직전 기간)도 봐야 하므로
   //   기간 제한 없이 전체 입금 내역을 받아 클라이언트에서 paidOn으로 계산한다.
   useEffect(() => {
@@ -304,13 +320,14 @@ export default function BillingPage() {
   const deltaLabel = fullMonthOf(range.from, range.to) != null ? '전월 대비' : '직전 동일기간 대비'
 
   const visible = useMemo(() => {
-    let list = ledgers
+    const q = query.trim().toLowerCase()
+    // 검색 중엔 기간과 무관한 전체 목록(searchLedgers)에서, 아니면 기간별 목록(ledgers)에서 고른다.
+    let list = q ? searchLedgers.filter((l) => l.customerName.toLowerCase().includes(q)) : ledgers
     if (statusFilter === 'OVERDUE') list = list.filter(isOverdue) // 파생 필터
     else if (statusFilter !== 'ALL') list = list.filter((l) => l.status === statusFilter)
-    const q = query.trim().toLowerCase()
-    if (q) list = list.filter((l) => l.customerName.toLowerCase().includes(q))
     return list
-  }, [ledgers, statusFilter, query])
+  }, [ledgers, searchLedgers, statusFilter, query])
+  const listLoading = searching ? searchLoading : loading
 
   // 현재 조회 기간의 기준 연·월 (from 기준)
   const cursor = useMemo(() => {
@@ -545,26 +562,28 @@ export default function BillingPage() {
         )}
       </div>
 
-      {loading && (
+      {listLoading && (
         <div className="flex items-center justify-center gap-2 py-12 text-slate-400">
           <Loader2 className="animate-spin" size={18} />
           <span className="text-sm">불러오는 중…</span>
         </div>
       )}
 
-      {!loading && error && (
+      {!listLoading && error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>
       )}
 
-      {!loading && !error && visible.length === 0 && (
+      {!listLoading && !error && visible.length === 0 && (
         <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-10 py-10 text-center">
-          <p className="text-base font-semibold text-slate-700">정산서가 없습니다</p>
-          <p className="mt-1 text-sm text-slate-400">계약이 등록되면 스케줄러가 자동으로 정산서를 생성합니다.</p>
+          <p className="text-base font-semibold text-slate-700">{searching ? '검색 결과가 없습니다' : '정산서가 없습니다'}</p>
+          <p className="mt-1 text-sm text-slate-400">
+            {searching ? '고객명을 다시 확인해주세요.' : '계약이 등록되면 스케줄러가 자동으로 정산서를 생성합니다.'}
+          </p>
         </div>
       )}
 
       {/* ===== 데스크톱: 테이블 (md 이상) ===== */}
-      {!loading && !error && visible.length > 0 && (
+      {!listLoading && !error && visible.length > 0 && (
         <div className="hidden overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-200/60 md:block">
           <table className="w-full text-sm">
             <thead>
@@ -611,7 +630,7 @@ export default function BillingPage() {
       )}
 
       {/* ===== 모바일: 정산 내역 카드 (md 미만) — 탭하면 정산 이력 팝업 ===== */}
-      {!loading && !error && visible.length > 0 && (
+      {!listLoading && !error && visible.length > 0 && (
         <div className="space-y-2 md:hidden">
           {visible.map((l) => {
             const outstanding = l.outstanding ?? Math.max(l.balance, 0)
