@@ -89,7 +89,7 @@ export default function ScheduleEditForm({
       <FieldGrid>
         <GridField label="정산 시작일" hint={lockStartDate ? '1회차 · 보관 시작일 고정' : undefined}>
           {lockStartDate ? (
-            <div className={gridReadonlyCls}>{md(periodStart)}</div>
+            <div className={cn(gridReadonlyCls, 'justify-start!')}>{md(periodStart)}</div>
           ) : (
             <CalendarField value={periodStart} onChange={setPeriodStart} max={periodEnd || undefined} className={gridInputCls} />
           )}

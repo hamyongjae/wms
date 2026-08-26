@@ -800,8 +800,9 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
       <Modal open onClose={onClose} title={`${target.customerName} · 정산 이력`} widthClass="max-w-2xl">
         <div className="space-y-3">
           {/* [좌우 밸런스] 계약기간에 더 넓은 칸을 주고 짧은 날짜 포맷을 써서 한 줄로 다
-              들어가게 하고, 보관료는 좁은 칸에 오른쪽 정렬로 맞춘다. */}
-          <div className="grid grid-cols-[3fr_2fr] gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
+              들어가게 하고, 보관료·미수금은 좁은 칸에 오른쪽 정렬로 맞춘다. 2행 구조로
+              두어 왼쪽 아래 "N회차 중 M회 완납"이 오른쪽 아래 "미수금"과 같은 줄에 오게 한다. */}
+          <div className="grid grid-cols-[3fr_2fr] gap-x-3 gap-y-1 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
             <div className="min-w-0">
               <p className="text-xs text-slate-400">계약 기간</p>
               <p className="mt-0.5 whitespace-nowrap font-medium text-slate-700">
@@ -817,21 +818,20 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
               <p className={cn('mt-0.5 font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-[#5C7C6B]')}>
                 {totalDue > 0 ? won(totalDue) : '미수 없음'}
               </p>
-              {/* [미수금 자동 표시] 진행 중인 회차의 잔액만 더한 것 — 완납 회차는 balance가
-                  0이라 자연히 빠진다. 보관료(청구 총액) 바로 아래에 둬서 "청구액 대비 아직
-                  안 들어온 돈"을 한눈에 비교할 수 있게 한다. */}
-              <p className="mt-1 text-xs text-slate-400">
-                미수금{' '}
-                <span className={cn('font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-slate-400')}>
-                  {won(totalBalance)}
-                </span>
+            </div>
+            {/* 항상 렌더해 그리드 칸 수를 유지한다(회차 0건이어도 오른쪽 미수금 칸이 밀리지 않도록) */}
+            <p className="self-center text-xs text-slate-400">
+              {ledgers.length > 0 ? `${ledgers.length}회차 중 ${paidCount}회 완납` : ''}
+            </p>
+            {/* [미수금 자동 표시] 진행 중인 회차의 잔액만 더한 것 — 완납 회차는 balance가
+                0이라 자연히 빠진다. 보관료(청구 총액)와 같은 칸에 나란히 둬서 "청구액 대비
+                아직 안 들어온 돈"을 한눈에 비교할 수 있게 한다. */}
+            <div className="min-w-0 text-right">
+              <p className="text-xs text-slate-400">미수금</p>
+              <p className={cn('mt-0.5 font-semibold', totalBalance > 0 ? 'text-[#A65B44]' : 'text-slate-400')}>
+                {won(totalBalance)}
               </p>
             </div>
-            {ledgers.length > 0 && (
-              <p className="col-span-2 text-xs text-slate-400">
-                {ledgers.length}회차 중 {paidCount}회 완납
-              </p>
-            )}
           </div>
 
           {loading && (
@@ -932,7 +932,7 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                 {/* [갭·중복 원천 차단] 시작일은 항상 "직전 회차 종료일 다음날"로 자동 계산되고
                     고정된다 — 직접 입력하게 두면 실수로 겹치거나 비는 날짜를 넣을 수 있다. */}
                 <GridField label="청구 시작일" hint="자동 계산 (직전 회차 다음날)">
-                  <div className={gridReadonlyCls}>{md(genStart)}</div>
+                  <div className={cn(gridReadonlyCls, 'justify-start!')}>{md(genStart)}</div>
                 </GridField>
                 <GridField label="청구 종료일">
                   <CalendarField
