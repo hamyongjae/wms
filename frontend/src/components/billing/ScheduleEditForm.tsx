@@ -6,7 +6,7 @@ import { orderSync } from '@/lib/orderEvents'
 import { CalendarField, FieldGrid, GridField, gridInputCls, gridReadonlyCls } from '@/components/order/orderFormUi'
 import MoneyInput from '@/components/ui/MoneyInput'
 import { md, today } from '@/lib/dates'
-import { storageDays } from '@/lib/fee'
+import { calcDailyFee, storageDays } from '@/lib/fee'
 
 /**
  * [정산 일정 수정 — 단일 공용 템플릿] 회차의 정산 시작일·종료일·입금액·정산금액을 한
@@ -60,6 +60,12 @@ export default function ScheduleEditForm({
   }, [ledger.id])
 
   const days = storageDays(periodStart, periodEnd)
+  // [하루 보관료 자동 계산] 정산금액 ÷ 보관일수 — 정산금액을 고치면 이 값도 함께 따라간다.
+  const dailyFee = calcDailyFee(baseAmount, periodStart, periodEnd)
+  // [입력칸 세로폭 축소] 계약 등록/수정 폼과 공유하는 gridInputCls(h-12)를 그대로 쓰면
+  //   필드가 늘어난 이 폼이 너무 길어진다 — 이 폼(입금 수정)만 개별로 낮춘다(공용 규격은 유지).
+  const compactInputCls = cn(gridInputCls, 'h-10!')
+  const compactReadonlyCls = cn(gridReadonlyCls, 'h-10!')
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -92,27 +98,30 @@ export default function ScheduleEditForm({
       <FieldGrid>
         <GridField label="정산 시작일" hint={lockStartDate ? '1회차 · 보관 시작일 고정' : undefined}>
           {lockStartDate ? (
-            <div className={cn(gridReadonlyCls, 'justify-start!')}>{md(periodStart)}</div>
+            <div className={cn(compactReadonlyCls, 'justify-start!')}>{md(periodStart)}</div>
           ) : (
-            <CalendarField value={periodStart} onChange={setPeriodStart} max={periodEnd || undefined} className={gridInputCls} />
+            <CalendarField value={periodStart} onChange={setPeriodStart} max={periodEnd || undefined} className={compactInputCls} />
           )}
         </GridField>
         <GridField label="정산 종료일">
-          <CalendarField value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} className={gridInputCls} />
+          <CalendarField value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} className={compactInputCls} />
         </GridField>
-        {/* [자동 계산 · 수정 불가] 정산 시작일~종료일로부터 파생되는 값이라 직접 입력을
-            열어두지 않는다 — 날짜를 고치면 이 값도 함께 따라간다. */}
+        {/* [자동 계산 · 수정 불가] 정산 시작일~종료일(또는 정산금액)로부터 파생되는 값이라
+            직접 입력을 열어두지 않는다 — 날짜나 정산금액을 고치면 이 값들도 함께 따라간다. */}
         <GridField label="보관일수">
-          <div className={gridReadonlyCls}>{days != null ? `${days.toLocaleString()}일` : ''}</div>
+          <div className={compactReadonlyCls}>{days != null ? `${days.toLocaleString()}일` : ''}</div>
+        </GridField>
+        <GridField label="하루 보관료" hint="정산금액 ÷ 보관일수">
+          <div className={compactReadonlyCls}>{dailyFee != null ? won(dailyFee) : ''}</div>
         </GridField>
         <GridField label="입금액" hint="실제 입금 처리됩니다">
-          <MoneyInput value={paidAmount} onChange={setPaidAmount} required className={cn(gridInputCls, 'pr-8')} />
+          <MoneyInput value={paidAmount} onChange={setPaidAmount} required className={cn(compactInputCls, 'pr-8')} />
         </GridField>
         <GridField label="정산금액">
-          <MoneyInput value={baseAmount} onChange={setBaseAmount} required className={cn(gridInputCls, 'pr-8')} />
+          <MoneyInput value={baseAmount} onChange={setBaseAmount} required className={cn(compactInputCls, 'pr-8')} />
         </GridField>
         <GridField label="입금 날짜" hint="매출관리에 이 날짜로 반영됩니다">
-          <CalendarField value={paidOn} onChange={setPaidOn} max={today()} className={gridInputCls} />
+          <CalendarField value={paidOn} onChange={setPaidOn} max={today()} className={compactInputCls} />
         </GridField>
       </FieldGrid>
       {error && <p className="text-xs text-red-600">{error}</p>}

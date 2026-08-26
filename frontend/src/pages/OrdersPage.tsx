@@ -796,6 +796,10 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
   const indexById = new Map(ledgers.map((l, i) => [l.id, i]))
   // [정산서 생성 폼 · 보관일수] 청구 시작일~종료일로부터 자동 계산 — 수정 입력을 열어두지 않는다.
   const genDays = storageDays(genStart, genEnd)
+  // [입력칸 세로폭 축소] 계약 등록/수정 폼과 공유하는 gridInputCls(h-12)를 그대로 쓰면 이
+  //   폼(정산서 생성)이 늘어져 보인다 — 이 폼만 개별로 낮춘다(공용 규격은 건드리지 않음).
+  const compactInputCls = cn(gridInputCls, 'h-10!')
+  const compactReadonlyCls = cn(gridReadonlyCls, 'h-10!')
 
   return (
     <>
@@ -934,24 +938,24 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                 {/* [갭·중복 원천 차단] 시작일은 항상 "직전 회차 종료일 다음날"로 자동 계산되고
                     고정된다 — 직접 입력하게 두면 실수로 겹치거나 비는 날짜를 넣을 수 있다. */}
                 <GridField label="청구 시작일" hint="자동 계산 (직전 회차 다음날)">
-                  <div className={cn(gridReadonlyCls, 'justify-start!')}>{md(genStart)}</div>
+                  <div className={cn(compactReadonlyCls, 'justify-start!')}>{md(genStart)}</div>
                 </GridField>
                 <GridField label="청구 종료일">
                   <CalendarField
                     value={genEnd}
                     onChange={setGenEnd}
                     min={genStart || undefined}
-                    className={gridInputCls}
+                    className={compactInputCls}
                   />
                 </GridField>
                 <GridField label="보관일수">
-                  <div className={gridReadonlyCls}>{genDays != null ? `${genDays.toLocaleString()}일` : ''}</div>
+                  <div className={compactReadonlyCls}>{genDays != null ? `${genDays.toLocaleString()}일` : ''}</div>
                 </GridField>
                 <GridField label="청구 금액">
-                  <MoneyInput value={genAmount} onChange={setGenAmount} required className={cn(gridInputCls, 'pr-8')} />
+                  <MoneyInput value={genAmount} onChange={setGenAmount} required className={cn(compactInputCls, 'pr-8')} />
                 </GridField>
                 <GridField label="납기일">
-                  <CalendarField value={genDue} onChange={setGenDue} className={gridInputCls} />
+                  <CalendarField value={genDue} onChange={setGenDue} className={compactInputCls} />
                 </GridField>
               </FieldGrid>
               {genError && <p className="text-xs text-red-600">{genError}</p>}
