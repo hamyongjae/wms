@@ -708,7 +708,11 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
       setHistoryOpen(false)
       load(target.id)
     }
-  }, [target])
+    // [초기화 방지] target은 60초 자동 새로고침·orderSync 갱신 때마다 내용이 같아도 새
+    //   객체로 교체된다(OrdersPage의 billingTarget 스냅샷 갱신) — 객체 참조가 아니라
+    //   id로만 걸어야 그때마다 펼친 회차·"이전 이력 보기"가 리셋되지 않는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target?.id])
 
   if (!target) return null
 
