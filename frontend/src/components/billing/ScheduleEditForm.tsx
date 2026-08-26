@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
 import { billingApi, type BillingLedger } from '@/api/billingApi'
 import { cn } from '@/lib/cn'
@@ -40,9 +40,23 @@ export default function ScheduleEditForm({
   const [paidAmount, setPaidAmount] = useState<number | null>(Math.round(ledger.paidTotal))
   // [입금일 기준 매출] 이 입금액이 실제로 통장에 찍힌 날짜 — 매출관리 화면이 이 날짜로 매출을
   // 인식하므로, 과거에 받은 입금을 뒤늦게 입력할 땐 오늘이 아니라 실제 입금일을 골라야 한다.
+  // [기존 입금일 프리필] 다른 필드(입금액·정산금액)는 원장의 현재 값을 그대로 보여주는데
+  //   이 필드만 항상 오늘 날짜로 비어 있으면, "이미 저장된 날짜를 보고 있다"고 착각해
+  //   고쳐서 저장해도 다시 열면 또 오늘 날짜라 "안 바뀐다"고 느끼게 된다 — 실제 마지막
+  //   유효 입금 건의 날짜를 가져와 채운다(입금 이력이 없으면 오늘을 그대로 둔다).
   const [paidOn, setPaidOn] = useState(today())
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    billingApi
+      .detail(ledger.id)
+      .then((d) => {
+        const last = d.payments.filter((p) => !p.reversed).sort((a, b) => (a.paidOn < b.paidOn ? -1 : 1)).at(-1)
+        if (last) setPaidOn(last.paidOn)
+      })
+      .catch(() => {})
+  }, [ledger.id])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
