@@ -769,10 +769,12 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
   }
 
   const totalBalance = ledgers.reduce((s, l) => s + (isOpenLedger(l) ? l.balance : 0), 0)
-  // [보관료] 남은 미수 잔액이 아니라 진행 중인 회차의 정산금액(청구 총액)을 보여준다 —
-  // 부분입금 후에도 "얼마 남았나"가 아니라 "원래 보관료가 얼마였나"가 보이게.
+  // [보관료] 계약 전체의 청구 총액 — 진행 중인 회차만 더하면 완납된 회차가 통째로 빠져
+  // 실제보다 작게 보인다(버그). 남은 미수 잔액이 아니라 회차별 청구액을 더한다는 원래
+  // 취지는 유지하되, 완납 여부와 무관하게 모든 회차를 합산한다(이월된 회차는 그 금액이
+  // 다음 회차의 carriedOverIn으로 옮겨가 있으므로 중복 합산을 막기 위해 제외).
   const totalDue = ledgers.reduce(
-    (s, l) => s + (isOpenLedger(l) ? l.baseAmount + l.carriedOverIn + l.adjustmentTotal : 0),
+    (s, l) => s + (l.status !== 'CARRIED_OVER' ? l.baseAmount + l.carriedOverIn + l.adjustmentTotal : 0),
     0,
   )
   const paidCount = ledgers.filter((l) => l.balance <= 0).length
