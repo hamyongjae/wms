@@ -6,6 +6,7 @@ import { orderSync } from '@/lib/orderEvents'
 import { CalendarField, FieldGrid, GridField, gridInputCls, gridReadonlyCls } from '@/components/order/orderFormUi'
 import MoneyInput from '@/components/ui/MoneyInput'
 import { md, today } from '@/lib/dates'
+import { storageDays } from '@/lib/fee'
 
 /**
  * [정산 일정 수정 — 단일 공용 템플릿] 회차의 정산 시작일·종료일·입금액·정산금액을 한
@@ -58,6 +59,8 @@ export default function ScheduleEditForm({
       .catch(() => {})
   }, [ledger.id])
 
+  const days = storageDays(periodStart, periodEnd)
+
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (baseAmount == null || baseAmount < 0) return setError('청구액을 입력하세요.')
@@ -96,6 +99,11 @@ export default function ScheduleEditForm({
         </GridField>
         <GridField label="정산 종료일">
           <CalendarField value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} className={gridInputCls} />
+        </GridField>
+        {/* [자동 계산 · 수정 불가] 정산 시작일~종료일로부터 파생되는 값이라 직접 입력을
+            열어두지 않는다 — 날짜를 고치면 이 값도 함께 따라간다. */}
+        <GridField label="보관일수">
+          <div className={gridReadonlyCls}>{days != null ? `${days.toLocaleString()}일` : ''}</div>
         </GridField>
         <GridField label="입금액" hint="실제 입금 처리됩니다">
           <MoneyInput value={paidAmount} onChange={setPaidAmount} required className={cn(gridInputCls, 'pr-8')} />

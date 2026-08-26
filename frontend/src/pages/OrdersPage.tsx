@@ -794,6 +794,8 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
   const recentLedgers = ledgers.slice(-3)
   const olderLedgers = ledgers.slice(0, -3)
   const indexById = new Map(ledgers.map((l, i) => [l.id, i]))
+  // [정산서 생성 폼 · 보관일수] 청구 시작일~종료일로부터 자동 계산 — 수정 입력을 열어두지 않는다.
+  const genDays = storageDays(genStart, genEnd)
 
   return (
     <>
@@ -941,6 +943,9 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                     min={genStart || undefined}
                     className={gridInputCls}
                   />
+                </GridField>
+                <GridField label="보관일수">
+                  <div className={gridReadonlyCls}>{genDays != null ? `${genDays.toLocaleString()}일` : ''}</div>
                 </GridField>
                 <GridField label="청구 금액">
                   <MoneyInput value={genAmount} onChange={setGenAmount} required className={cn(gridInputCls, 'pr-8')} />
