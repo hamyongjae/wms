@@ -150,6 +150,9 @@ export default function OrdersPage() {
   const [statusTarget, setStatusTarget] = useState<StorageOrder | null>(null) // 입/출고 처리 모달 대상
   // 계약 id → 배치된 슬롯 위치 라벨 목록 (창고+화주 기준으로 조인)
   const [locationsByOrder, setLocationsByOrder] = useState<Map<number, string[]>>(new Map())
+  // 계약 id → 정산 이력 전체 합산액(=정산 이력 팝업의 '보관료'와 동일 규칙) — 목록의
+  // '보관료' 칼럼에도 그대로 써서, 정산서를 생성·수정·삭제하면 두 화면이 함께 갱신되게 한다.
+  const [totalDueByOrder, setTotalDueByOrder] = useState<Map<number, number>>(new Map())
   // [주의 필요 필터] 상단 경고 배너를 눌러 "입고 미배치" / "출고 지연" 건만 골라 보기.
   //   상태 탭(전체/입고/출고)과는 별개 축이라, 활성화하면 다른 조회 조건은 초기화해 결과가 헷갈리지 않게 한다.
   const [attention, setAttention] = useState<'NONE' | 'UNPLACED' | 'OVERDUE'>('NONE')
@@ -159,8 +162,8 @@ export default function OrdersPage() {
   useEffect(() => {
     setLoading(true)
     setError(null)
-    Promise.all([orderApi.list(), customerApi.list(), warehouseApi.list()])
-      .then(([o, c, w]) => {
+    Promise.all([orderApi.list(), customerApi.list(), warehouseApi.list(), billingApi.list()])
+      .then(([o, c, w, ledgers]) => {
         setOrders(o)
         setCustomers(c)
         setWarehouses(w)
@@ -169,6 +172,14 @@ export default function OrdersPage() {
         //   예정 출고일을 자동 연장해도(extendOrderPeriod) 팝업은 처음 열 때의 계약 스냅샷을 그대로
         //   들고 있어 "계약 기간"·초과 경고가 옛 날짜에 머물렀다 — 목록 갱신 때마다 최신 값으로 맞춘다.
         setBillingTarget((prev) => (prev ? (o.find((x) => x.id === prev.id) ?? prev) : prev))
+        // [보관료 = 정산 합계] 정산 이력 팝업의 '보관료'와 동일한 규칙(완납 여부 무관, 취소·
+        //   이월 회차 제외)으로 계약별 합계를 내 목록에도 반영한다.
+        const totals = new Map<number, number>()
+        for (const l of ledgers) {
+          if (l.status === 'CANCELED' || l.status === 'CARRIED_OVER') continue
+          totals.set(l.storageOrderId, (totals.get(l.storageOrderId) ?? 0) + l.baseAmount + l.carriedOverIn + l.adjustmentTotal)
+        }
+        setTotalDueByOrder(totals)
       })
       .catch(() => setError('계약 목록을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
@@ -566,7 +577,7 @@ export default function OrdersPage() {
                       </div>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-5 py-3 text-right text-slate-700">{won(o.monthlyFee)}</td>
+                  <td className="whitespace-nowrap px-5 py-3 text-right text-slate-700">{won(totalDueByOrder.get(o.id) ?? o.monthlyFee)}</td>
                   <td className="whitespace-nowrap px-5 py-3">
                     <OrderStatusBadge status={o.status} />
                   </td>
@@ -599,7 +610,7 @@ export default function OrdersPage() {
 
                 {/* 핵심 정보 */}
                 <div className="mt-1.5 space-y-1">
-                  <InfoRow label="보관료" value={won(o.monthlyFee)} strong />
+                  <InfoRow label="보관료" value={won(totalDueByOrder.get(o.id) ?? o.monthlyFee)} strong />
                   <InfoRow
                     label="보관기간"
                     value={<DateRangeLabel start={o.storageStartDate} end={o.actualEndDate ?? o.expectedEndDate} format={md} />}
