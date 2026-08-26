@@ -122,12 +122,17 @@ export default function EditOrderModal({
     setFormError(null)
   }, [target])
 
-  // [컨테이너 관리 진입] 이미 아는 자리·컨테이너를 즉시 반영 — 서버 조회를 기다리지 않는다
+  // [컨테이너 관리 진입] 이미 아는 자리·컨테이너를 즉시 반영 — 서버 조회를 기다리지 않는다.
+  // [상태 누수 방지] 계약관리에서 진입할 땐 hint가 항상 undefined라, 계약을 바꿔가며 연달아
+  //   열어도(예: A 계약 닫고 B 계약 열기) hint?.slotId가 계속 undefined→undefined라 이 effect가
+  //   재실행되지 않았다 — 그 결과 직전에 열었던 A 계약의 위치 선택(slotId·currentSlotId)이
+  //   초기화되지 않고 B 계약 폼에 그대로 남아 보이는 버그가 있었다. target?.id를 의존성에
+  //   추가해 대상 계약이 바뀔 때마다 반드시 리셋되게 한다.
   useEffect(() => {
     setSlotId(hint?.slotId ?? null)
     setCurrentSlotId(hint?.slotId ?? null)
     setContainer(hint?.container ?? null)
-  }, [hint?.slotId, hint?.container])
+  }, [target?.id, hint?.slotId, hint?.container])
 
   // [입금 계좌] 담당 직원 목록 (계좌이체 시 선택용)
   useEffect(() => {
