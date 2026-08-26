@@ -10,6 +10,8 @@ import {
   ChevronDown,
   PieChart,
   Download,
+  Search,
+  X,
 } from 'lucide-react'
 import { billingApi, type BillingLedger, type BillingStatus, type RevenuePayment } from '@/api/billingApi'
 import { orderApi, type StorageOrder } from '@/api/orderApi'
@@ -172,6 +174,7 @@ export default function BillingPage() {
   // [스크롤 절약] 고객별 입금 비중은 부가 정보라 기본 접힘 — 헤더 탭으로 펼친다
   const [revenueOpen, setRevenueOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<FilterKey>('ALL')
+  const [query, setQuery] = useState('') // 조회어(고객명) — 계약관리 화면과 동일한 검색창
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -301,10 +304,13 @@ export default function BillingPage() {
   const deltaLabel = fullMonthOf(range.from, range.to) != null ? '전월 대비' : '직전 동일기간 대비'
 
   const visible = useMemo(() => {
-    if (statusFilter === 'ALL') return ledgers
-    if (statusFilter === 'OVERDUE') return ledgers.filter(isOverdue) // 파생 필터
-    return ledgers.filter((l) => l.status === statusFilter)
-  }, [ledgers, statusFilter])
+    let list = ledgers
+    if (statusFilter === 'OVERDUE') list = list.filter(isOverdue) // 파생 필터
+    else if (statusFilter !== 'ALL') list = list.filter((l) => l.status === statusFilter)
+    const q = query.trim().toLowerCase()
+    if (q) list = list.filter((l) => l.customerName.toLowerCase().includes(q))
+    return list
+  }, [ledgers, statusFilter, query])
 
   // 현재 조회 기간의 기준 연·월 (from 기준)
   const cursor = useMemo(() => {
@@ -516,6 +522,27 @@ export default function BillingPage() {
             </button>
           )
         })}
+      </div>
+
+      {/* 조회 — 고객명 (계약관리 화면과 동일한 검색창) */}
+      <div className="relative">
+        <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="고객명으로 조회"
+          className="w-full rounded-2xl border border-slate-300 bg-white py-3 pl-11 pr-11 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 md:py-2 md:text-sm"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery('')}
+            aria-label="조회어 지우기"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition active:text-slate-600"
+          >
+            <X size={18} />
+          </button>
+        )}
       </div>
 
       {loading && (
