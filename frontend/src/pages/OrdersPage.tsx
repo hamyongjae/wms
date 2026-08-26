@@ -796,6 +796,8 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
   const indexById = new Map(ledgers.map((l, i) => [l.id, i]))
   // [정산서 생성 폼 · 보관일수] 청구 시작일~종료일로부터 자동 계산 — 수정 입력을 열어두지 않는다.
   const genDays = storageDays(genStart, genEnd)
+  // [하루 보관료 자동 계산] 청구 금액 ÷ 보관일수 — 청구 금액을 고치면 이 값도 함께 따라간다.
+  const genDailyFee = calcDailyFee(genAmount, genStart, genEnd)
   // [입력칸 세로폭 축소] 계약 등록/수정 폼과 공유하는 gridInputCls(h-12)를 그대로 쓰면 이
   //   폼(정산서 생성)이 늘어져 보인다 — 이 폼만 개별로 낮춘다(공용 규격은 건드리지 않음).
   const compactInputCls = cn(gridInputCls, 'h-10!')
@@ -950,6 +952,9 @@ export function OrderBillingModal({ target, isAdmin, onClose }: { target: Storag
                 </GridField>
                 <GridField label="보관일수">
                   <div className={compactReadonlyCls}>{genDays != null ? `${genDays.toLocaleString()}일` : ''}</div>
+                </GridField>
+                <GridField label="하루 보관료" hint="청구 금액 ÷ 보관일수">
+                  <div className={compactReadonlyCls}>{genDailyFee != null ? won(genDailyFee) : ''}</div>
                 </GridField>
                 <GridField label="청구 금액">
                   <MoneyInput value={genAmount} onChange={setGenAmount} required className={cn(compactInputCls, 'pr-8')} />
