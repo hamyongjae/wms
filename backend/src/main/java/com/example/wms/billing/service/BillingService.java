@@ -392,9 +392,31 @@ public class BillingService {
                 } else {
                     ledger.reversePayment(delta.negate());
                 }
+            } else if (req.getPaidOn() != null) {
+                // [입금액 불변 · 날짜만 정정] 위 delta 분기는 입금액이 실제로 바뀔 때만 타서,
+                // 날짜만 고치고 금액은 그대로 두면 이 폼의 "입금 날짜"가 어디에도 반영되지
+                // 않았다(버그) — 가장 최근 유효 입금 건을 취소 처리하고 같은 금액으로 새
+                // 날짜에 다시 남긴다. paidTotal은 두 건이 상쇄돼 그대로라 잔액엔 영향 없다.
+                correctLastPaymentDate(ledger, req.getPaidOn());
             }
         }
         return new BillingLedgerResponse(ledger);
+    }
+
+    private void correctLastPaymentDate(BillingLedger ledger, LocalDate newPaidOn) {
+        PaymentHistory last = paymentHistoryRepository
+                .findByBillingLedgerIdAndTenantIdOrderByPaidOnAsc(ledger.getId(), ledger.getTenantId())
+                .stream()
+                .filter(p -> !p.isReversed())
+                .reduce((a, b) -> b)
+                .orElse(null);
+        if (last == null || last.getPaidOn().equals(newPaidOn)) return;
+        Long userId = SecurityUtils.getCurrentUser().getUserId();
+        last.markReversed();
+        PaymentHistory corrected = new PaymentHistory(
+                ledger.getTenant(), ledger, last.getAmount(), last.getMethod(),
+                newPaidOn, "입금 날짜 정정", userId);
+        paymentHistoryRepository.save(corrected);
     }
 
     /**
